@@ -11,6 +11,14 @@ FastAPI backend for SigmaSight portfolio risk management platform.
 - **Batch Processing**: Automated market data updates and calculations
 - **Modern Stack**: FastAPI, PostgreSQL, Redis, and UV package manager
 
+## 🌊 Using Windsurf IDE? 
+
+**For the best development experience with AI assistance:**
+
+👉 **[See WINDSURF_SETUP.md](./WINDSURF_SETUP.md)** for Windsurf-specific setup instructions with Cascade AI integration.
+
+---
+
 ## 🚀 Quick Setup Guide (Non-Technical)
 
 ### Step 1: Install Prerequisites
