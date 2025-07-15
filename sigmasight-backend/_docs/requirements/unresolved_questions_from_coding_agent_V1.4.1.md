@@ -101,16 +101,18 @@
 - **V1.4 Implementation**: Identity matrix with 1% variance (diagonal)
 - **Future Enhancement**: Implement 60-day rolling correlations of ETF proxies in Phase 2
 
-## 15. Batch Job Implementation ⚠️ NEEDS DETAIL
-- Schedule defined but implementation functions referenced not provided
-- **Needs**: Actual Python functions for:
-  - `update_market_data()`
-  - `calculate_all_risk_metrics()`
-  - `create_portfolio_snapshots()`
+## 15. Batch Job Implementation ✅ RESOLVED
+- ✅ RESOLVED - Complete implementation details added to PRD_V1.4.md Section 3.6
+- ✅ RESOLVED - Specific tasks added to TODO.md Section 1.7
+- **Implementation approach**:
+  - Use APScheduler instead of Celery for V1.4 simplicity
+  - Three main jobs: market data (4 PM), risk metrics (5 PM), snapshots (5:30 PM)
+  - Mock values for Greeks and factor exposures
+  - Manual trigger endpoints for admin control
 
 ## Summary
 
-**14 of 15 issues resolved or deferred** for V1.4:
+**15 of 15 issues resolved or deferred** for V1.4:
 - ✅ All database schemas complete
 - ✅ Authentication strategy defined  
 - ✅ Mock Greeks approach clarified
@@ -122,8 +124,9 @@
 - ✅ Short Interest calculation deferred (mock values)
 - ✅ Factor covariance matrix deferred (static matrix)
 
-**1 item needs implementation detail**:
-- Batch job function implementations (can be developed during coding phase)
+**All 15 items now have clear resolution paths**:
+- Batch job implementations documented in PRD and TODO.md
+- Ready for V1.4 demo development
 
 ## V1.4 Mock Implementation Approach
 

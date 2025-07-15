@@ -88,12 +88,12 @@ sigmasight-backend/
 ```
 *Complete FastAPI project structure created with 15 API endpoints, batch processing, testing, and deployment configuration*
 
-### 0.4 Database Setup 🟡 PARTIALLY COMPLETED
-- [ ] Design PostgreSQL schema based on DATABASE_DESIGN_V1.4.md *(Schema reviewed, ready for implementation)*
-- [ ] Create Alembic migrations for all tables *(Alembic configured, migrations pending)*
+### 0.4 Database Setup ✅ COMPLETED
+- [x] Design PostgreSQL schema based on DATABASE_DESIGN_V1.4.md *(Schema implemented following design spec)*
+- [x] Create Alembic migrations for all tables *(Manual migration created with all tables and indexes)*
 - [x] Set up database connection pooling with asyncpg *(AsyncPG engine configured with connection pooling)*
-- [ ] Create indexes for performance-critical queries *(Pending schema implementation)*
-- [ ] Implement database models with SQLAlchemy ORM *(Base model created, specific models pending)*
+- [x] Create indexes for performance-critical queries *(All indexes included in migration)*
+- [x] Implement database models with SQLAlchemy ORM *(All models created: users, portfolios, positions, tags, market data, analytics, snapshots, batch tracking)*
 
 ### 0.5 Configuration Management ✅ COMPLETED
 - [x] Create settings module with Pydantic BaseSettings *(app/config.py with comprehensive settings)*
@@ -106,14 +106,16 @@ sigmasight-backend/
 
 ## 🎉 Phase 0 Summary - COMPLETED (2025-07-15)
 
-**✅ Fully Completed:** 0.1, 0.2, 0.3, 0.5  
-**🟡 Partially Completed:** 0.4 (Database models pending)
+**✅ Fully Completed:** 0.1, 0.2, 0.3, 0.4, 0.5  
 
 **Key Achievements:**
 - FastAPI backend running on http://localhost:8000
 - 15 API endpoints implemented across 6 modules
 - Complete project structure with batch processing, testing, deployment
 - All dependencies installed and configured
+- SQLAlchemy ORM models for all tables implemented
+- Alembic migrations created with full schema and indexes
+- Docker Compose setup for PostgreSQL development
 - Sample data generation and basic test suite
 - Ready for Phase 1 implementation
 
@@ -181,13 +183,30 @@ sigmasight-backend/
 - [ ] Implement delta-adjusted exposure calculations
 
 ### 1.7 Batch Processing
-- [ ] Set up Celery with Redis broker
-- [ ] Create daily calculation jobs:
-  - [ ] Market data sync from Polygon.io
-  - [ ] Greeks recalculation
-  - [ ] P&L updates
-  - [ ] Exposure calculations
-- [ ] Implement job scheduling
+- [ ] Create batch job framework:
+  - [ ] Implement `batch_jobs` table for job tracking
+  - [ ] Create `batch_job_schedules` table for cron management
+  - [ ] Build job runner service (using APScheduler, not Celery for V1.4)
+- [ ] Implement `update_market_data()` job (4 PM EST):
+  - [ ] Query unique symbols from positions
+  - [ ] Integrate Polygon.io API client for EOD prices
+  - [ ] Add YFinance fallback for GICS data
+  - [ ] Update `market_data_cache` table
+  - [ ] Calculate position market values and P&L
+- [ ] Implement `calculate_all_risk_metrics()` job (5 PM EST):
+  - [ ] Apply mock Greeks values by position type
+  - [ ] Apply mock factor exposures (MOCK_FACTOR_EXPOSURES)
+  - [ ] Aggregate portfolio-level Greeks
+  - [ ] Store in `position_greeks` and `factor_exposures` tables
+- [ ] Implement `create_portfolio_snapshots()` job (5:30 PM EST):
+  - [ ] Calculate daily portfolio P&L
+  - [ ] Compute gross/net exposure
+  - [ ] Create `portfolio_snapshots` records
+  - [ ] Implement 365-day retention policy
+- [ ] Add manual trigger endpoints:
+  - [ ] POST /api/v1/admin/batch/market-data
+  - [ ] POST /api/v1/admin/batch/risk-metrics
+  - [ ] POST /api/v1/admin/batch/snapshots
 - [ ] Add job monitoring and error handling
 
 ## Phase 2: Advanced Features & Integration (Weeks 5-6)

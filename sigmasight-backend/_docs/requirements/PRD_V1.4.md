@@ -167,8 +167,83 @@ Steps:
 6. Create new portfolio snapshot
 
 Scheduling:
-- **Automatic**: 6:30 AM EST daily
+- **Automatic**: Daily batch runs at specific times
 - **Manual**: Admin endpoint trigger
+
+#### Batch Job Implementation Details
+
+##### 1. Market Data Update Job (4 PM EST)
+```python
+def update_market_data():
+    """
+    Fetch and store latest market data for all active securities
+    """
+    # Steps:
+    # 1. Get list of unique symbols from positions
+    # 2. Fetch EOD prices from Polygon.io
+    # 3. Fetch sector/industry from YFinance for new symbols
+    # 4. Update market_data_cache table
+    # 5. Update last_price in positions table
+    # 6. Calculate market values and P&L
+```
+
+##### 2. Risk Metrics Calculation Job (5 PM EST)
+```python
+def calculate_all_risk_metrics():
+    """
+    Calculate portfolio-level risk metrics and factor exposures
+    """
+    # Steps:
+    # 1. Calculate position-level Greeks (using mock values)
+    # 2. Aggregate portfolio Greeks
+    # 3. Calculate factor exposures (using mock values):
+    #    - Use MOCK_FACTOR_EXPOSURES dictionary
+    #    - Apply to each position based on characteristics
+    # 4. Update position_greeks table
+    # 5. Update factor_exposures table
+    # 6. Calculate portfolio beta and volatility
+```
+
+##### 3. Portfolio Snapshot Job (5:30 PM EST)
+```python
+def create_portfolio_snapshots():
+    """
+    Create daily snapshots for historical tracking
+    """
+    # Steps:
+    # 1. Calculate daily P&L for each portfolio
+    # 2. Calculate portfolio metrics:
+    #    - Total value, gross/net exposure
+    #    - Aggregated Greeks
+    #    - Risk metrics
+    # 3. Create portfolio_snapshots record
+    # 4. Update portfolio performance metrics
+    # 5. Clean up old snapshots (>365 days)
+```
+
+##### Batch Job Configuration
+```python
+BATCH_SCHEDULE = {
+    'market_data': {
+        'function': update_market_data,
+        'schedule': '0 16 * * 1-5',  # 4 PM weekdays
+        'timeout': 300,
+        'retry_count': 3
+    },
+    'risk_metrics': {
+        'function': calculate_all_risk_metrics,
+        'schedule': '0 17 * * 1-5',  # 5 PM weekdays
+        'timeout': 600,
+        'retry_count': 2
+    },
+    'snapshots': {
+        'function': create_portfolio_snapshots,
+        'schedule': '30 17 * * 1-5',  # 5:30 PM weekdays
+        'timeout': 300,
+        'retry_count': 2
+    }
+}
+```
 
 ## 4. Technical Architecture
 ### 4.1 Technology Stack

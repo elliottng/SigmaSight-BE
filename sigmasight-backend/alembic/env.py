@@ -14,13 +14,17 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Import our database configuration
 from app.database import Base
 from app.config import settings
+# Import all models to ensure they are registered
+from app.models import *  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set the database URL from environment variables
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Convert async database URL to sync URL for Alembic
+# Replace postgresql+asyncpg with postgresql
+sync_database_url = settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
+config.set_main_option("sqlalchemy.url", sync_database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

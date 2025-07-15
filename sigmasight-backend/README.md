@@ -1,5 +1,17 @@
 # SigmaSight Backend
 
+SigmaSight is a sophisticated portfolio analytics platform designed for options traders, providing real-time risk metrics, portfolio-level Greeks calculations, and comprehensive position management.
+
+**Version**: 1.4.1  
+**Status**: In Development  
+**Tech Stack**: FastAPI, PostgreSQL, Python 3.11+
+
+## 📖 Setup Guides
+
+- **Windows Users**: See [WINDOWS_SETUP_GUIDE.md](WINDOWS_SETUP_GUIDE.md) for detailed instructions
+- **Quick Reference**: See [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) for a one-page guide
+- **Mac/Linux Users**: Continue reading below
+
 FastAPI backend for SigmaSight portfolio risk management platform.
 
 ## Features
@@ -86,7 +98,24 @@ cp .env.example .env
    - The default values work for local development
    - You can leave it as-is for now
 
-### Step 5: Start the Server
+### Step 5: Set Up Database (Optional for Development)
+
+**Option A: Use Docker (Recommended)**
+```bash
+# Start PostgreSQL with Docker Compose
+docker-compose up -d
+
+# Run database migrations
+uv run alembic upgrade head
+```
+
+**Option B: Use Existing PostgreSQL**
+1. Update DATABASE_URL in .env file with your PostgreSQL connection
+2. Run migrations: `uv run alembic upgrade head`
+
+**Note:** The app works without a database for basic testing, but you'll need it for full functionality.
+
+### Step 6: Start the Server
 
 ```bash
 uv run python run.py
