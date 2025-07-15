@@ -1,7 +1,7 @@
-# DATABASE_DESIGN_ADDENDUM.md
+# DATABASE_DESIGN_ADDENDUM_V1.4.1.md
 
 ## Overview
-This addendum resolves all 15 unresolved questions identified by the coding agent and provides complete database schemas, implementation details, and deployment configuration for SigmaSight V1.
+This addendum resolves all 15 unresolved questions identified by the coding agent and provides complete database schemas, implementation details, and deployment configuration for SigmaSight V1.4.
 
 ## 1. Complete Database Schema
 

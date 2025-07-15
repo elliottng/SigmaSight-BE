@@ -6,6 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.v1.router import api_router
+from app.core.logging import setup_logging, api_logger
+
+# Initialize logging
+setup_logging()
 
 # Create FastAPI app
 app = FastAPI(
@@ -31,6 +35,7 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 async def root():
     """Health check endpoint"""
+    api_logger.info("Root endpoint accessed")
     return {"message": "SigmaSight Backend API", "version": "1.0.0"}
 
 @app.get("/health")

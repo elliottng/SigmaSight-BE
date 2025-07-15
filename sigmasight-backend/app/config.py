@@ -9,9 +9,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings"""
     
-    # App settings
+    # Application settings
     APP_NAME: str = "SigmaSight Backend"
+    VERSION: str = "1.0.0"
     DEBUG: bool = False
+    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
+    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     
     # Database settings
     DATABASE_URL: str = Field(..., env="DATABASE_URL")

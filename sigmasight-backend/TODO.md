@@ -98,7 +98,7 @@ sigmasight-backend/
 ### 0.5 Configuration Management ✅ COMPLETED
 - [x] Create settings module with Pydantic BaseSettings *(app/config.py with comprehensive settings)*
 - [x] Configure environment-specific settings (dev/staging/prod) *(Environment variables and .env support)*
-- [ ] Set up logging configuration *(Basic logging, advanced config pending)*
+- [x] Set up logging configuration *(Structured logging with JSON format for production, file rotation, module-specific loggers)*
 - [x] Configure CORS for frontend integration *(CORS middleware configured for multiple origins)*
 - [x] Set up API versioning structure *(API v1 router structure implemented)*
 
@@ -125,6 +125,14 @@ sigmasight-backend/
 
 ## Phase 1: Core Backend Implementation (Weeks 2-4)
 
+### 1.0 Logging Infrastructure ✅ COMPLETED (2025-07-15)
+- [x] Create centralized logging configuration *(app/core/logging.py with setup_logging())*
+- [x] Set up structured logging with JSON formatter for production *(JSON logs in production, human-readable in dev)*
+- [x] Configure environment-specific log levels *(LOG_LEVEL setting in config)*
+- [x] Set up log rotation and file handlers *(10MB files, 5 backups)*
+- [x] Create logger instances for each module *(api, db, auth, batch, market_data loggers)*
+- [x] Add logging to existing endpoints *(Root endpoint logging added)*
+
 ### 1.1 Authentication System
 - [ ] Implement JWT token generation and validation
 - [ ] Create user registration endpoint (admin-only initially)
@@ -134,15 +142,21 @@ sigmasight-backend/
 - [ ] Add authentication dependencies to protected routes
 
 ### 1.2 Database Models & Seeding
-- [ ] Implement all SQLAlchemy models from database design
+- [x] Implement core SQLAlchemy models *(users, portfolios, positions, tags, market_data, greeks, snapshots, batch_jobs)*
+- [ ] Implement missing models from DATABASE_DESIGN_ADDENDUM_V1.4.1:
+  - [ ] modeling_session_snapshots table (for what-if scenarios)
+  - [ ] export_history table (track exports)
+  - [ ] factors table with 8 fixed factor definitions
+  - [ ] Update market_data_cache to include sector/industry fields
 - [ ] Create database seeding scripts:
-  - [ ] Demo users (3-5 test accounts)
-  - [ ] Sample portfolios with realistic data
+  - [ ] Demo users (demo_growth, demo_value, demo_balanced)
+  - [ ] Sample portfolios with strategy characteristics
   - [ ] Historical positions (90 days)
   - [ ] Pre-calculated risk metrics
   - [ ] Sample tags and strategies
+  - [ ] Load 8 fixed factors into factors table
 - [ ] Create Pydantic schemas for all models
-- [ ] Implement proper foreign key relationships
+- [ ] Generate historical snapshots (90 days with realistic variations)
 
 ### 1.3 Market Data Integration
 - [ ] Set up Polygon.io client with API key management
@@ -184,21 +198,23 @@ sigmasight-backend/
 
 ### 1.7 Batch Processing
 - [ ] Create batch job framework:
-  - [ ] Implement `batch_jobs` table for job tracking
-  - [ ] Create `batch_job_schedules` table for cron management
+  - [x] Implement `batch_jobs` table for job tracking *(Table created in initial migration)*
+  - [x] Create `batch_job_schedules` table for cron management *(Table created in initial migration)*
   - [ ] Build job runner service (using APScheduler, not Celery for V1.4)
-- [ ] Implement `update_market_data()` job (4 PM EST):
+- [ ] Implement `update_market_data()` job (cron: `0 16 * * 1-5` - 4 PM weekdays):
   - [ ] Query unique symbols from positions
   - [ ] Integrate Polygon.io API client for EOD prices
-  - [ ] Add YFinance fallback for GICS data
-  - [ ] Update `market_data_cache` table
+  - [ ] Add YFinance for sector/industry data (not just fallback)
+  - [ ] Update `market_data_cache` table with sector/industry
   - [ ] Calculate position market values and P&L
-- [ ] Implement `calculate_all_risk_metrics()` job (5 PM EST):
-  - [ ] Apply mock Greeks values by position type
-  - [ ] Apply mock factor exposures (MOCK_FACTOR_EXPOSURES)
+  - [ ] 5-minute timeout
+- [ ] Implement `calculate_all_risk_metrics()` job (cron: `0 17 * * 1-5` - 5 PM weekdays):
+  - [ ] Apply mock Greeks values by position type (LC, LP, SC, SP, LONG, SHORT)
+  - [ ] Apply mock factor exposures using MOCK_FACTOR_EXPOSURES
   - [ ] Aggregate portfolio-level Greeks
   - [ ] Store in `position_greeks` and `factor_exposures` tables
-- [ ] Implement `create_portfolio_snapshots()` job (5:30 PM EST):
+  - [ ] 10-minute timeout
+- [ ] Implement `create_portfolio_snapshots()` job (cron: `30 17 * * 1-5` - 5:30 PM weekdays):
   - [ ] Calculate daily portfolio P&L
   - [ ] Compute gross/net exposure
   - [ ] Create `portfolio_snapshots` records
@@ -209,7 +225,33 @@ sigmasight-backend/
   - [ ] POST /api/v1/admin/batch/snapshots
 - [ ] Add job monitoring and error handling
 
-## Phase 2: Advanced Features & Integration (Weeks 5-6)
+### 1.8 API Infrastructure  
+- [ ] Add user activity logging
+- [ ] Create data validation middleware
+- [ ] Add rate limiting (100 requests/minute per user)
+- [ ] Set up request/response logging
+
+### 1.9 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
+**Week 1 Priority - Core Tables:**
+- Users & Authentication
+- Portfolios & Positions (with options parsing)
+- Market Data Cache (with sector/industry)
+- Tags
+
+**Week 2 Priority - Analytics:**
+- Portfolio Snapshots
+- Position Greeks
+- Factor Definitions (8 fixed factors)
+- Risk Metrics
+
+**Week 3 Priority - Operations:**
+- Batch Jobs
+- Demo Data Generation (3 demo users)
+- Historical Snapshots (90 days)
+
+---
+
+## Phase 2: Advanced Features & Frontend Integration (Weeks 5-6)
 
 ### 2.1 ProForma Modeling APIs
 - [ ] **POST /api/v1/modeling/sessions** - Create modeling session
