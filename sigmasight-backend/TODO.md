@@ -176,7 +176,147 @@ sigmasight-backend/
 - [ ] Implement data caching strategy with Redis
 - [ ] Create batch job for daily market data updates
 
-### 1.4 Portfolio Management APIs
+### 1.4 Core Calculation Engine
+*Granular calculation functions designed for both batch processing and future real-time APIs*
+
+**⚠️ IMPORTANT**: Before implementing any calculation function, review the legacy analytics code in:
+- `_docs/requirements/legacy_scripts_for_reference_only/legacy_analytics_for_reference/`
+- Key files: `factors_utils.py`, `var_utils.py`, `reporting_plotting_analytics.py`
+- Extract business logic and mathematical formulas, but modernize for FastAPI/PostgreSQL
+- See `README_legacy.md` for migration guidelines
+
+#### 1.4.1 Market Data Calculations (No Dependencies)
+- [ ] **`calculate_position_market_value(position, current_price)`**
+  - Input: Position object, current market price
+  - Output: Current market value, unrealized P&L
+  - File: `app/calculations/market_data.py`
+
+- [ ] **`calculate_daily_pnl(position, previous_price, current_price)`**
+  - Input: Position, previous close, current price
+  - Output: Daily P&L (realized + unrealized)
+  - File: `app/calculations/market_data.py`
+
+- [ ] **`fetch_and_cache_prices(symbols_list)`**
+  - Input: List of unique symbols from positions
+  - Output: Updated market_data_cache table
+  - Dependencies: Polygon.io API, YFinance for GICS
+  - File: `app/calculations/market_data.py`
+
+#### 1.4.2 Options Greeks Calculations (Depends on 1.4.1)
+- [ ] **`calculate_black_scholes_greeks(option_params)`**
+  - Input: Strike, expiry, underlying_price, volatility, risk_free_rate
+  - Output: Delta, gamma, theta, vega, rho
+  - File: `app/calculations/greeks.py`
+
+- [ ] **`apply_mock_greeks_by_position_type(position)`**
+  - Input: Position with type (LC, LP, SC, SP, LONG, SHORT)
+  - Output: Mock Greeks values for V1.4 demo
+  - File: `app/calculations/greeks.py`
+
+- [ ] **`calculate_position_greeks(position, market_data)`**
+  - Input: Position object, current market data
+  - Output: Position-level Greeks (delta, gamma, theta, vega)
+  - Dependencies: Market data calculations
+  - File: `app/calculations/greeks.py`
+
+#### 1.4.3 Portfolio Aggregation (Depends on 1.4.1, 1.4.2)
+- [ ] **`aggregate_portfolio_greeks(positions_greeks)`**
+  - Input: List of position Greeks
+  - Output: Portfolio-level Greeks summary
+  - File: `app/calculations/portfolio.py`
+
+- [ ] **`calculate_portfolio_exposures(positions)`**
+  - Input: List of positions with market values
+  - Output: Gross exposure, net exposure, long/short breakdown
+  - File: `app/calculations/portfolio.py`
+
+- [ ] **`calculate_delta_adjusted_exposure(positions_with_greeks)`**
+  - Input: Positions with calculated Greeks
+  - Output: Delta-adjusted notional exposure
+  - Dependencies: Greeks calculations
+  - File: `app/calculations/portfolio.py`
+
+#### 1.4.4 Risk Factor Analysis (Depends on 1.4.2)
+- [ ] **`calculate_factor_exposures(position, market_data)`**
+  - Input: Position, market data with sector/industry
+  - Output: 8-factor exposure (Market Beta, Momentum, Value, Growth, Quality, Size, Low Vol, Short Interest)
+  - File: `app/calculations/factors.py`
+
+- [ ] **`apply_mock_factor_exposures(position)`**
+  - Input: Position object
+  - Output: Mock factor exposures using MOCK_FACTOR_EXPOSURES
+  - File: `app/calculations/factors.py`
+
+- [ ] **`calculate_factor_covariance_matrix()`**
+  - Input: None (uses static identity matrix for V1.4)
+  - Output: 8x8 covariance matrix
+  - File: `app/calculations/factors.py`
+
+#### 1.4.5 Risk Metrics (Depends on 1.4.3, 1.4.4)
+- [ ] **`calculate_portfolio_var(portfolio_exposures, covariance_matrix)`**
+  - Input: Portfolio exposures, factor covariance matrix
+  - Output: 1-day VaR (95%, 99% confidence)
+  - File: `app/calculations/risk_metrics.py`
+
+- [ ] **`calculate_sharpe_ratio(returns_series)`**
+  - Input: Historical portfolio returns
+  - Output: Annualized Sharpe ratio
+  - File: `app/calculations/risk_metrics.py`
+
+- [ ] **`calculate_maximum_drawdown(portfolio_values)`**
+  - Input: Time series of portfolio values
+  - Output: Maximum drawdown percentage
+  - File: `app/calculations/risk_metrics.py`
+
+#### 1.4.6 Snapshot Generation (Depends on All Above)
+- [ ] **`create_portfolio_snapshot(portfolio_id, calculation_date)`**
+  - Input: Portfolio ID, date
+  - Output: Complete portfolio snapshot record
+  - Dependencies: All calculation functions
+  - File: `app/calculations/snapshots.py`
+
+- [ ] **`generate_historical_snapshots(portfolio_id, days_back=90)`**
+  - Input: Portfolio ID, number of historical days
+  - Output: Historical snapshot records with realistic variations
+  - File: `app/calculations/snapshots.py`
+
+### 1.5 Batch Processing Framework
+*Orchestrates calculation functions for automated daily processing*
+
+- [ ] Create batch job framework:
+  - [x] Implement `batch_jobs` table for job tracking *(Table created in initial migration)*
+  - [x] Create `batch_job_schedules` table for cron management *(Table created in initial migration)*
+  - [ ] Build job runner service (using APScheduler, not Celery for V1.4)
+
+- [ ] **Batch Job 1: `update_market_data()` (4 PM weekdays)**
+  - [ ] Call `fetch_and_cache_prices()` for all portfolio symbols
+  - [ ] Call `calculate_position_market_value()` for all positions
+  - [ ] Call `calculate_daily_pnl()` for all positions
+  - [ ] Update market_data_cache and positions tables
+  - [ ] 5-minute timeout
+
+- [ ] **Batch Job 2: `calculate_all_risk_metrics()` (5 PM weekdays)**
+  - [ ] Call `calculate_position_greeks()` for all positions
+  - [ ] Call `calculate_factor_exposures()` for all positions
+  - [ ] Call `aggregate_portfolio_greeks()` for each portfolio
+  - [ ] Call `calculate_portfolio_exposures()` for each portfolio
+  - [ ] Store results in position_greeks and factor_exposures tables
+  - [ ] 10-minute timeout
+
+- [ ] **Batch Job 3: `create_portfolio_snapshots()` (5:30 PM weekdays)**
+  - [ ] Call `create_portfolio_snapshot()` for each portfolio
+  - [ ] Call `calculate_portfolio_var()` and risk metrics
+  - [ ] Store in portfolio_snapshots table
+  - [ ] Implement 365-day retention policy
+
+- [ ] Add manual trigger endpoints:
+  - [ ] POST /api/v1/admin/batch/market-data
+  - [ ] POST /api/v1/admin/batch/risk-metrics
+  - [ ] POST /api/v1/admin/batch/snapshots
+
+- [ ] Add job monitoring and error handling
+
+### 1.6 Portfolio Management APIs
 - [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
 - [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
 - [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
@@ -185,7 +325,7 @@ sigmasight-backend/
 - [ ] Add position type detection logic
 - [ ] Implement exposure calculations (notional & delta-adjusted)
 
-### 1.5 Position Management APIs
+### 1.7 Position Management APIs
 - [ ] **GET /api/v1/positions** - List positions with filtering
 - [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
 - [ ] **GET /api/v1/positions/{id}** - Individual position details
@@ -195,7 +335,7 @@ sigmasight-backend/
 - [ ] **GET /api/v1/strategies** - Strategy groupings
 - [ ] Implement position grouping logic
 
-### 1.6 Risk Analytics APIs
+### 1.8 Risk Analytics APIs
 - [ ] Implement simplified Black-Scholes calculator
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
@@ -204,42 +344,13 @@ sigmasight-backend/
 - [ ] Create Greeks aggregation logic
 - [ ] Implement delta-adjusted exposure calculations
 
-### 1.7 Batch Processing
-- [ ] Create batch job framework:
-  - [x] Implement `batch_jobs` table for job tracking *(Table created in initial migration)*
-  - [x] Create `batch_job_schedules` table for cron management *(Table created in initial migration)*
-  - [ ] Build job runner service (using APScheduler, not Celery for V1.4)
-- [ ] Implement `update_market_data()` job (cron: `0 16 * * 1-5` - 4 PM weekdays):
-  - [ ] Query unique symbols from positions
-  - [ ] Integrate Polygon.io API client for EOD prices
-  - [ ] Add YFinance for sector/industry data (not just fallback)
-  - [ ] Update `market_data_cache` table with sector/industry
-  - [ ] Calculate position market values and P&L
-  - [ ] 5-minute timeout
-- [ ] Implement `calculate_all_risk_metrics()` job (cron: `0 17 * * 1-5` - 5 PM weekdays):
-  - [ ] Apply mock Greeks values by position type (LC, LP, SC, SP, LONG, SHORT)
-  - [ ] Apply mock factor exposures using MOCK_FACTOR_EXPOSURES
-  - [ ] Aggregate portfolio-level Greeks
-  - [ ] Store in `position_greeks` and `factor_exposures` tables
-  - [ ] 10-minute timeout
-- [ ] Implement `create_portfolio_snapshots()` job (cron: `30 17 * * 1-5` - 5:30 PM weekdays):
-  - [ ] Calculate daily portfolio P&L
-  - [ ] Compute gross/net exposure
-  - [ ] Create `portfolio_snapshots` records
-  - [ ] Implement 365-day retention policy
-- [ ] Add manual trigger endpoints:
-  - [ ] POST /api/v1/admin/batch/market-data
-  - [ ] POST /api/v1/admin/batch/risk-metrics
-  - [ ] POST /api/v1/admin/batch/snapshots
-- [ ] Add job monitoring and error handling
-
-### 1.8 API Infrastructure  
+### 1.9 API Infrastructure  
 - [ ] Add user activity logging
 - [ ] Create data validation middleware
 - [ ] Add rate limiting (100 requests/minute per user)
 - [ ] Set up request/response logging
 
-### 1.9 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
+### 1.10 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
 **Week 1 Priority - Core Tables:**
 - Users & Authentication
 - Portfolios & Positions (with options parsing)
