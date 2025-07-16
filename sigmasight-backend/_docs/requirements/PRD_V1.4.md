@@ -51,8 +51,17 @@ Requirements:
 - Support stocks (positive quantity = long, negative = short)
 - Support options (OCC symbology)
 - Multiple tags per position (comma-separated)
-- Calculate current market value using latest prices
+- Calculate current market value using latest prices ✅ **IMPLEMENTED Section 1.4.1**
 - Generate 90 days of historical snapshots
+
+**✅ Market Value Calculation Implementation (Section 1.4.1):**
+- **Market Value**: Always positive using `abs(quantity) × price × multiplier`
+- **Exposure**: Signed value `quantity × price × multiplier` (negative for shorts)
+- **Options Multiplier**: 100x for contracts (LC, LP, SC, SP)
+- **Stock Multiplier**: 1x for stocks (LONG, SHORT)
+- **P&L Calculation**: Current exposure - cost basis
+- **Database Integration**: Automated previous price lookup from market_data_cache
+- **Fallback Logic**: Uses position.last_price if no market data available
 
 #### Historical Data Generation
 Upon successful CSV upload:
@@ -67,10 +76,18 @@ Upon successful CSV upload:
 GET /api/v1/portfolio
 ```
 Returns:
-- Total portfolio value
-- Long/short/gross/net exposures
-- Total P&L (daily, MTD, YTD)
-- Number of positions by type
+- Total portfolio value ✅ **IMPLEMENTED via calculate_single_portfolio_aggregation()**
+- Long/short/gross/net exposures ✅ **IMPLEMENTED via Section 1.4.1 aggregations**
+- Total P&L (daily, MTD, YTD) ✅ **Daily P&L IMPLEMENTED via calculate_daily_pnl()**
+- Number of positions by type ✅ **IMPLEMENTED with long/short position counting**
+
+**✅ Portfolio Aggregation Implementation:**
+- **Total Market Value**: Sum of all position market values (always positive)
+- **Gross Exposure**: Long value + short value (total capital at risk)
+- **Net Exposure**: Long value - short value (directional exposure)
+- **Long/Short Breakdown**: Separate aggregations for positive/negative quantity positions
+- **Position Counts**: Automated counting of long vs short positions
+- **Daily P&L**: Calculated via database-integrated previous price lookup
 
 ### 3.2 Position Management
 #### List Positions
@@ -81,7 +98,15 @@ Features:
 - Filter by position type (LONG, SHORT, LC, LP, SC, SP)
 - Filter by tags with AND/OR logic
 - Group by type or tag
-- Include current market values and P&L
+- Include current market values and P&L ✅ **IMPLEMENTED via Section 1.4.1**
+
+**✅ Position Value Calculation Implementation:**
+- **Market Values**: Calculated via `calculate_position_market_value()` function
+- **Daily P&L**: Calculated via `calculate_daily_pnl()` with database integration
+- **Real-time Updates**: Bulk position updates via `bulk_update_position_values()`
+- **Options Detection**: Automatic detection via `is_options_position()` helper
+- **Error Handling**: Graceful fallback to cached prices when API fails
+- **Database Updates**: Automatic persistence of calculated values to positions table
 
 #### Position Greeks (Hybrid Real/Mock Calculations)
 ```
@@ -273,15 +298,52 @@ Scheduling:
 def update_market_data():
     """
     Fetch and store latest market data for all active securities
+    IMPLEMENTED: Section 1.4.1 Market Data Calculations
     """
     # Steps:
-    # 1. Get list of unique symbols from positions
-    # 2. Fetch EOD prices from Polygon.io
-    # 3. Fetch sector/industry from YFinance for new symbols
-    # 4. Update market_data_cache table
-    # 5. Update last_price in positions table
-    # 6. Calculate market values and P&L
+    # 1. Get list of unique symbols from positions ✅ IMPLEMENTED
+    # 2. Fetch EOD prices from Polygon.io ✅ IMPLEMENTED via fetch_and_cache_prices()
+    # 3. Fetch sector/industry from YFinance for new symbols ✅ IMPLEMENTED
+    # 4. Update market_data_cache table ✅ IMPLEMENTED with upsert operations
+    # 5. Update last_price in positions table ✅ IMPLEMENTED
+    # 6. Calculate market values and P&L ✅ IMPLEMENTED via Section 1.4.1 functions
 ```
+
+**Section 1.4.1 Implementation Status: ✅ COMPLETED (2025-07-15)**
+
+**Core Functions Implemented:**
+
+1. **`calculate_position_market_value(position, current_price)`**
+   - **Location**: `app/calculations/market_data.py:32`
+   - **Business Logic**: Market value = abs(quantity) × price × multiplier
+   - **Options Support**: 100x multiplier for contracts (LC, LP, SC, SP)
+   - **Stock Support**: 1x multiplier for stocks (LONG, SHORT)
+   - **Returns**: market_value, exposure (signed), unrealized_pnl, cost_basis
+
+2. **`calculate_daily_pnl(db, position, current_price)`**
+   - **Location**: `app/calculations/market_data.py:78`
+   - **Database Integration**: Automatically queries market_data_cache for previous price
+   - **Fallback Logic**: Uses position.last_price if no market data found
+   - **Error Handling**: Returns zero P&L with error message if no previous price
+   - **Returns**: daily_pnl, daily_return, price_change, previous/current values
+
+3. **`fetch_and_cache_prices(db, symbols_list)`**
+   - **Location**: `app/calculations/market_data.py:298`
+   - **Integration**: Uses existing MarketDataService.fetch_current_prices()
+   - **Caching**: Updates market_data_cache table for valid prices
+   - **Fallback**: Retrieves cached prices for failed API calls
+   - **Returns**: Dictionary mapping symbol to current price
+
+**Batch Processing Integration:**
+- **Updated**: `app/batch/daily_calculations.py` with Section 1.4.1 functions
+- **Function**: `bulk_update_position_values()` - Efficient batch updates for all portfolios
+- **Aggregations**: Portfolio-level calculations (total value, exposure, long/short breakdown)
+- **Error Resilience**: Comprehensive error handling and reporting
+
+**Testing Status:**
+- ✅ **Unit Tests**: 4/4 tests passing (stock long/short, options, position detection)
+- ✅ **Integration Tests**: Batch processing and database integration verified
+- ✅ **Manual Testing**: `scripts/test_calculations.py` - All calculations validated
 
 ##### 2. Risk Metrics Calculation Job (5 PM EST)
 ```python

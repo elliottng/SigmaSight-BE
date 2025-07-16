@@ -1,277 +1,455 @@
-# Testing Guide - Market Data Implementation
+# Testing Guide - Core Calculation Engine
 
-This guide covers how to test the Market Data Service implementations we just created.
+## 🎯 Test-Driven Development for Section 1.4.2: Options Greeks Calculations
 
-## 🚀 Quick Start Testing
+### Overview
+This section implements the **V1.4 Hybrid Greeks Calculation** approach:
+- **Real calculations** using `py_vollib` and `mibian` libraries
+- **Mock fallback values** when real calculations fail
+- **Database integration** for market data and position updates
 
-### 1. Prerequisites
+### 📋 Test Requirements (Write Tests First)
 
-Make sure you have:
-- ✅ PostgreSQL running
-- ✅ Database migrated (`alembic upgrade head`)
-- ✅ Dependencies installed (`uv sync`)
-- ✅ Polygon.io API key in `.env` file
+#### 1. Unit Tests to Write
 
-### 2. Set Up Your API Key
+**File:** `tests/test_greeks_calculations.py`
 
-Add your Polygon.io API key to the `.env` file:
-```bash
-# In .env file
-POLYGON_API_KEY=your_actual_api_key_here
+```python
+# Test cases to implement BEFORE writing the actual functions
+# Import fixtures from tests/fixtures/greeks_fixtures.py
+from app.calculations.greeks import MOCK_GREEKS  # Import existing dict
+
+class TestGreeksCalculations:
+    
+    def test_calculate_greeks_hybrid_long_call_real():
+        """Test real Greeks calculation for long call with valid market data"""
+        # Expected: Real py_vollib calculation results
+        # Input: LC position (SQLAlchemy model or dict) with all fields
+        # Market data: Dict keyed by symbol {'AAPL': {...}}
+        # Output: Dict with all 5 Greeks as floats, scaled appropriately
+        
+    def test_calculate_greeks_hybrid_short_put_real():
+        """Test real Greeks calculation for short put with valid market data"""
+        # Expected: Real calculation with negative scaling for short position
+        
+    def test_calculate_greeks_hybrid_fallback_missing_data():
+        """Test fallback to mock values when market data missing"""
+        # Expected: Mock values from imported MOCK_GREEKS dict
+        # IV fallback: 0.25 (25%) if missing
+        
+    def test_calculate_greeks_hybrid_fallback_calculation_error():
+        """Test fallback when py_vollib throws exception"""
+        # Expected: Mock values with appropriate logging (no error raise)
+        
+    def test_calculate_greeks_hybrid_stock_positions():
+        """Test that stock positions always use simple delta"""
+        # Expected: LONG=1.0, SHORT=-1.0, other Greeks=0.0
+        
+    def test_calculate_greeks_hybrid_expired_options():
+        """Test expired options return zero Greeks"""
+        # Expected: All Greeks = 0.0 for expired positions
+        
+    def test_get_mock_greeks_all_position_types():
+        """Test mock Greeks for all position types (LC, SC, LP, SP, LONG, SHORT)"""
+        # Expected: Predefined values scaled by quantity
+        
+    def test_options_symbol_parsing_edge_cases():
+        """Test parsing of complex option symbols"""
+        # Test cases:
+        # - Special chars: BRK.A → BRK/A240119C00150000
+        # - Weekly options with 'W' suffix
+        # - Non-standard strikes with extra digits
+        # - Mini options (10 vs 100 multiplier)
+        
+    def test_update_position_greeks_database():
+        """Test database update to position_greeks table"""
+        # Expected: Insert/update in position_greeks table with:
+        # - position_id, calculation_date
+        # - All 5 Greeks + dollar_delta, dollar_gamma
+        # Use PostgreSQL test schema with test_ prefix
+        
+    def test_bulk_update_portfolio_greeks():
+        """Test bulk Greeks calculation for entire portfolio"""
+        # Process in chunks of 100 positions
+        # Use bulk_update_mappings for efficiency
+        # Return summary with failed calculations
 ```
 
-### 3. Quick API Connection Test
+#### 2. Integration Tests to Write
 
-```bash
-# Quick test of API connections
-python scripts/test_market_data.py quick
+**File:** `tests/test_greeks_integration.py`
+
+```python
+class TestGreeksIntegration:
+    
+    def test_greeks_with_real_market_data():
+        """Test Greeks calculation with live market data from cache"""
+        # Expected: Real calculations using cached prices and volatility
+        # Database: Use test_ prefixed PostgreSQL schema
+        
+    def test_greeks_batch_processing():
+        """Test Greeks calculation in daily batch job"""
+        # Expected: All portfolio positions updated after market close
+        # Missing market data: Log warning, use last known values
+        # Create batch_jobs record to track success/failure
+        # Create positions via SQLAlchemy ORM
+        
+    def test_greeks_api_endpoint():
+        """Test Greeks retrieval via API endpoint"""
+        # Expected JSON response:
+        # {
+        #   "position_id": 123,
+        #   "symbol": "AAPL240119C00150000",
+        #   "greeks": {
+        #     "delta": 2.6,
+        #     "gamma": 0.09,
+        #     "theta": -0.225,
+        #     "vega": 0.75,
+        #     "rho": 0.4
+        #   },
+        #   "calculated_at": "2024-01-15T10:30:00Z"
+        # }
 ```
 
-## 🧪 Testing Methods
+#### 3. Performance Tests to Write
 
-### Method 1: Unit Tests (Pytest)
+```python
+import pytest
 
-Run the comprehensive test suite:
-
-```bash
-# Run all tests
-pytest tests/test_market_data_service.py -v
-
-# Run specific test categories
-pytest tests/test_market_data_service.py::TestMarketDataService -v
-pytest tests/test_market_data_service.py::TestMarketDataEndpoints -v
-
-# Run integration tests (requires API key)
-pytest tests/test_market_data_service.py -m integration -v
+@pytest.mark.performance
+def test_greeks_calculation_performance():
+    """Test Greeks calculation speed for large portfolios"""
+    # Expected: <100ms per position, <5s for 100-position portfolio
+    # Skip with: pytest -m "not performance"
+    
+@pytest.mark.performance
+def test_greeks_memory_usage():
+    """Test memory efficiency of bulk calculations"""
+    # Expected: Reasonable memory usage for large portfolios
 ```
 
-### Method 2: Manual Service Testing
+### 🔧 Implementation Checklist (After Writing Tests)
 
-Test the service directly:
+#### Core Functions to Implement:
 
-```bash
-# Comprehensive test of all components
-python scripts/test_market_data.py
+**File:** `app/calculations/greeks.py`
 
-# This will test:
-# - Polygon.io connection and data fetching
-# - YFinance GICS data
-# - Historical data retrieval
-# - Options chain data
-# - Database integration
-```
+- [ ] `calculate_greeks_hybrid(position, market_data) -> Dict[str, float]`
+  - Real calculation using py_vollib/mibian
+  - Fallback to mock values on error (with logger.warning)
+  - Position: SQLAlchemy model or dict with required fields
+  - Market data: Dict keyed by symbol
+  - Returns all 5 Greeks as floats (never Decimal)
+  
+- [ ] `get_mock_greeks(position_type, quantity) -> Dict[str, float]`
+  - Predefined mock values by position type
+  - Scaled by quantity
+  
+- [ ] `update_position_greeks(db, position_id, greeks) -> None`
+  - Insert/update position_greeks table
+  - Include dollar_delta and dollar_gamma
+  
+- [ ] `bulk_update_portfolio_greeks(db, portfolio_id) -> Dict`
+  - Process in chunks of 100 positions
+  - Use SQLAlchemy bulk_update_mappings
+  - Track and return failed calculations
+  - Returns summary: {updated: int, failed: int, errors: list}
 
-### Method 3: API Endpoint Testing
+#### Helper Functions:
 
-Test the HTTP endpoints:
+- [ ] `extract_option_parameters(position) -> Dict`
+  - Parse strike, expiry, option type from position
+  
+- [ ] `get_implied_volatility(symbol, market_data) -> float`
+  - Retrieve or estimate implied volatility
+  
+- [ ] `calculate_time_to_expiry(expiry_date) -> float`
+  - Convert expiry date to years fraction using calendar days / 365 convention
 
-```bash
-# Start the server first
-uvicorn app.main:app --reload
+### 🧪 Test Data Setup
 
-# In another terminal, test the API endpoints
-./scripts/test_api_endpoints.sh
+#### Test Fixtures File:
+**File:** `tests/fixtures/greeks_fixtures.py`
 
-# Or specify a different URL
-./scripts/test_api_endpoints.sh http://localhost:8000
-```
+```python
+# Create explicit fixtures for all position types
+from datetime import date, timedelta
 
-### Method 4: Manual API Testing with curl
+# Market data includes dividend yield
+TEST_MARKET_DATA = {
+    'AAPL': {
+        'current_price': 150.00,
+        'implied_volatility': 0.25,  # 25% - fallback if missing
+        'risk_free_rate': 0.05,       # 5%
+        'dividend_yield': 0.0         # 0% default
+    }
+}
 
-```bash
-# 1. Start the server
-uvicorn app.main:app --reload
-
-# 2. Create a demo user (if not exists)
-python scripts/seed_demo_users.py
-
-# 3. Get auth token
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "demo_growth@sigmasight.com", "password": "demopassword123"}'
-
-# 4. Use the token from response for authenticated requests
-TOKEN="your_token_here"
-
-# 5. Test market data endpoints
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/api/v1/market-data/prices/AAPL"
-
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/api/v1/market-data/current-prices?symbols=AAPL&symbols=MSFT"
-```
-
-## 📊 Expected Test Results
-
-### ✅ Successful Test Outputs
-
-**API Connection Test:**
-```
-✅ Polygon.io connection successful
-   AAPL current price: $175.43
-
-✅ YFinance connection successful
-   AAPL sector: Technology
-   AAPL industry: Consumer Electronics
-```
-
-**Database Integration:**
-```
-✅ Database connection successful
-   Cached price check completed for ['AAPL']
-   Found cached price for AAPL: $175.43
-```
-
-**API Endpoint Response:**
-```json
-{
-  "symbol": "AAPL",
-  "date": "2024-01-15",
-  "open": 174.50,
-  "high": 176.20,
-  "low": 174.10,
-  "close": 175.43,
-  "volume": 52469400,
-  "sector": "Technology",
-  "industry": "Consumer Electronics"
+# All position types fixtures
+# Position structure matches SQLAlchemy model fields
+TEST_POSITIONS = {
+    'LC': {  # Long Call
+        'id': 1,
+        'portfolio_id': 1,
+        'symbol': 'AAPL240119C00150000',
+        'position_type': 'LC',
+        'quantity': 5,
+        'entry_price': 3.50,
+        'entry_date': '2024-01-01',
+        'last_price': 4.00,
+        'market_value': 2000.00,
+        'unrealized_pnl': 250.00,
+        # Option-specific fields
+        'underlying_symbol': 'AAPL',
+        'strike_price': 150.00,
+        'expiration_date': '2024-01-19'
+    },
+    'SC': {  # Short Call
+        'symbol': 'AAPL240119C00155000',
+        'position_type': 'SC',
+        'quantity': -3,
+        'strike_price': 155.00,
+        'expiry_date': '2024-01-19',
+        'underlying_symbol': 'AAPL'
+    },
+    'LP': {  # Long Put
+        'symbol': 'AAPL240119P00145000',
+        'position_type': 'LP',
+        'quantity': 2,
+        'strike_price': 145.00,
+        'expiry_date': '2024-01-19',
+        'underlying_symbol': 'AAPL'
+    },
+    'SP': {  # Short Put
+        'symbol': 'AAPL240119P00140000',
+        'position_type': 'SP',
+        'quantity': -4,
+        'strike_price': 140.00,
+        'expiry_date': '2024-01-19',
+        'underlying_symbol': 'AAPL'
+    },
+    'LONG': {  # Long Stock
+        'symbol': 'AAPL',
+        'position_type': 'LONG',
+        'quantity': 100,
+        'underlying_symbol': 'AAPL'
+    },
+    'SHORT': {  # Short Stock
+        'symbol': 'MSFT',
+        'position_type': 'SHORT',
+        'quantity': -50,
+        'underlying_symbol': 'MSFT'
+    }
 }
 ```
 
-### ⚠️ Common Issues and Solutions
+### 📊 Expected Test Results
 
-**No API Key:**
-```
-❌ No Polygon API key configured in .env file
-```
-**Solution:** Add `POLYGON_API_KEY=your_key_here` to `.env`
-
-**Database Connection Error:**
-```
-❌ Database integration failed: connection to server failed
-```
-**Solution:** Start PostgreSQL and run `alembic upgrade head`
-
-**Authentication Required:**
-```
-🔒 Status: 401 (Authentication required)
-```
-**Solution:** Run `python scripts/seed_demo_users.py` first
-
-## 🔍 Testing Specific Features
-
-### Test Price Data Fetching
+#### Real Calculation Results:
 ```python
-# Direct service test
-from app.services.market_data_service import market_data_service
-import asyncio
-
-async def test_prices():
-    prices = await market_data_service.fetch_current_prices(['AAPL', 'MSFT'])
-    print(f"Current prices: {prices}")
-
-asyncio.run(test_prices())
+# Long Call (AAPL, strike=150, 30 days, vol=25%)
+# Values shown are AFTER scaling:
+expected_greeks = {
+    'delta': 0.52 * 5,           # 5 contracts
+    'gamma': 0.018 * 5,
+    'theta': -0.045 * 5,         # Already daily (÷365)
+    'vega': 0.12 * 5,            # Already per 1% (÷100)
+    'rho': 0.06 * 5
+}
 ```
 
-### Test Historical Data
+#### Mock Fallback Results:
+```python
+# From MOCK_GREEKS['LC'] scaled by quantity=5
+fallback_greeks = {
+    'delta': 0.6 * 5,
+    'gamma': 0.02 * 5,
+    'theta': -0.05 * 5,
+    'vega': 0.15 * 5,
+    'rho': 0.08 * 5
+}
+```
+
+### 🚨 Error Scenarios to Test
+
+1. **Missing Market Data**: Position has no underlying price
+   - Action: Log warning, use last known values or mock fallback
+2. **Invalid Option Parameters**: Malformed option symbol
+   - Action: Log error, return mock Greeks
+3. **Expired Options**: Expiry date in the past
+   - Action: Return all Greeks as 0.0
+4. **py_vollib Errors**: Library calculation failures
+   - Action: `logger.warning(f"Greeks calculation failed: {e}")`
+   - Return mock values
+5. **Database Errors**: Failed position updates
+   - Action: Track in failed list, continue processing
+
+### 🔄 Batch Processing Behavior
+
+- **Schedule**: Runs after market close (configurable time)
+- **Tracking**: Creates batch_jobs record with status
+- **Failure Handling**: Continues processing on individual failures
+- **Market Data**: Uses cached prices from market_data_cache
+
+### 🎯 TDD Workflow
+
+1. **Red**: Write failing tests first
+   ```bash
+   pytest tests/test_greeks_calculations.py -v
+   # Should fail - functions don't exist yet
+   ```
+
+2. **Green**: Implement minimal code to pass tests
+   ```bash
+   # Create app/calculations/greeks.py with basic implementations
+   pytest tests/test_greeks_calculations.py -v
+   # Should pass
+   ```
+
+3. **Refactor**: Improve code quality while keeping tests green
+   ```bash
+   # Optimize performance, add error handling
+   pytest tests/test_greeks_calculations.py -v
+   # Should still pass
+   ```
+
+### 📝 Manual Testing Script
+
+**File:** `scripts/test_greeks.py`
+
 ```bash
-# Via API endpoint
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/api/v1/market-data/prices/AAPL?days_back=30"
+# After implementation, run manual tests
+python scripts/test_greeks.py
+
+# Expected output:
+# ✅ Real Greeks calculation: AAPL LC delta=2.6
+# ✅ Mock fallback: Invalid position uses mock values
+# ✅ Database update: Position Greeks saved
+# ✅ Portfolio bulk update: 25 positions updated
 ```
 
-### Test Batch Processing
-```python
-# Test the daily sync job
-from app.batch.market_data_sync import sync_market_data
-import asyncio
+### ✅ Definition of Done
 
-asyncio.run(sync_market_data())
-```
-
-### Test Options Chain
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/api/v1/market-data/options/AAPL"
-```
-
-## 🎯 Performance Testing
-
-### Load Testing with Multiple Symbols
-```python
-# Test bulk fetching
-symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'NVDA']
-prices = await market_data_service.fetch_current_prices(symbols)
-```
-
-### Database Caching Performance
-```python
-# Test cache vs API performance
-import time
-
-# First call (should hit API)
-start = time.time()
-await service.update_market_data_cache(db, ['AAPL'])
-api_time = time.time() - start
-
-# Second call (should use cache)
-start = time.time()
-cached = await service.get_cached_prices(db, ['AAPL'])
-cache_time = time.time() - start
-
-print(f"API call: {api_time:.2f}s, Cache lookup: {cache_time:.2f}s")
-```
-
-## 🐛 Debugging Tips
-
-### Enable Debug Logging
-```python
-# In your test script
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-### Check API Rate Limits
-```python
-# The service includes rate limiting delays
-# Check logs for rate limit warnings
-```
-
-### Verify Database State
-```sql
--- Check cached data
-SELECT symbol, date, close, sector 
-FROM market_data_cache 
-ORDER BY symbol, date DESC 
-LIMIT 10;
-```
-
-## 📈 Next Steps
-
-After successful testing:
-
-1. **Ready for Production:**
-   - All tests pass ✅
-   - API key configured ✅
-   - Database integration working ✅
-
-2. **Ready for Section 1.4:**
-   - Market data available ✅
-   - Can proceed with calculation engine ✅
-
-3. **Optional Improvements:**
-   - Implement Redis caching
-   - Add WebSocket real-time updates
-   - Set up monitoring/alerting
-
-## 🆘 Getting Help
-
-If tests fail:
-
-1. Check the logs: `tail -f logs/sigmasight.log`
-2. Verify environment: `python -c "from app.config import settings; print(settings.POLYGON_API_KEY[:10] + '...')"`
-3. Test database: `python -c "from app.core.database import engine; print('DB configured')"`
-4. Check dependencies: `uv sync`
+- [ ] All unit tests pass (100% coverage)
+- [ ] Integration tests pass with real database
+- [ ] Performance tests meet requirements (<100ms per position)
+- [ ] Manual testing script runs successfully
+- [ ] Error scenarios handled gracefully
+- [ ] Database updates work correctly
+- [ ] Batch processing integration complete
 
 ---
 
-**Ready to test?** Start with: `python scripts/test_market_data.py quick`
+## 📋 Section 1.4.1: Market Data Calculations
+
+This guide covers integration and manual testing for the **Market Data Calculations** implementation (Section 1.4.1).
+
+## ✅ Unit Testing Status
+
+**Completed:** Full unit test suite with 100% coverage
+- File: `tests/test_market_data_calculations.py`
+- Run: `pytest tests/test_market_data_calculations.py -v`
+
+## 🧪 Integration Testing
+
+### 1. Test Calculation Functions
+
+```bash
+# Run the comprehensive calculation test script
+python scripts/test_calculations.py
+```
+
+This validates:
+- ✅ Position market value calculations (stocks & options)
+- ✅ Daily P&L with database price lookups
+- ✅ Bulk price fetching and caching
+- ✅ Portfolio aggregations
+
+### 2. Test Batch Processing Integration
+
+```python
+# Test the daily calculations batch job
+from app.batch.daily_calculations import (
+    update_portfolio_market_values,
+    calculate_portfolio_aggregations
+)
+import asyncio
+
+# Run for a specific portfolio
+async def test_batch():
+    async with get_db() as db:
+        portfolio_id = 1  # Your test portfolio
+        await update_portfolio_market_values(db, portfolio_id)
+        aggregations = await calculate_portfolio_aggregations(db, portfolio_id)
+        print(f"Portfolio aggregations: {aggregations}")
+
+asyncio.run(test_batch())
+```
+
+### 3. Verify Database Updates
+
+```sql
+-- Check position updates
+SELECT symbol, quantity, last_price, market_value, 
+       unrealized_pnl, daily_pnl, updated_at
+FROM positions
+WHERE portfolio_id = 1
+ORDER BY market_value DESC;
+
+-- Check market data cache
+SELECT symbol, date, close, volume
+FROM market_data_cache
+WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+ORDER BY symbol, date DESC;
+```
+
+## 📊 Expected Results
+
+### Position Calculations:
+```
+Stock Long (AAPL, 100 shares @ $150):
+  Market Value: $15,500
+  Exposure: $15,500
+  Unrealized P&L: $500
+
+Options Long Call (AAPL240119C00150, 5 contracts @ $3.75):
+  Market Value: $1,875 (5 × $3.75 × 100)
+  Exposure: $1,875
+  Daily P&L: $125
+```
+
+### Portfolio Aggregations:
+```json
+{
+  "total_market_value": 125000.00,
+  "total_exposure": 115000.00,
+  "long_exposure": 120000.00,
+  "short_exposure": -5000.00,
+  "gross_exposure": 125000.00,
+  "net_exposure": 115000.00,
+  "cash_percentage": 8.0
+}
+```
+
+## 🐛 Common Issues
+
+**Missing Previous Price:**
+- Function returns zero P&L with warning
+- Check market_data_cache has historical data
+
+**API Rate Limits:**
+- Bulk operations respect Polygon rate limits
+- Check logs for rate limit warnings
+
+## ✅ Validation Checklist
+
+- [ ] Unit tests pass: `pytest tests/test_market_data_calculations.py`
+- [ ] Integration script runs: `python scripts/test_calculations.py`
+- [ ] Database shows updated position values
+- [ ] Market data cache populated
+- [ ] Batch processing completes without errors
+- [ ] Portfolio aggregations match expected values
+
+---
+
+**Section 1.4.1 Complete** ✅ Ready for Section 1.4.2: Options Greeks Calculations

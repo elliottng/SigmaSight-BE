@@ -135,7 +135,7 @@ CREATE TABLE positions (
     entry_date DATE NOT NULL,
     
     -- Current values (updated by batch)
-    last_price DECIMAL(12,4),
+    last_price DECIMAL(12,4),         -- Used as fallback for daily P&L calculations when market_data_cache lacks historical data
     market_value DECIMAL(15,2),
     unrealized_pnl DECIMAL(15,2),
     unrealized_pnl_pct DECIMAL(8,4),
@@ -602,3 +602,39 @@ python scripts/load_demo_data.py
 ```
 
 This addendum provides complete resolution to all identified issues and clear implementation guidance for the SigmaSight V1 database.
+
+## 11. Database Integration for Calculation Functions (V1.4.1 Update)
+
+### 11.1 Enhanced Function Signatures
+
+The core calculation functions have been updated to integrate directly with the database for improved robustness and performance:
+
+#### Updated: `calculate_daily_pnl(db, position, current_price)`
+- **Previous signature**: `calculate_daily_pnl(position, previous_price, current_price)`
+- **New signature**: `calculate_daily_pnl(db, position, current_price)`
+- **Enhancement**: Automatically queries `market_data_cache` for previous trading day price
+- **Fallback behavior**: Uses `position.last_price` when historical data is unavailable
+- **Benefits**: Eliminates need for caller to fetch previous price, reduces API calls
+
+#### Enhanced: `calculate_position_market_value(position, current_price)`
+- **Integration**: Works seamlessly with database-cached prices
+- **Fallback behavior**: Uses `position.last_price` for missing current price data
+- **Performance**: Reduces external API dependencies through intelligent caching
+
+### 11.2 Database Fallback Strategy
+
+The calculation engine implements a robust fallback hierarchy:
+
+1. **Primary**: Real-time data from Polygon.io API
+2. **Secondary**: Cached data from `market_data_cache` table
+3. **Tertiary**: Position-stored `last_price` field
+4. **Fallback**: Mock/estimated values where appropriate
+
+This approach ensures calculation functions never fail due to missing market data while maintaining accuracy when data is available.
+
+### 11.3 Performance Optimizations
+
+- **Indexed queries**: All market data queries use optimized indexes on `(symbol, date)`
+- **Batch processing**: Multiple position calculations can reuse cached price data
+- **Smart caching**: Only fetches missing data, leverages existing cache entries
+- **Database connection pooling**: Efficient resource usage for calculation-heavy operations
