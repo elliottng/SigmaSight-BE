@@ -175,6 +175,7 @@ DELETE /api/v1/tags/{id}
 GET    /api/v1/positions/{id}/tags
 PUT    /api/v1/positions/{id}/tags   {"tag_ids": [1, 2, 3]}
 ```
+** IMPORTANT: please review PRD_TAGS_V1.4.1.md for more details **
 
 ### 3.5 Authentication
 #### Login
@@ -578,10 +579,138 @@ V1.4 implements a hybrid real/mock calculation engine that provides realistic an
 - **Metrics**: Sharpe ratio, max drawdown, volatility, VaR
 - **Legacy**: Uses `var_utils.py` for covariance matrix calculations
 
-#### Portfolio Aggregations
-- **Libraries**: `numpy`, `pandas`
-- **Calculations**: Weighted averages, exposures, P&L aggregations
-- **Legacy**: Adapts `reporting_plotting_analytics.py` logic
+#### Portfolio Aggregations (Section 1.4.3)
+
+**Libraries**: `numpy`, `pandas` (vectorised DataFrame operations ⟶ <200 ms for ≤200 positions)
+
+**Input Contract**
+- `positions`: List[Dict] – pre-enriched by Section 1.4.1 and 1.4.2, containing:
+  - `id`, `symbol`, `quantity`, `market_value`, `exposure`, `is_option`
+  - `sector`, `industry`, `tags` (List[str])
+  - `greeks`: Dict[str, float] from `calculate_greeks_hybrid()` (delta, gamma, theta, vega, rho)
+
+**Core Aggregations**
+1. Gross / Net / Long / Short exposure (USD, Decimal)
+2. Portfolio-level Greeks = Σ signed position Greeks
+3. Delta-adjusted notional exposure (stock Δ = ±1, option Δ from Greeks)
+4. Position counts: `total`, `long`, `short`
+5. Optional drill-downs (lazy-evaluated):
+   • Sector / Industry  • Tag groups  • Underlying symbol
+
+**Output Schema**
+```json
+{
+  "gross_exposure": "Decimal",
+  "net_exposure": "Decimal",
+  "long_exposure": "Decimal",
+  "short_exposure": "Decimal",
+  "position_counts": { "total": 0, "long": 0, "short": 0 },
+  "portfolio_greeks": { "delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0 },
+  "delta_adjusted_exposure": "Decimal",
+  "calculated_at": "ISO8601 timestamp"
+}
+```
+
+**Design Decisions**
+- Stock positions use Δ = +1 (long) / −1 (short).
+- Option multiplier (100) already applied in `market_value` & `exposure`.
+- Monetary fields persisted as `Decimal(18,4)`; Greeks as `FLOAT`.
+- Results recomputed nightly by 17:00 batch job and upserted into `portfolio_snapshots`.
+- Empty portfolios return zeroed structure with `success: false` & log warning.
+
+**Implementation Decisions**
+- **Precision & Rounding**
+  - Monetary values: 2 decimal places (stored as DECIMAL in database)
+  - Greeks: 4 decimal places (for accuracy in aggregations)
+  - Percentages: 2 decimal places
+  - Apply rounding at the API response layer, not in calculations or storage
+
+- **Underlying-Symbol Breakdowns**
+  - Implement `aggregate_by_underlying()` function
+  - Critical for options portfolios (e.g., all SPY positions together)
+  - Include both stock and options positions for each underlying
+  - Required for proper risk analysis in options-heavy portfolios
+
+- **Option Sign Conventions**
+  - Use signed-by-quantity Greeks consistently
+  - Maintain mathematical correctness from `calculate_greeks_hybrid()`
+  - Short call delta remains negative, short put delta remains positive
+  - No overrides or transformations - preserve the signs for accurate hedging calculations
+
+- **Point-in-Time Parameter**
+  - Current positions only for V1.4
+  - No `as_of_date` parameter needed for the demo
+  - All aggregations work on current positions from latest batch job
+  - Add comment for future enhancement: `# TODO: Add as_of_date support for historical analysis`
+
+- **Storage vs. On-Demand**
+  - **Store in portfolio_snapshots** (via 5:30 PM batch job):
+    - Portfolio-level exposures (gross/net/long/short)
+    - Aggregated Greeks totals
+    - Position counts by type
+  - **Compute on-demand** for API requests:
+    - Tag-based aggregations
+    - Underlying-based aggregations
+    - Any custom groupings
+
+- **Notional vs. Dollar Exposures**
+  - Include both notional and dollar exposures:
+```python
+{
+    "exposures": {
+        "gross": Decimal,     # Dollar exposure
+        "net": Decimal,       # Dollar exposure
+        "notional": Decimal   # Sum of abs(quantity × price × multiplier)
+    }
+}
+```
+  - Notional exposure helps assess leverage, especially for options positions
+
+- **API Pagination/Filtering**
+  - Basic filtering only, no pagination for V1.4
+  - Support query parameters: `?tag=momentum` or `?underlying=AAPL`
+  - Return all results (unlikely to exceed 100 items in demo)
+  - Document pagination structure for future: `# TODO: Add pagination for production`
+
+- **Concurrency Requirements**
+  - No special concurrency handling for V1.4
+  - Single-threaded batch processing is sufficient
+  - Read-only aggregations don't need locking
+  - Demo is single-user per portfolio
+
+- **Caching & TTL**
+  - Simple in-memory caching with 60-second TTL
+  - Cache configuration:
+```python
+AGGREGATION_CACHE_TTL = 60  # seconds
+CACHE_KEY_FORMAT = "portfolio_agg:{user_id}:{agg_type}:{filters}"
+```
+  - Use `functools.lru_cache` for simple method-level caching
+
+- **Configurability**
+  - Hard-code with named constants in `app/constants/portfolio.py`:
+```python
+# Multipliers
+OPTIONS_MULTIPLIER = 100
+DEFAULT_SECTOR = "Unknown"
+DEFAULT_INDUSTRY = "Unknown"
+
+# Greeks precision
+GREEKS_DECIMAL_PLACES = 4
+MONETARY_DECIMAL_PLACES = 2
+
+# Cache settings
+AGGREGATION_CACHE_TTL = 60
+```
+
+**Testing Matrix** (see TESTING_GUIDE.md §1.4.3):
+- Mixed portfolios (stocks + options)
+- Empty portfolios
+- Large portfolios (1000+ positions)
+- Positions with missing Greeks
+- Performance benchmarks (<200ms for 200 positions)
+- All-short portfolio (edge)
+- Missing market data / Greeks fallback
 
 ### 6.3 Mock Calculations
 
