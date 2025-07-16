@@ -133,23 +133,31 @@ sigmasight-backend/
 - [x] Create logger instances for each module *(api, db, auth, batch, market_data loggers)*
 - [x] Add logging to existing endpoints *(Root endpoint logging added)*
 
-### 1.1 Authentication System
-- [ ] Implement JWT token generation and validation
-- [ ] Create user registration endpoint (admin-only initially)
-- [ ] Create login endpoint with email/password
-- [ ] Implement token refresh mechanism
-- [ ] Create demo user seeding script
-- [ ] Add authentication dependencies to protected routes
+### 1.1 Authentication System ✅ COMPLETED (2025-07-15)
+- [x] Implement JWT token generation and validation *(app/core/auth.py with passlib + jose)*
+- [x] Create user registration endpoint (admin-only initially) *(POST /auth/register with auto portfolio creation)*
+- [x] Create login endpoint with email/password *(POST /auth/login returning JWT token)*
+- [x] Implement token refresh mechanism *(POST /auth/refresh, V1 simple token renewal)*
+- [x] Create demo user seeding script *(scripts/seed_demo_users.py with 3 demo users)*
+- [x] Add authentication dependencies to protected routes *(app/core/dependencies.py, portfolio endpoints protected)*
+- [x] Complete authentication testing: ✅ ALL TESTS PASSING (2025-07-15)
+  - [x] Test user registration flow (email validation, password hashing, portfolio creation)
+  - [x] Test login flow (valid/invalid credentials, JWT token generation)
+  - [x] Test token refresh (expired token handling, new token generation)
+  - [x] Test protected route access (with/without token, expired token)
+  - [x] Test demo user seeding script execution
+  - [x] Verify JWT token expiration and validation
+  - [x] Test authentication error handling and logging
 
 ### 1.2 Database Models & Seeding
 - [x] Implement core SQLAlchemy models *(users, portfolios, positions, tags, market_data, greeks, snapshots, batch_jobs)*
 - [ ] Implement missing models from DATABASE_DESIGN_ADDENDUM_V1.4.1:
   - [ ] modeling_session_snapshots table (for what-if scenarios)
   - [ ] export_history table (track exports)
-  - [ ] factors table with 8 fixed factor definitions
-  - [ ] Update market_data_cache to include sector/industry fields
+  - [ ] Update FactorDefinition model to match addendum (add etf_proxy, display_order fields)
+  - [x] Update market_data_cache to include sector/industry fields *(Already implemented)*
 - [ ] Create database seeding scripts:
-  - [ ] Demo users (demo_growth, demo_value, demo_balanced)
+  - [x] Demo users (demo_growth, demo_value, demo_balanced) *(scripts/seed_demo_users.py ready)*
   - [ ] Sample portfolios with strategy characteristics
   - [ ] Historical positions (90 days)
   - [ ] Pre-calculated risk metrics

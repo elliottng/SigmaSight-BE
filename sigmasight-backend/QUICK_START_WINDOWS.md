@@ -20,22 +20,38 @@ cd SigmaSight-BE\sigmasight-backend
 
 ### 3. Setup Project
 ```bash
-uv venv
-uv pip install -r requirements.txt
+uv sync
 copy .env.example .env
 ```
 
-### 4. Start Database
+**Important**: Edit `.env` file and ensure:
+```
+DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
+```
+
+### 4. Start Database & Setup
 ```bash
 docker-compose up -d
 uv run alembic upgrade head
+uv run python scripts/seed_demo_users.py
 ```
+
+Demo accounts created:
+- demo_growth@sigmasight.com (password: demo12345)
+- demo_value@sigmasight.com (password: demo12345)
+- demo_balanced@sigmasight.com (password: demo12345)
 
 ### 5. Run SigmaSight
 ```bash
 uv run python run.py
 ```
 Open browser to: http://localhost:8000/docs
+
+### 6. Test Authentication (Optional)
+```bash
+uv run python scripts/test_auth.py
+```
+Should show: "Success Rate: 100%"
 
 ---
 
@@ -73,5 +89,18 @@ uv run python run.py
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/health
+
+## Quick Commands
+```bash
+# Update from GitHub
+git pull
+uv sync
+
+# Run tests
+uv run python scripts/test_auth.py
+
+# Check database
+docker ps
+```
 
 💡 **Tip**: Save this file to your desktop for quick reference!

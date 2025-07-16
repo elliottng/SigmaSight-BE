@@ -146,16 +146,25 @@ We'll install these tools in order:
 
 1. **Install Python packages:**
    ```bash
-   uv venv
-   uv pip install -r requirements.txt
+   uv sync
    ```
    - This creates a virtual environment and installs all dependencies
+   - Wait for "Installed X packages" message
 
 2. **Set up configuration:**
    ```bash
    copy .env.example .env
    ```
    - This creates your configuration file
+
+3. **Update database configuration:**
+   - Open `.env` file in Notepad
+   - Find the line starting with `DATABASE_URL=`
+   - Make sure it says:
+   ```
+   DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
+   ```
+   - Save and close the file
 
 ---
 
@@ -180,6 +189,15 @@ We'll install these tools in order:
    ```
    - This creates all the necessary tables
 
+4. **Create demo users (optional):**
+   ```bash
+   uv run python scripts/seed_demo_users.py
+   ```
+   - This creates three demo accounts:
+     - demo_growth@sigmasight.com (password: demo12345)
+     - demo_value@sigmasight.com (password: demo12345)
+     - demo_balanced@sigmasight.com (password: demo12345)
+
 ---
 
 ## Step 8: Start SigmaSight 🚀
@@ -197,6 +215,13 @@ We'll install these tools in order:
 3. **View API Documentation:**
    - Go to http://localhost:8000/docs
    - You'll see all available API endpoints
+
+4. **Test Authentication (optional):**
+   ```bash
+   uv run python scripts/test_auth.py
+   ```
+   - This runs automated tests for login, registration, and security
+   - You should see "Success Rate: 100%" at the end
 
 ---
 
@@ -272,11 +297,17 @@ uv run python run.py
 # Update code from GitHub
 git pull
 
-# Install new dependencies
-uv pip install -r requirements.txt
+# Install/update dependencies
+uv sync
 
 # Run database migrations
 uv run alembic upgrade head
+
+# Seed demo users
+uv run python scripts/seed_demo_users.py
+
+# Run authentication tests
+uv run python scripts/test_auth.py
 ```
 
 ---

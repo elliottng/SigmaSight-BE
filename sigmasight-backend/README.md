@@ -98,22 +98,51 @@ cp .env.example .env
    - The default values work for local development
    - You can leave it as-is for now
 
-### Step 5: Set Up Database (Optional for Development)
+### Step 5: Set Up Database (Required for Full Functionality)
 
 **Option A: Use Docker (Recommended)**
+
+1. **Install Docker Desktop:**
+   - **Mac:** `brew install --cask docker` then `open -a Docker`
+   - **Windows:** Download from [docker.com](https://www.docker.com/products/docker-desktop/)
+   - **Linux:** Follow [Docker installation guide](https://docs.docker.com/engine/install/)
+
+2. **Start PostgreSQL:**
 ```bash
 # Start PostgreSQL with Docker Compose
 docker-compose up -d
 
-# Run database migrations
+# Verify it's running
+docker-compose ps
+```
+
+3. **Update .env file:**
+```bash
+# Make sure your .env has the correct database URL:
+DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
+```
+
+4. **Run database migrations:**
+```bash
 uv run alembic upgrade head
 ```
+
+5. **Seed demo users (optional):**
+```bash
+uv run python scripts/seed_demo_users.py
+```
+
+This creates three demo users:
+- demo_growth@sigmasight.com (password: demo12345)
+- demo_value@sigmasight.com (password: demo12345)
+- demo_balanced@sigmasight.com (password: demo12345)
 
 **Option B: Use Existing PostgreSQL**
 1. Update DATABASE_URL in .env file with your PostgreSQL connection
 2. Run migrations: `uv run alembic upgrade head`
+3. Optionally seed demo users: `uv run python scripts/seed_demo_users.py`
 
-**Note:** The app works without a database for basic testing, but you'll need it for full functionality.
+**Note:** The database is required for authentication, portfolio management, and all core features.
 
 ### Step 6: Start the Server
 
@@ -129,7 +158,7 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ```
 
-### Step 6: Verify Everything Works
+### Step 7: Verify Everything Works
 
 **Option A: Run Automated Verification**
 ```bash
@@ -141,6 +170,32 @@ uv run python scripts/verify_setup.py
 2. You should see: `{"message": "SigmaSight Backend API", "version": "1.0.0"}`
 3. Check API docs: http://localhost:8000/docs
 4. Test health endpoint: http://localhost:8000/health
+
+### Step 8: Test Authentication (Optional)
+
+**Run the authentication test suite:**
+```bash
+uv run python scripts/test_auth.py
+```
+
+This will test:
+- User registration and validation
+- Login with demo users
+- JWT token generation and refresh
+- Protected route access
+- Error handling
+
+**Or test manually with curl:**
+```bash
+# Login with demo user
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo_growth@sigmasight.com", "password": "demo12345"}'
+
+# Use the returned access_token to access protected endpoints
+curl -X GET http://localhost:8000/api/v1/auth/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN_HERE"
+```
 
 ## ⚡ Automated Setup (Alternative)
 
@@ -169,13 +224,18 @@ Run this checklist to ensure identical setup:
 
 - [ ] Python 3.11+ installed (`python --version` or `python3 --version`)
 - [ ] UV package manager installed (`uv --version`)
+- [ ] Docker Desktop installed and running (for database)
 - [ ] Repository cloned and in correct directory
 - [ ] Dependencies installed (`uv sync` completed successfully)
-- [ ] Environment file created (`.env` exists)
+- [ ] Environment file created (`.env` exists with correct DATABASE_URL)
+- [ ] PostgreSQL container running (`docker-compose ps` shows postgres as "Up")
+- [ ] Database migrations applied (`uv run alembic upgrade head` succeeded)
+- [ ] Demo users seeded (optional: `uv run python scripts/seed_demo_users.py`)
 - [ ] Server starts without errors (`uv run python run.py`)
 - [ ] API responds at http://localhost:8000
 - [ ] API documentation loads at http://localhost:8000/docs
 - [ ] Health check works at http://localhost:8000/health
+- [ ] Authentication works (login with demo_growth@sigmasight.com / demo12345)
 - [ ] All verification tests pass (`uv run python scripts/verify_setup.py`)
 
 ## 🔧 API Documentation
@@ -216,6 +276,18 @@ Once the server is running:
 **Dependencies fail to install**
 - Try: `uv sync --reinstall`
 - Ensure internet connection is stable
+
+**"Docker not running" or database connection errors**
+- Ensure Docker Desktop is running (check system tray/menu bar)
+- Run `docker-compose up -d` to start PostgreSQL
+- Check container status: `docker-compose ps`
+- Verify .env has correct DATABASE_URL matching docker-compose.yml
+
+**"Alembic migration failed"**
+- Check database is running: `docker-compose ps`
+- Ensure .env DATABASE_URL matches docker-compose credentials
+- Try: `docker-compose down` then `docker-compose up -d`
+- Check logs: `docker-compose logs postgres`
 
 ### Get Help:
 1. Run the verification script: `uv run python scripts/verify_setup.py`
