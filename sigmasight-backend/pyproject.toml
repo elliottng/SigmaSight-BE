@@ -38,6 +38,9 @@ dependencies = [
     # Options Calculations
     "scipy>=1.11.0",
     "py-vollib>=1.0.1",
+    "mibian>=0.1.3",
+    "statsmodels>=0.14.0",
+    "empyrical>=0.5.5",
     # Utils
     "httpx>=0.25.0",
     "redis>=5.0.0",
