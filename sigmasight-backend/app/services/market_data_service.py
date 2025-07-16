@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.config import settings
 from app.models.market_data import MarketDataCache
 from app.core.logging import get_logger
+from app.services.rate_limiter import polygon_rate_limiter, ExponentialBackoff
 
 logger = get_logger(__name__)
 
@@ -55,36 +56,90 @@ class MarketDataService:
         
         for symbol in symbols:
             try:
-                # Get daily bars from Polygon
-                bars = self.polygon_client.get_aggs(
-                    ticker=symbol.upper(),
-                    multiplier=1,
-                    timespan="day",
-                    from_=start_date.strftime("%Y-%m-%d"),
-                    to=end_date.strftime("%Y-%m-%d"),
-                    adjusted=True,
-                    sort="asc",
-                    limit=50000
-                )
+                # Apply rate limiting before API call
+                await polygon_rate_limiter.acquire()
                 
+                # Get daily bars from Polygon with pagination support
+                all_bars = []
+                next_url = None
+                page_count = 0
+                
+                while True:
+                    page_count += 1
+                    
+                    if next_url:
+                        # Fetch next page using pagination URL
+                        await polygon_rate_limiter.acquire()
+                        response = self.polygon_client._get_raw(next_url)
+                    else:
+                        # Initial request
+                        response = self.polygon_client.get_aggs(
+                            ticker=symbol.upper(),
+                            multiplier=1,
+                            timespan="day",
+                            from_=start_date.strftime("%Y-%m-%d"),
+                            to=end_date.strftime("%Y-%m-%d"),
+                            adjusted=True,
+                            sort="asc",
+                            limit=50000,
+                            raw=True  # Get raw response to check for pagination
+                        )
+                    
+                    # Extract bars from response
+                    if hasattr(response, 'results'):
+                        bars = response.results
+                    elif isinstance(response, dict) and 'results' in response:
+                        bars = response['results']
+                    else:
+                        # Fallback for non-paginated response
+                        bars = response
+                        all_bars.extend(bars)
+                        break
+                    
+                    all_bars.extend(bars)
+                    
+                    # Check for pagination
+                    if hasattr(response, 'next_url') and response.next_url:
+                        next_url = response.next_url
+                        logger.debug(f"Fetching page {page_count + 1} for {symbol}")
+                    elif isinstance(response, dict) and response.get('next_url'):
+                        next_url = response['next_url']
+                        logger.debug(f"Fetching page {page_count + 1} for {symbol}")
+                    else:
+                        break
+                
+                # Process all bars
                 price_data = []
-                for bar in bars:
+                for bar in all_bars:
+                    # Handle both object and dict formats
+                    if hasattr(bar, 'timestamp'):
+                        timestamp = bar.timestamp
+                        open_price = bar.open
+                        high_price = bar.high
+                        low_price = bar.low
+                        close_price = bar.close
+                        volume = bar.volume
+                    else:
+                        timestamp = bar['t']
+                        open_price = bar['o']
+                        high_price = bar['h']
+                        low_price = bar['l']
+                        close_price = bar['c']
+                        volume = bar['v']
+                    
                     price_data.append({
                         'symbol': symbol.upper(),
-                        'date': datetime.fromtimestamp(bar.timestamp / 1000).date(),
-                        'open': Decimal(str(bar.open)),
-                        'high': Decimal(str(bar.high)),
-                        'low': Decimal(str(bar.low)),
-                        'close': Decimal(str(bar.close)),
-                        'volume': bar.volume,
+                        'date': datetime.fromtimestamp(timestamp / 1000).date(),
+                        'open': Decimal(str(open_price)),
+                        'high': Decimal(str(high_price)),
+                        'low': Decimal(str(low_price)),
+                        'close': Decimal(str(close_price)),
+                        'volume': volume,
                         'data_source': 'polygon'
                     })
                 
                 results[symbol] = price_data
-                logger.info(f"Fetched {len(price_data)} price records for {symbol}")
-                
-                # Add small delay to respect rate limits
-                await asyncio.sleep(0.1)
+                logger.info(f"Fetched {len(price_data)} price records for {symbol} across {page_count} page(s)")
                 
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {str(e)}")
@@ -107,14 +162,14 @@ class MarketDataService:
         
         for symbol in symbols:
             try:
+                # Apply rate limiting before API call
+                await polygon_rate_limiter.acquire()
+                
                 # Get last trade from Polygon
                 last_trade = self.polygon_client.get_last_trade(ticker=symbol.upper())
                 if last_trade:
                     current_prices[symbol] = Decimal(str(last_trade.price))
                     logger.debug(f"Current price for {symbol}: {last_trade.price}")
-                
-                # Small delay for rate limiting
-                await asyncio.sleep(0.05)
                 
             except Exception as e:
                 logger.error(f"Error fetching current price for {symbol}: {str(e)}")
@@ -175,22 +230,55 @@ class MarketDataService:
         logger.info(f"Fetching options chain for {symbol}")
         
         try:
-            # Get options contracts
-            if expiration_date:
-                exp_date_str = expiration_date.strftime("%Y-%m-%d")
-                contracts = self.polygon_client.list_options_contracts(
-                    underlying_ticker=symbol.upper(),
-                    expiration_date=exp_date_str,
-                    limit=1000
-                )
-            else:
-                contracts = self.polygon_client.list_options_contracts(
-                    underlying_ticker=symbol.upper(),
-                    limit=1000
-                )
+            # Apply rate limiting before API call
+            await polygon_rate_limiter.acquire()
+            
+            # Get options contracts with pagination support
+            all_contracts = []
+            next_url = None
+            page_count = 0
+            
+            while True:
+                page_count += 1
+                
+                if next_url:
+                    # Fetch next page
+                    await polygon_rate_limiter.acquire()
+                    response = self.polygon_client._get_raw(next_url)
+                    if isinstance(response, dict) and 'results' in response:
+                        contracts = response['results']
+                        next_url = response.get('next_url')
+                    else:
+                        break
+                else:
+                    # Initial request
+                    if expiration_date:
+                        exp_date_str = expiration_date.strftime("%Y-%m-%d")
+                        contracts = self.polygon_client.list_options_contracts(
+                            underlying_ticker=symbol.upper(),
+                            expiration_date=exp_date_str,
+                            limit=1000
+                        )
+                    else:
+                        contracts = self.polygon_client.list_options_contracts(
+                            underlying_ticker=symbol.upper(),
+                            limit=1000
+                        )
+                    
+                    # Check if this is a paginated response
+                    if hasattr(contracts, '__iter__'):
+                        all_contracts.extend(contracts)
+                        break  # No pagination in current response format
+                
+                all_contracts.extend(contracts)
+                
+                if not next_url:
+                    break
+                
+                logger.debug(f"Fetching page {page_count + 1} of options contracts for {symbol}")
             
             options_data = []
-            for contract in contracts:
+            for contract in all_contracts:
                 options_data.append({
                     'ticker': contract.ticker,
                     'underlying_ticker': contract.underlying_ticker,
@@ -200,7 +288,7 @@ class MarketDataService:
                     'exercise_style': getattr(contract, 'exercise_style', 'american'),
                 })
             
-            logger.info(f"Fetched {len(options_data)} option contracts for {symbol}")
+            logger.info(f"Fetched {len(options_data)} option contracts for {symbol} across {page_count} page(s)")
             return options_data
             
         except Exception as e:

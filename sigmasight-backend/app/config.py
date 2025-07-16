@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     
     # Market data API keys
     POLYGON_API_KEY: str = Field(..., env="POLYGON_API_KEY")
+    POLYGON_PLAN: str = Field(default="free", env="POLYGON_PLAN")  # free, starter, developer, advanced
     
     # JWT settings
     SECRET_KEY: str = Field(..., env="SECRET_KEY")

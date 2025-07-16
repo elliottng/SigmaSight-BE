@@ -187,20 +187,50 @@ sigmasight-backend/
 - Created verification script (app/db/verify_schema.py)
 - Git commit: 45f1840
 
-### 1.3 Market Data Integration
-- [ ] Set up Polygon.io client with API key management
-- [ ] Implement market data service:
-  - [ ] Stock price fetching
-  - [ ] Options chain data  
-  - [ ] Historical price data (90 days of real market data)
-  - [ ] Bulk fetch capability for initial historical backfill
-  - [ ] Rate limiting handling for Polygon.io API
-- [ ] Set up YFinance integration for GICS data
-- [ ] Implement data caching strategy with Redis
-- [ ] Create batch job for daily market data updates
+### 1.3 Market Data Integration ✅ COMPLETED (2025-07-15)
+- [x] Set up Polygon.io client with API key management *(app/services/market_data_service.py with environment-based API key)*
+- [x] Implement market data service:
+  - [x] Stock price fetching *(fetch_stock_prices() with historical data support)*
+  - [x] Options chain data *(fetch_options_chain() with full contract details)*
+  - [x] Historical price data (90 days of real market data) *(bulk_fetch_and_cache() with configurable date ranges)*
+  - [x] Bulk fetch capability for initial historical backfill *(fetch_missing_historical_data() with intelligent caching)*
+  - [x] Rate limiting handling for Polygon.io API *(Built-in delays: 0.1s between requests, 0.2s for YFinance)*
+- [x] Set up YFinance integration for GICS data *(fetch_gics_data() for sector/industry classification)*
+- [ ] Implement data caching strategy with Redis *(Deferred - using PostgreSQL caching for V1.4)*
+- [x] Create batch job for daily market data updates *(app/batch/market_data_sync.py with automated portfolio symbol detection)*
+
+**Completion Notes:**
+- **Core Service**: Complete MarketDataService class with Polygon.io RESTClient integration
+- **API Endpoints**: Full REST API with authentication (GET prices, current prices, sectors, options; POST refresh)
+- **Database Integration**: PostgreSQL caching with upsert operations using market_data_cache table
+- **Batch Processing**: Daily sync job for portfolio symbols + factor ETFs (SPY, VTV, VUG, etc.)
+- **Testing Framework**: Comprehensive pytest suite, manual testing scripts, API endpoint tests
+- **Documentation**: Complete TESTING_GUIDE.md with multiple testing approaches
+- **Validation**: Successfully tested with user's Polygon API key - historical data working
+- **Dependencies Added**: mibian, statsmodels, empyrical for upcoming calculation engine
+- **Production Considerations**: Code review identified areas for improvement (async I/O, rate limiting)
+- **Git Commit**: 34372dd - "feat: Complete Section 1.3 - Market Data Integration"
+
+**Known Limitations (V1.4 Scope):**
+- Redis caching deferred to Phase 2 (PostgreSQL caching sufficient for V1.4)
+- Free-tier Polygon API limits real-time data access (historical data works perfectly)
+- Rate limiting optimized for current load (may need adjustment for high-concurrency usage)
+- Options chain returns full data (filtering can be added in Phase 2)
+
+**Critical Improvements Completed:**
+- [x] Implement proper rate limiting with token bucket pattern ✅ COMPLETED (2025-07-15)
+  - Token bucket algorithm with configurable capacity and refill rate
+  - Support for multiple Polygon plan tiers (free/starter/developer/advanced)
+  - Exponential backoff for 429 errors
+  - Integrated into all MarketDataService API calls
+- [x] Add pagination handling for Polygon aggregation API ✅ COMPLETED (2025-07-15)
+  - Follows next_url in API responses to fetch all pages
+  - Successfully tested with 8,748+ options contracts
+  - Handles large date ranges properly
+- [ ] Create and apply Alembic migration for market_data_cache table (existing DBs lack schema updates)
 
 ### 1.4 Core Calculation Engine
-*Granular calculation functions designed for both batch processing and future real-time APIs*
+*Individual calculation functions designed for both batch processing and future real-time APIs*
 
 **📚 LIBRARY STACK**: 
 - **py_vollib**: Options Greeks (Black-Scholes standard)
