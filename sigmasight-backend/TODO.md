@@ -249,22 +249,41 @@ sigmasight-backend/
 - Extract business logic and mathematical formulas, but modernize for FastAPI/PostgreSQL
 - See `README_legacy.md` for migration guidelines
 
-#### 1.4.1 Market Data Calculations (No Dependencies)
-- [ ] **`calculate_position_market_value(position, current_price)`**
-  - Input: Position object, current market price
-  - Output: Current market value, unrealized P&L
+#### 1.4.1 Market Data Calculations (Database Integrated) ✅ COMPLETED (2025-07-16)
+- [x] **`calculate_position_market_value(position, current_price)`**
+  - Input: Position object, current market price (Decimal)
+  - Output: Dict with market_value, exposure, unrealized_pnl
+  - Business Logic: market_value = abs(quantity) × price × multiplier; exposure = quantity × price × multiplier
+  - Options: 1 contract = 100 shares multiplier
   - File: `app/calculations/market_data.py`
 
-- [ ] **`calculate_daily_pnl(position, previous_price, current_price)`**
-  - Input: Position, previous close, current price
-  - Output: Daily P&L (realized + unrealized)
+- [x] **`calculate_daily_pnl(db, position, current_price)`**
+  - **Updated Function Signature**: Now takes (db, position, current_price) instead of (position, previous_price, current_price)
+  - Input: Database session, Position object, current price (Decimal)
+  - Output: Dict with daily_pnl, daily_return, price_change
+  - **Database Integration**: Automatically queries market_data_cache for previous trading day price
+  - **Fallback Behavior**: Uses position.last_price if no market data found in cache
+  - **Robust Price Lookup**: Handles missing historical data gracefully
+  - Database: Queries market_data_cache for previous close price with date filtering
   - File: `app/calculations/market_data.py`
 
-- [ ] **`fetch_and_cache_prices(symbols_list)`**
-  - Input: List of unique symbols from positions
-  - Output: Updated market_data_cache table
-  - Dependencies: Polygon.io API, YFinance for GICS
+- [x] **`fetch_and_cache_prices(db, symbols_list)`**
+  - Input: Database session, List of unique symbols from positions
+  - Output: Dict mapping symbol to current price (Decimal)
+  - Integration: Uses existing MarketDataService.fetch_current_prices()
+  - Caching: Updates market_data_cache table for valid prices
+  - Fallback: Retrieves cached prices for symbols with fetch failures
+  - Dependencies: Polygon.io API via MarketDataService
   - File: `app/calculations/market_data.py`
+
+**Implementation Notes:**
+- **Database Integration**: All functions now include database integration for robust price lookups
+- **Automated Previous Price Retrieval**: calculate_daily_pnl automatically queries market_data_cache instead of requiring previous_price parameter
+- **Fallback Strategy**: Uses position.last_price field when market_data_cache lacks historical data
+- **Maintains Legacy Business Logic**: market value always positive, exposure signed
+- **Options handling**: 100x multiplier for contract-to-share conversion
+- **Error handling**: Graceful fallbacks to cached data when API fails
+- **Database Performance**: Uses efficient SQL queries with proper indexing on market_data_cache(symbol, date)
 
 #### 1.4.2 Options Greeks Calculations - V1.4 Hybrid (Depends on 1.4.1)
 - [ ] **`calculate_greeks_hybrid(position, market_data)`**
@@ -475,20 +494,22 @@ sigmasight-backend/
 
 ## 🎯 Phase 1 Summary
 
-**✅ Completed:** 1.1, 1.2  
+**✅ Completed:** 1.1, 1.2, 1.3, 1.4.1  
 **🔄 In Progress:** None  
-**📋 Remaining:** 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13
+**📋 Remaining:** 1.4.2-1.4.6, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13
 
 **Key Achievements:**
 - Authentication system with JWT tokens fully tested
 - All database models and Pydantic schemas implemented
 - Factor definitions seeded with ETF proxies
 - New tables for modeling sessions, export history, and backfill progress
+- Complete market data integration with Polygon.io and YFinance
+- Database-integrated market data calculations (section 1.4.1) with improved function signatures
 - Git commit 45f1840 with comprehensive implementation
 
 **Next Priority:**
-- Section 1.3: Market Data Integration (Polygon.io client setup)
-- Section 1.4: Core Calculation Engine (quantitative libraries)
+- Section 1.4.2: Options Greeks Calculations - V1.4 Hybrid
+- Section 1.4.3: Portfolio Aggregation
 - Section 1.5: Demo Data Seeding (sample portfolios)
 
 ---
