@@ -158,25 +158,34 @@ sigmasight-backend/
   - [x] Verify JWT token expiration and validation
   - [x] Test authentication error handling and logging
 
-### 1.2 Database Models & Seeding
+### 1.2 Database Models & Seeding ✅ COMPLETED (2025-07-15)
 - [x] Implement core SQLAlchemy models *(users, portfolios, positions, tags, market_data, greeks, snapshots, batch_jobs)*
-- [ ] Implement missing models from DATABASE_DESIGN_ADDENDUM_V1.4.1:
-  - [ ] modeling_session_snapshots table (for what-if scenarios)
-  - [ ] export_history table (track exports)
-  - [ ] Update FactorDefinition model to match addendum (add etf_proxy, display_order fields)
+- [x] Implement missing models from DATABASE_DESIGN_ADDENDUM_V1.4.1:
+  - [x] modeling_session_snapshots table (for what-if scenarios) *(app/models/modeling.py with JSONB fields)*
+  - [x] export_history table (track exports) *(app/models/history.py with type/format constraints)*
+  - [x] Update FactorDefinition model to match addendum (add etf_proxy, display_order fields) *(Migration applied)*
   - [x] Update market_data_cache to include sector/industry fields *(Already implemented)*
-- [ ] Create database seeding scripts:
+- [x] Create database seeding scripts:
   - [x] Demo users (demo_growth, demo_value, demo_balanced) *(scripts/seed_demo_users.py ready)*
-  - [ ] Sample portfolios with strategy characteristics
-  - [ ] Historical positions (90 days)
-  - [ ] Pre-calculated risk metrics
-  - [ ] Sample tags and strategies
-  - [ ] Load 8 fixed factors into factors table
-- [ ] Create Pydantic schemas for all models
-- [ ] Generate historical snapshots (90 days with realistic variations)
-  - [ ] Use real historical market data from Polygon.io
-  - [ ] Calculate actual P&L from real price movements
-  - [ ] Only generate snapshots for actual trading days
+  - [ ] Sample portfolios with strategy characteristics *(Deferred to section 1.5)*
+  - [ ] Historical positions (90 days) *(Deferred to section 1.5)*
+  - [ ] Pre-calculated risk metrics *(Deferred to section 1.5)*
+  - [ ] Sample tags and strategies *(Deferred to section 1.5)*
+  - [x] Load 8 fixed factors into factors table *(app/db/seed_factors.py - all 8 factors seeded with ETF proxies)*
+- [x] Create Pydantic schemas for all models *(app/schemas/ with CRUD pattern for all new models)*
+- [ ] Generate historical snapshots (90 days with realistic variations) *(Deferred to section 1.5)*
+  - [ ] Use real historical market data from Polygon.io *(Deferred to section 1.5)*
+  - [ ] Calculate actual P&L from real price movements *(Deferred to section 1.5)*
+  - [ ] Only generate snapshots for actual trading days *(Deferred to section 1.5)*
+
+**Completion Notes:**
+- Created ModelingSessionSnapshot, ExportHistory, and HistoricalBackfillProgress models
+- Added relationships: User.modeling_sessions
+- Implemented full Pydantic schema hierarchy with base classes and CRUD patterns
+- Successfully seeded all 8 factors with ETF proxies and display order
+- Applied migrations for new tables and FactorDefinition updates
+- Created verification script (app/db/verify_schema.py)
+- Git commit: 45f1840
 
 ### 1.3 Market Data Integration
 - [ ] Set up Polygon.io client with API key management
@@ -310,7 +319,28 @@ sigmasight-backend/
   - Output: Historical snapshot records with realistic variations
   - File: `app/calculations/snapshots.py`
 
-### 1.5 Batch Processing Framework
+### 1.5 Demo Data Seeding
+*Create comprehensive demo data for testing and demonstration*
+
+- [ ] Create sample portfolio data:
+  - [ ] Sample portfolios with strategy characteristics (from SAMPLE_PORTFOLIO_SPEC.md)
+  - [ ] Historical positions (90 days) with realistic variations
+  - [ ] Pre-calculated risk metrics for demo purposes
+  - [ ] Sample tags and strategies for each portfolio
+
+- [ ] Generate historical snapshots:
+  - [ ] Use real historical market data from Polygon.io
+  - [ ] Calculate actual P&L from real price movements
+  - [ ] Only generate snapshots for actual trading days
+  - [ ] 90 days of portfolio history with realistic variations
+
+- [ ] Implement demo data seeding scripts:
+  - [ ] `app/db/seed_demo_portfolios.py` - Create 3 demo portfolios
+  - [ ] `app/db/seed_historical_data.py` - Fetch and store 90 days of market data
+  - [ ] `app/db/seed_portfolio_snapshots.py` - Generate historical snapshots
+  - [ ] `app/db/seed_risk_metrics.py` - Pre-calculate risk metrics for demos
+
+### 1.6 Batch Processing Framework
 *Orchestrates calculation functions for automated daily processing*
 
 - [ ] Create batch job framework:
@@ -346,7 +376,7 @@ sigmasight-backend/
 
 - [ ] Add job monitoring and error handling
 
-### 1.6 Portfolio Management APIs
+### 1.7 Portfolio Management APIs
 - [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
 - [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
 - [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
@@ -355,7 +385,7 @@ sigmasight-backend/
 - [ ] Add position type detection logic
 - [ ] Implement exposure calculations (notional & delta-adjusted)
 
-### 1.7 Position Management APIs
+### 1.8 Position Management APIs
 - [ ] **GET /api/v1/positions** - List positions with filtering
 - [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
 - [ ] **GET /api/v1/positions/{id}** - Individual position details
@@ -365,7 +395,7 @@ sigmasight-backend/
 - [ ] **GET /api/v1/strategies** - Strategy groupings
 - [ ] Implement position grouping logic
 
-### 1.8 Risk Analytics APIs
+### 1.9 Risk Analytics APIs
 - [ ] Implement simplified Black-Scholes calculator
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
@@ -374,13 +404,26 @@ sigmasight-backend/
 - [ ] Create Greeks aggregation logic
 - [ ] Implement delta-adjusted exposure calculations
 
-### 1.9 API Infrastructure  
+### 1.10 Factor Analysis APIs
+- [ ] **GET /api/v1/factors/definitions** - List factor definitions
+- [ ] **GET /api/v1/factors/exposures** - Portfolio factor exposures
+- [ ] **GET /api/v1/factors/correlation** - Factor correlation matrix
+- [ ] Implement factor exposure calculations
+
+### 1.11 Tag Management APIs
+- [ ] **GET /api/v1/tags** - List all tags
+- [ ] **POST /api/v1/tags** - Create new tag
+- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
+- [ ] **DELETE /api/v1/tags/{id}** - Delete tag
+- [ ] Implement tag validation and limits
+
+### 1.12 API Infrastructure  
 - [ ] Add user activity logging
 - [ ] Create data validation middleware
 - [ ] Add rate limiting (100 requests/minute per user)
 - [ ] Set up request/response logging
 
-### 1.10 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
+### 1.13 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
 **Week 1 Priority - Core Tables:**
 - Users & Authentication
 - Portfolios & Positions (with options parsing)
@@ -397,6 +440,26 @@ sigmasight-backend/
 - Batch Jobs
 - Demo Data Generation (3 demo users)
 - Historical Snapshots (90 days)
+
+---
+
+## 🎯 Phase 1 Summary
+
+**✅ Completed:** 1.1, 1.2  
+**🔄 In Progress:** None  
+**📋 Remaining:** 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13
+
+**Key Achievements:**
+- Authentication system with JWT tokens fully tested
+- All database models and Pydantic schemas implemented
+- Factor definitions seeded with ETF proxies
+- New tables for modeling sessions, export history, and backfill progress
+- Git commit 45f1840 with comprehensive implementation
+
+**Next Priority:**
+- Section 1.3: Market Data Integration (Polygon.io client setup)
+- Section 1.4: Core Calculation Engine (quantitative libraries)
+- Section 1.5: Demo Data Seeding (sample portfolios)
 
 ---
 
