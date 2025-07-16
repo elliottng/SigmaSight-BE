@@ -75,11 +75,16 @@ Features:
 - Group by type or tag
 - Include current market values and P&L
 
-#### Position Greeks (Mock Data)
+#### Position Greeks (Hybrid Real/Mock Calculations)
 ```
 GET /api/v1/risk/greeks?view=portfolio|longs|shorts
 ```
-Mock Greeks by Position Type:
+**V1.4 Hybrid Approach**:
+- **Real calculations** for options using `py_vollib` or `mibian` libraries
+- **Fallback to mock values** if real calculation fails or data unavailable
+- Stock positions always use delta=1.0 (long) or -1.0 (short)
+
+Mock Greeks Fallback Values:
 
 | Type | Delta | Gamma | Theta | Vega |
 |------|------|------|------|------|
@@ -103,21 +108,26 @@ Eight Factors (with ETF proxies):
 7. Low Volatility (SPLV)
 8. Short Interest (custom calculation)
 
-Calculation Method:
-- 60-day rolling window
-- Daily returns regression
+**V1.4 Hybrid Calculation Method**:
+- **Real calculations** for 7 of 8 factors using `statsmodels` regression
+- 60-day rolling window with daily returns
 - Position-level betas aggregated by portfolio weights
+- **Mock calculation** only for Short Interest factor (custom logic TBD)
+- Leverages legacy `factors_utils.py` calculation logic
 
 #### Risk Metrics
 ```
 GET /api/v1/risk/metrics
 ```
-Pre-calculated Metrics:
-- Portfolio Beta (weighted average vs SPY)
-- Annualized Volatility (60-day rolling)
-- Sharpe Ratio
-- Maximum Drawdown (90-day period)
-- Value at Risk (95% confidence, 1-day)
+**V1.4 Hybrid Risk Metrics**:
+- **Real calculations** using `empyrical` library:
+  - Portfolio Beta (weighted average vs SPY)
+  - Annualized Volatility (60-day rolling)
+  - Sharpe Ratio (with risk-free rate)
+  - Maximum Drawdown (90-day period)
+  - Value at Risk (95% confidence, 1-day)
+- Leverages legacy `var_utils.py` for covariance matrix calculations
+- All metrics calculated during batch processing and cached
 
 ### 3.4 Tag Management
 CRUD Operations
@@ -245,6 +255,58 @@ BATCH_SCHEDULE = {
 }
 ```
 
+### 3.7 Technology Stack and Quantitative Libraries
+
+#### Core Calculation Libraries
+Our technology choices align with institutional quantitative finance practices:
+
+##### Options Pricing and Greeks
+- **Library**: `py_vollib` (pure Python Black-Scholes implementation)
+- **Rationale**: Created by Gammon Capital Management, provides accurate Greeks calculations
+- **Usage**: Real-time options pricing, delta/gamma/theta/vega/rho calculations
+- **Alternative Considered**: QuantLib (too heavyweight for our equity/options focus)
+
+##### Risk Metrics and Performance Analytics  
+- **Library**: `empyrical` (from Quantopian)
+- **Rationale**: Battle-tested by thousands of quants, maintained by "ML for Algorithmic Trading" author
+- **Usage**: Sharpe ratio, maximum drawdown, VaR calculations
+- **Institutional Validation**: Used by Point72-backed platform, standard for Python quants
+
+##### Statistical Analysis and Factor Modeling
+- **Library**: `statsmodels`  
+- **Rationale**: Academic-grade statistics, used by Federal Reserve and major banks
+- **Usage**: Factor regression analysis, beta calculations
+- **Method**: 60-day rolling OLS regression for factor exposures
+
+##### Data Infrastructure
+- **Libraries**: `pandas`, `numpy`, `scipy`
+- **Rationale**: Industry standard at Two Sigma, AQR, Man Group
+- **Evidence**: Public contributions from major funds to these libraries
+
+#### Calculation Architecture Decisions
+
+1. **Hybrid Real/Mock Approach for V1.4**
+   - Real calculations: Portfolio metrics, basic risk metrics, factor betas (7/8), Greeks
+   - Mock calculations: Short interest factor, edge cases
+   - Fallback pattern: Real calculations with mock fallback for robustness
+
+2. **Historical Volatility Proxy**
+   - Using 30-day historical volatility as implied volatility proxy
+   - Industry-standard approach when options market data unavailable
+
+3. **Factor Model Implementation**
+   - 8 factors with ETF proxies (matching institutional approaches)
+   - Real regression-based calculations for 7 factors
+   - Simplified covariance matrix with real correlations
+
+#### Alignment with Institutional Practices
+
+This stack mirrors typical hedge fund infrastructure:
+- Scientific Python ecosystem (same as Two Sigma, AQR)
+- Standard risk metrics for investor reporting
+- Flexibility to add proprietary models later
+- Version-controlled, reproducible calculations
+
 ## 4. Technical Architecture
 ### 4.1 Technology Stack
 - **Language**: Python 3.11+
@@ -337,8 +399,102 @@ Environment variables (.env) and UV `pyproject.toml` settings are defined for da
 ## 5. Implementation Phases
 1. **Phase 1 – Core Infrastructure (Week 1)**: project setup, auth, CSV upload.
 2. **Phase 2 – Data Pipeline (Week 2)**: Polygon integration, batch, risk metrics.
-3. **Phase 3 – API Development (Week 3)**: endpoints, mock Greeks, tag CRUD.
+3. **Phase 3 – API Development (Week 3)**: endpoints, hybrid calculations, tag CRUD.
 4. **Phase 4 – Testing & Deployment (Week 4)**: tests, Railway deploy, performance.
+
+## 6. V1.4 Hybrid Calculation Approach
+
+### 6.1 Overview
+V1.4 implements a hybrid real/mock calculation engine that provides realistic analytics while maintaining system stability. Real calculations are used wherever possible, with mock values as fallbacks.
+
+### 6.2 Real Calculations
+
+#### Options Greeks
+- **Libraries**: `py_vollib` (primary) or `mibian` (fallback)
+- **Inputs**: Current price, strike, expiration, volatility, risk-free rate
+- **Outputs**: Delta, Gamma, Theta, Vega, Rho
+- **Fallback**: Mock values if calculation fails or data missing
+
+#### Factor Betas (7 of 8)
+- **Library**: `statsmodels` for OLS regression
+- **Method**: 60-day rolling regression of position returns vs factor ETF returns
+- **Factors**: Market Beta (SPY), Momentum (MTUM), Value (VTV), Growth (VUG), Quality (QUAL), Size (IWM), Low Volatility (SPLV)
+- **Legacy**: Leverages `factors_utils.py` calculation logic
+
+#### Risk Metrics
+- **Library**: `empyrical` for financial metrics
+- **Metrics**: Sharpe ratio, max drawdown, volatility, VaR
+- **Legacy**: Uses `var_utils.py` for covariance matrix calculations
+
+#### Portfolio Aggregations
+- **Libraries**: `numpy`, `pandas`
+- **Calculations**: Weighted averages, exposures, P&L aggregations
+- **Legacy**: Adapts `reporting_plotting_analytics.py` logic
+
+### 6.3 Mock Calculations
+
+#### Short Interest Factor
+- Custom calculation logic (TBD)
+- No reliable real-time data source in V1.4
+
+#### Fallback Greeks
+- Pre-defined values by position type
+- Used when real calculation fails
+
+### 6.4 Required Dependencies
+
+```toml
+# pyproject.toml dependencies
+[project]
+dependencies = [
+    # Core framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    
+    # Database
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.12.0",
+    
+    # Authentication
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    
+    # Calculation libraries (V1.4 Hybrid)
+    "py_vollib>=1.0.1",      # Options pricing
+    "mibian>=0.1.3",         # Backup options library
+    "empyrical>=0.5.5",      # Risk metrics
+    "statsmodels>=0.14.0",   # Factor regression
+    "numpy>=1.24.0",         # Numerical operations
+    "pandas>=2.0.0",         # Data manipulation
+    
+    # Market data
+    "httpx>=0.25.0",         # Async HTTP client
+    "yfinance>=0.2.28",      # GICS data
+    
+    # Utilities
+    "python-multipart>=0.0.6",  # File uploads
+    "python-dotenv>=1.0.0",     # Environment variables
+]
+```
+
+### 6.5 Calculation Pattern
+
+```python
+async def calculate_with_fallback(calculation_func, fallback_value, **kwargs):
+    """Standard pattern for hybrid calculations"""
+    try:
+        # Attempt real calculation
+        result = await calculation_func(**kwargs)
+        if result is None or math.isnan(result):
+            raise ValueError("Invalid calculation result")
+        return result
+    except Exception as e:
+        logger.warning(f"Calculation failed, using fallback: {e}")
+        return fallback_value
+```
 5. **Phase 5 – ProForma Modeling (Post-Demo)**: session management, real-time calcs.
 
 ## 6. API Endpoint Summary

@@ -530,10 +530,12 @@ GET /api/v1/risk/overview
 }
 ```
 
-### 6.2 Calculate Portfolio Greeks
+### 6.2 Calculate Portfolio Greeks (V1.4 Hybrid)
 ```http
 GET /api/v1/risk/greeks
 ```
+
+**V1.4 Implementation**: Uses real calculations with `py_vollib` for options, falls back to mock values if calculation fails.
 
 #### 6.2.1 Query Parameters
 ```http
@@ -570,10 +572,15 @@ GET /api/v1/risk/greeks
 }
 ```
 
-### 6.3 Calculate Greeks for Modified Positions
+### 6.3 Calculate Greeks for Modified Positions (V1.4 Hybrid)
 ```http
 POST /api/v1/risk/greeks/calculate
 ```
+
+**V1.4 Implementation**: 
+- Attempts real-time calculation using `py_vollib` or `mibian`
+- Falls back to mock values if missing data or calculation error
+- Requires underlying price from market data cache
 
 #### 6.3.1 Query Parameters
 ```http
@@ -657,10 +664,16 @@ GET /api/v1/risk/factors/definitions
 }
 ```
 
-### 6.5 Get Factor Exposures
+### 6.5 Get Factor Exposures (V1.4 Hybrid)
 ```http
 GET /api/v1/risk/factors
 ```
+
+**V1.4 Implementation**:
+- **Real calculations** for 7 factors using `statsmodels` OLS regression
+- 60-day rolling window with position returns vs factor ETF returns
+- **Mock value** (0.0) for Short Interest factor
+- Leverages legacy `factors_utils.py` logic
 
 #### 6.5.1 Query Parameters
 ```http

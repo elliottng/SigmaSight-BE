@@ -2,6 +2,8 @@
 
 > **UPDATE**: The DATABASE_DESIGN_ADDENDUM_V1.4.1.md and PRD_TAGS_V1.4.1.md documents have resolved most of these questions. This document now tracks both the original questions and their resolutions.
 
+> **V1.4 HYBRID APPROACH UPDATE**: All project documentation has been updated to reflect the hybrid real/mock calculation approach. Real calculations are implemented for Greeks (py_vollib), factor betas (statsmodels), and risk metrics (empyrical) with fallback to mock values when data is unavailable or calculations fail.
+
 ## 1. Database Schema Gaps ✅ RESOLVED
 
 ### 1.1 Missing Core Tables ✅ RESOLVED
@@ -24,10 +26,11 @@
 - ✅ RESOLVED - Auth endpoints to be implemented in API layer
 
 ## 3. Greeks Calculation Contradiction ✅ RESOLVED
-- ✅ RESOLVED - Phase 1 uses MOCK VALUES ONLY (Section 2.2)
-- Mock Greeks values provided by position type
-- `/api/v1/risk/greeks/calculate` endpoint will return mock values
-- Real calculations deferred to future phases
+- ✅ RESOLVED - V1.4 uses HYBRID REAL/MOCK APPROACH
+- Real calculations using `py_vollib` or `mibian` for options
+- Fallback to mock values if calculation fails or data missing
+- `/api/v1/risk/greeks/calculate` endpoint attempts real calculations first
+- Updated in PRD_V1.4.md Section 6 and DATABASE_DESIGN_ADDENDUM Section 2.2
 
 ## 4. Tag System Architecture ✅ RESOLVED
 - ✅ RESOLVED - Complete schema in DATABASE_DESIGN_ADDENDUM Section 1.4

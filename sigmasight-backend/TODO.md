@@ -1,7 +1,13 @@
 # SigmaSight Backend Implementation TODO
 
 ## Project Overview
-Build a FastAPI backend for SigmaSight portfolio risk management platform with Railway deployment, PostgreSQL database, Polygon.io/YFinance market data integration, and simplified Black-Scholes options calculations.
+Build a FastAPI backend for SigmaSight portfolio risk management platform with Railway deployment, PostgreSQL database, Polygon.io/YFinance market data integration, and **V1.4 hybrid real/mock calculation engine**.
+
+### V1.4 Hybrid Calculation Approach
+- **Real calculations** for Greeks (py_vollib), factor betas (statsmodels), and risk metrics (empyrical)
+- **Fallback to mock values** when data unavailable or calculations fail
+- **Legacy business logic** modernized with async patterns and type safety
+- **Batch processing** for heavy calculations, API serves cached results
 
 ## Phase 0: Project Setup & Infrastructure (Week 1)
 
@@ -37,9 +43,12 @@ Build a FastAPI backend for SigmaSight portfolio risk management platform with R
 - [x] pandas *(v2.3.1 installed)*
 - [x] numpy *(v2.3.1 installed)*
 
-# Options Calculations
+# Calculations (V1.4 Hybrid Engine)
 - [x] scipy *(v1.16.0 installed)*
-- [x] py_vollib *(v1.0.1 installed)*
+- [x] py_vollib *(v1.0.1 installed - real Greeks)*
+- [ ] mibian *(fallback Greeks calculations)*
+- [ ] statsmodels *(factor beta regressions)*
+- [ ] empyrical *(risk metrics: Sharpe, VaR, etc.)*
 
 # Utils
 - [x] httpx *(v0.28.1 installed)*
@@ -179,6 +188,17 @@ sigmasight-backend/
 ### 1.4 Core Calculation Engine
 *Granular calculation functions designed for both batch processing and future real-time APIs*
 
+**📚 LIBRARY STACK**: 
+- **py_vollib**: Options Greeks (Black-Scholes standard)
+- **empyrical**: Risk metrics (Sharpe, VaR, max drawdown)  
+- **statsmodels**: Factor regression analysis
+- **pandas/numpy**: Data manipulation and matrix operations
+
+**🎯 V1.4 APPROACH**: Hybrid real/mock calculations
+- Real: Greeks, risk metrics, factor betas (7/8), portfolio aggregations
+- Mock: Short interest factor, fallback values
+- See ANALYTICAL_ARCHITECTURE_V1.4.md for detailed rationale
+
 **⚠️ IMPORTANT**: Before implementing any calculation function, review the legacy analytics code in:
 - `_docs/requirements/legacy_scripts_for_reference_only/legacy_analytics_for_reference/`
 - Key files: `factors_utils.py`, `var_utils.py`, `reporting_plotting_analytics.py`
@@ -202,21 +222,21 @@ sigmasight-backend/
   - Dependencies: Polygon.io API, YFinance for GICS
   - File: `app/calculations/market_data.py`
 
-#### 1.4.2 Options Greeks Calculations (Depends on 1.4.1)
-- [ ] **`calculate_black_scholes_greeks(option_params)`**
-  - Input: Strike, expiry, underlying_price, volatility, risk_free_rate
-  - Output: Delta, gamma, theta, vega, rho
-  - File: `app/calculations/greeks.py`
-
-- [ ] **`apply_mock_greeks_by_position_type(position)`**
-  - Input: Position with type (LC, LP, SC, SP, LONG, SHORT)
-  - Output: Mock Greeks values for V1.4 demo
-  - File: `app/calculations/greeks.py`
-
-- [ ] **`calculate_position_greeks(position, market_data)`**
+#### 1.4.2 Options Greeks Calculations - V1.4 Hybrid (Depends on 1.4.1)
+- [ ] **`calculate_greeks_hybrid(position, market_data)`**
   - Input: Position object, current market data
-  - Output: Position-level Greeks (delta, gamma, theta, vega)
-  - Dependencies: Market data calculations
+  - Output: Position-level Greeks (delta, gamma, theta, vega, rho)
+  - Implementation: Try py_vollib first, fallback to mock values
+  - File: `app/calculations/greeks.py`
+
+- [ ] **`calculate_real_greeks(option_params)`**
+  - Input: Strike, expiry, underlying_price, volatility, risk_free_rate
+  - Output: Real Greeks using py_vollib BSM model
+  - File: `app/calculations/greeks.py`
+
+- [ ] **`get_mock_greeks_fallback(position_type, quantity)`**
+  - Input: Position type (LC, LP, SC, SP, LONG, SHORT), quantity
+  - Output: Scaled mock Greeks values (fallback)
   - File: `app/calculations/greeks.py`
 
 #### 1.4.3 Portfolio Aggregation (Depends on 1.4.1, 1.4.2)
@@ -236,36 +256,41 @@ sigmasight-backend/
   - Dependencies: Greeks calculations
   - File: `app/calculations/portfolio.py`
 
-#### 1.4.4 Risk Factor Analysis (Depends on 1.4.2)
-- [ ] **`calculate_factor_exposures(position, market_data)`**
-  - Input: Position, market data with sector/industry
-  - Output: 8-factor exposure (Market Beta, Momentum, Value, Growth, Quality, Size, Low Vol, Short Interest)
+#### 1.4.4 Risk Factor Analysis - V1.4 Hybrid (Depends on 1.4.2)
+- [ ] **`calculate_factor_betas_hybrid(position_returns, factor_returns)`**
+  - Input: 60-day position returns, factor ETF returns
+  - Output: 8-factor betas (7 real via statsmodels, 1 mock for Short Interest)
+  - Implementation: Uses legacy `factors_utils.py` logic with statsmodels OLS
   - File: `app/calculations/factors.py`
 
-- [ ] **`apply_mock_factor_exposures(position)`**
-  - Input: Position object
-  - Output: Mock factor exposures using MOCK_FACTOR_EXPOSURES
+- [ ] **`calculate_position_betas(factor_returns_df, position_returns_df)`**
+  - Input: Factor returns DataFrame, position returns DataFrame
+  - Output: Adjusted position-level betas using legacy logic
   - File: `app/calculations/factors.py`
 
-- [ ] **`calculate_factor_covariance_matrix()`**
+- [ ] **`get_factor_covariance_matrix()`**
   - Input: None (uses static identity matrix for V1.4)
-  - Output: 8x8 covariance matrix
+  - Output: 8x8 covariance matrix (np.eye(8) * 0.01)
+  - Note: Real correlations deferred to Phase 2
   - File: `app/calculations/factors.py`
 
-#### 1.4.5 Risk Metrics (Depends on 1.4.3, 1.4.4)
-- [ ] **`calculate_portfolio_var(portfolio_exposures, covariance_matrix)`**
+#### 1.4.5 Risk Metrics - V1.4 Real Calculations (Depends on 1.4.3, 1.4.4)
+- [ ] **`calculate_portfolio_var_hybrid(portfolio_exposures, covariance_matrix)`**
   - Input: Portfolio exposures, factor covariance matrix
   - Output: 1-day VaR (95%, 99% confidence)
+  - Implementation: Uses legacy `var_utils.py` matrix multiplication
   - File: `app/calculations/risk_metrics.py`
 
-- [ ] **`calculate_sharpe_ratio(returns_series)`**
-  - Input: Historical portfolio returns
-  - Output: Annualized Sharpe ratio
+- [ ] **`calculate_risk_metrics_empyrical(returns_series)`**
+  - Input: Historical portfolio returns (pandas Series)
+  - Output: Dict with Sharpe ratio, max drawdown, volatility, VaR
+  - Implementation: Uses `empyrical` library for all metrics
   - File: `app/calculations/risk_metrics.py`
 
-- [ ] **`calculate_maximum_drawdown(portfolio_values)`**
-  - Input: Time series of portfolio values
-  - Output: Maximum drawdown percentage
+- [ ] **`multiply_matrices(cov_matrix, exposures, factor_betas)`**
+  - Input: Covariance matrix, exposures, factor betas
+  - Output: Position exposure for VaR calculation
+  - Implementation: Legacy `var_utils.py` logic
   - File: `app/calculations/risk_metrics.py`
 
 #### 1.4.6 Snapshot Generation (Depends on All Above)
