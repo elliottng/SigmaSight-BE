@@ -113,9 +113,11 @@ Features:
 GET /api/v1/risk/greeks?view=portfolio|longs|shorts
 ```
 **V1.4 Hybrid Approach**:
-- **Real calculations** for options using `py_vollib` or `mibian` libraries
+- **Real calculations** for options using `mibian` library (primary)
 - **Fallback to mock values** if real calculation fails or data unavailable
 - Stock positions always use delta=1.0 (long) or -1.0 (short)
+
+**📝 Implementation Note**: Originally planned to use `py_vollib` but encountered `_testcapi` import issues on Python 3.11. `mibian` provides the same Black-Scholes calculations with better compatibility.
 
 Mock Greeks Fallback Values:
 
@@ -409,10 +411,12 @@ BATCH_SCHEDULE = {
 Our technology choices align with institutional quantitative finance practices:
 
 ##### Options Pricing and Greeks
-- **Library**: `py_vollib` (pure Python Black-Scholes implementation)
-- **Rationale**: Created by Gammon Capital Management, provides accurate Greeks calculations
+- **Library**: `mibian` (pure Python Black-Scholes implementation)
+- **Rationale**: Simple, reliable Black-Scholes calculations with excellent Python 3.11+ compatibility
 - **Usage**: Real-time options pricing, delta/gamma/theta/vega/rho calculations
-- **Alternative Considered**: QuantLib (too heavyweight for our equity/options focus)
+- **Alternative Considered**: `py_vollib` (encountered `_testcapi` import issues), QuantLib (too heavyweight for our equity/options focus)
+
+**📝 Implementation Update**: Originally specified `py_vollib` but switched to `mibian` due to compatibility issues with Python 3.11. The `py_vollib` library has a dependency on `py_lets_be_rational` which tries to import `_testcapi` - a private CPython testing module not available in standard Python installations. `mibian` provides equivalent Black-Scholes calculations with better stability.
 
 ##### Risk Metrics and Performance Analytics  
 - **Library**: `empyrical` (from Quantopian)
@@ -611,8 +615,8 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     
     # Calculation libraries (V1.4 Hybrid)
-    "py_vollib>=1.0.1",      # Options pricing
-    "mibian>=0.1.3",         # Backup options library
+    "mibian>=0.1.3",         # Options pricing (primary)
+    "py-vollib>=1.0.1",      # Options pricing (fallback, has compatibility issues)
     "empyrical>=0.5.5",      # Risk metrics
     "statsmodels>=0.14.0",   # Factor regression
     "numpy>=1.24.0",         # Numerical operations
@@ -627,6 +631,8 @@ dependencies = [
     "python-dotenv>=1.0.0",     # Environment variables
 ]
 ```
+
+**📝 Dependency Update**: `mibian` is now the primary options pricing library, with `py-vollib` kept as a fallback option (though it has known compatibility issues with Python 3.11+).
 
 ### 6.5 Calculation Pattern
 
