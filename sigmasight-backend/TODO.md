@@ -174,13 +174,18 @@ sigmasight-backend/
   - [ ] Load 8 fixed factors into factors table
 - [ ] Create Pydantic schemas for all models
 - [ ] Generate historical snapshots (90 days with realistic variations)
+  - [ ] Use real historical market data from Polygon.io
+  - [ ] Calculate actual P&L from real price movements
+  - [ ] Only generate snapshots for actual trading days
 
 ### 1.3 Market Data Integration
 - [ ] Set up Polygon.io client with API key management
 - [ ] Implement market data service:
   - [ ] Stock price fetching
-  - [ ] Options chain data
-  - [ ] Historical price data (90 days)
+  - [ ] Options chain data  
+  - [ ] Historical price data (90 days of real market data)
+  - [ ] Bulk fetch capability for initial historical backfill
+  - [ ] Rate limiting handling for Polygon.io API
 - [ ] Set up YFinance integration for GICS data
 - [ ] Implement data caching strategy with Redis
 - [ ] Create batch job for daily market data updates

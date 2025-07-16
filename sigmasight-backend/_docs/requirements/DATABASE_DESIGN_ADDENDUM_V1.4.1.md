@@ -504,32 +504,25 @@ INSERT INTO users (username, email, password_hash, is_demo) VALUES
    - 30 positions: 20 stocks, 10 options
    - Includes pairs trades and hedges
 
-### 5.3 Historical Data Generation
+### 5.3 Demo Data Requirements
 
-```python
-def generate_historical_snapshots(portfolio_id: str, days: int = 90):
-    """Generate 90 days of historical snapshots with realistic variations"""
-    
-    base_value = 1_000_000  # $1M starting value
-    volatility = 0.02       # 2% daily volatility
-    
-    for day in range(days):
-        date = datetime.now().date() - timedelta(days=days-day)
-        
-        # Random walk with slight upward bias
-        daily_return = np.random.normal(0.0003, volatility)
-        base_value *= (1 + daily_return)
-        
-        snapshot = {
-            'portfolio_id': portfolio_id,
-            'snapshot_date': date,
-            'total_value': base_value,
-            'daily_pnl_pct': daily_return,
-            # ... other metrics
-        }
-        
-        create_snapshot(snapshot)
-```
+For the V1.4 demo, we need realistic portfolio data:
+
+1. **Historical Market Data**:
+   - Fetch real 90-day historical prices from Polygon.io for all positions
+   - Store in `market_data_cache` table with `data_source='polygon'`
+   - Include OHLCV data for accurate calculations
+
+2. **Portfolio Snapshots**:
+   - Generate 90 daily snapshots using actual historical closing prices
+   - Calculate real P&L based on actual market movements
+   - Only create snapshots for trading days (skip weekends/holidays)
+   - Each snapshot should reflect realistic portfolio values
+
+3. **Demo Users** (demo_growth, demo_value, demo_balanced):
+   - Each portfolio will show actual historical performance
+   - Risk metrics calculated from real price volatility
+   - Factor exposures based on actual market correlations
 
 ## 6. Batch Processing Schedule
 

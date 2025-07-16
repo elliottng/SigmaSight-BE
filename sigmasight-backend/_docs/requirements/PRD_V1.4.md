@@ -54,6 +54,14 @@ Requirements:
 - Calculate current market value using latest prices
 - Generate 90 days of historical snapshots
 
+#### Historical Data Generation
+Upon successful CSV upload:
+- System fetches 90 days of real historical market data from Polygon.io for all positions
+- Generates authentic historical portfolio snapshots using actual closing prices
+- Calculates real historical P&L based on actual market movements
+- Creates realistic risk metrics derived from true market volatility
+- Handles weekends/holidays by only creating snapshots for actual trading days
+
 #### Portfolio Overview
 ```
 GET /api/v1/portfolio
@@ -170,11 +178,89 @@ POST /api/v1/admin/daily-update
 ```
 Steps:
 1. Fetch latest prices from Polygon.io
-2. Calculate new market values
-3. Generate P&L for the day
-4. Recalculate all risk metrics
+2. Calculate new market values using real market data
+3. Generate P&L based on actual price movements
+4. Recalculate all risk metrics using historical volatility
 5. Update factor exposures
 6. Create new portfolio snapshot
+
+Historical Backfill Process:
+- Triggered automatically after CSV upload
+- Fetches 90 days of historical daily prices for all positions
+- Respects Polygon.io rate limits (implements retry logic)
+- Caches historical data to minimize API calls
+- Generates portfolio snapshots for each trading day using real prices
+
+##### Rate Limiting Strategy for Polygon.io
+
+**1. Token Bucket Implementation**
+- Free tier: 5 requests/minute rate limit
+- Implement token bucket algorithm with configurable rate
+- Queue requests with priority levels (real-time > batch > backfill)
+
+**2. Exponential Backoff**
+```python
+def exponential_backoff(attempt):
+    """Calculate wait time for retry attempts"""
+    base_wait = 2  # seconds
+    max_wait = 300  # 5 minutes
+    wait_time = min(base_wait * (2 ** attempt), max_wait)
+    return wait_time + random.uniform(0, 1)  # Add jitter
+```
+
+**3. Caching Strategy**
+- Check `market_data_cache` before API calls
+- Cache TTL: 24 hours for EOD data
+- Implement cache warming during off-peak hours
+
+**4. Progress Tracking**
+```sql
+CREATE TABLE historical_backfill_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    portfolio_id UUID REFERENCES portfolios(id),
+    total_symbols INTEGER NOT NULL,
+    processed_symbols INTEGER DEFAULT 0,
+    failed_symbols INTEGER DEFAULT 0,
+    status VARCHAR(20) NOT NULL, -- 'pending', 'processing', 'completed', 'failed'
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    error_details JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**5. Batch Processing Architecture**
+```python
+# Pseudo-code for rate-limited batch processing
+async def process_historical_backfill(portfolio_id: UUID):
+    tracker = await create_backfill_tracker(portfolio_id)
+    rate_limiter = TokenBucket(rate=5, per_minute=True)
+    
+    for symbol in get_portfolio_symbols(portfolio_id):
+        try:
+            # Check cache first
+            if cached_data := await get_cached_data(symbol):
+                await update_progress(tracker, symbol, 'cached')
+                continue
+                
+            # Rate-limited API call
+            await rate_limiter.acquire()
+            data = await polygon_client.get_aggs(
+                ticker=symbol,
+                from_date=datetime.now() - timedelta(days=90),
+                to_date=datetime.now()
+            )
+            
+            await save_to_cache(symbol, data)
+            await update_progress(tracker, symbol, 'completed')
+            
+        except RateLimitError:
+            await asyncio.sleep(60)  # Wait full minute
+            retry_queue.add(symbol, priority='low')
+            
+        except Exception as e:
+            await update_progress(tracker, symbol, 'failed', error=str(e))
+```
 
 Scheduling:
 - **Automatic**: Daily batch runs at specific times
@@ -508,6 +594,113 @@ Portfolio: $3M total with 20 longs, 15 shorts, 15 options; 90-day historical ret
 - **Code standards**: type hints, docstrings, Black, Ruff, 90% test coverage.
 - **Migrations**: Alembic revision management.
 
+### 8.1 Pydantic Schema Organization
+
+#### Directory Structure
+```
+app/schemas/
+├── __init__.py
+├── base.py          # Base schema classes with common fields
+├── auth.py          # Authentication schemas
+├── portfolio.py     # Portfolio-related schemas
+├── positions.py     # Position CRUD schemas
+├── market_data.py   # Market data schemas
+├── modeling.py      # Modeling session schemas
+└── exports.py       # Export-related schemas
+```
+
+#### Schema Pattern Guidelines
+
+**1. Base Schema Classes**
+```python
+# base.py
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+class BaseSchema(BaseModel):
+    """Base schema with common configuration"""
+    model_config = ConfigDict(
+        from_attributes=True,  # Support ORM model conversion
+        str_strip_whitespace=True,  # Auto-strip strings
+        use_enum_values=True  # Use enum values not names
+    )
+
+class TimestampedSchema(BaseSchema):
+    """Schema with timestamp fields"""
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+```
+
+**2. CRUD Schema Pattern**
+```python
+# positions.py
+from decimal import Decimal
+from typing import Optional, List
+from uuid import UUID
+from app.schemas.base import BaseSchema, TimestampedSchema
+
+class PositionBase(BaseSchema):
+    """Shared position fields"""
+    symbol: str
+    quantity: Decimal
+    position_type: PositionType
+    
+class PositionCreate(PositionBase):
+    """Required fields for position creation"""
+    # Additional create-only fields
+    initial_price: Optional[Decimal] = None
+    tags: Optional[List[str]] = None
+    
+class PositionUpdate(BaseSchema):
+    """All fields optional for partial updates"""
+    symbol: Optional[str] = None
+    quantity: Optional[Decimal] = None
+    position_type: Optional[PositionType] = None
+    tags: Optional[List[str]] = None
+    
+class PositionInDB(PositionBase, TimestampedSchema):
+    """Full database model"""
+    id: UUID
+    portfolio_id: UUID
+    cost_basis: Decimal
+    
+class PositionResponse(PositionInDB):
+    """API response with computed fields"""
+    current_price: Optional[Decimal] = None
+    market_value: Optional[Decimal] = None
+    unrealized_pnl: Optional[Decimal] = None
+    tags: List[TagResponse] = []
+```
+
+**3. Schema Benefits**
+- **Type Safety**: Prevents wrong schema usage at compile time
+- **Clear Intent**: Schema name indicates its purpose
+- **Validation**: Different rules for create vs update
+- **Documentation**: Auto-generated API docs
+- **Separation**: Database fields vs API response fields
+- **Reusability**: Base classes reduce duplication
+
+**4. Request/Response Patterns**
+```python
+# Standard response wrapper
+class ResponseWrapper(BaseSchema, Generic[T]):
+    """Standard API response wrapper"""
+    success: bool = True
+    data: T
+    message: Optional[str] = None
+    
+# Paginated response
+class PaginatedResponse(BaseSchema, Generic[T]):
+    """Paginated list response"""
+    items: List[T]
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+```
+
 ## 9. Deployment to Railway
 CLI steps for initial setup, environment variables, and continuous deployment on `main` branch.
 
@@ -575,8 +768,9 @@ The AI agent should maintain the Polygon API integration while simplifying the s
 - Keep the same API endpoints and parameters - The Polygon API calls should remain identical
 - Remove minute-level data handling - Focus only on daily data for the demo
 - Replace S3 storage with PostgreSQL - Write market data directly to the database
-- Enhance error handling - Add better logging and retry logic
-- Add batch update capabilities - Support both historical backfill and daily updates
+- **CRITICAL**: Use this integration to fetch real historical data for all positions after CSV upload
+- **Generate authentic 90-day historical snapshots using actual market prices, not mock data**
+- Implement proper rate limiting and caching to optimize API usage
 
 **Key Integration Points:**
 

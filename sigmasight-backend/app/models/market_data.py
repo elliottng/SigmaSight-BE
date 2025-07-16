@@ -4,7 +4,7 @@ Market data and analytics models
 from datetime import datetime, date
 from uuid import uuid4
 from decimal import Decimal
-from sqlalchemy import String, DateTime, ForeignKey, Index, Numeric, Date, UniqueConstraint
+from sqlalchemy import String, DateTime, ForeignKey, Index, Numeric, Date, UniqueConstraint, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional
@@ -79,6 +79,8 @@ class FactorDefinition(Base):
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     factor_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 'style', 'sector', 'macro'
     calculation_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    etf_proxy: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # ETF ticker for factor proxy
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # Display order in UI
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)

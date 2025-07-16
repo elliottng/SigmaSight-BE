@@ -206,6 +206,12 @@ Show update to Changes Summary
 
 Script: "Let's recap what makes SigmaSight unique:"
 
+### Historical Data Processing
+- After uploading the CSV, the system automatically fetches 90 days of real historical market data
+- This creates authentic portfolio performance history based on actual market movements
+- The historical charts and metrics shown reflect real market conditions
+- Processing typically takes 5-10 minutes for a full portfolio
+
 ## Demo Environment Setup Notes
 
 ### Portfolio Composition for Demo:

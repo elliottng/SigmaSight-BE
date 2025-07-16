@@ -311,15 +311,41 @@ GET /api/v1/portfolio
 }
 ```
 
-### 4.2 Get Portfolio Summary
+### 4.2 Upload Portfolio CSV
+```http
+POST /api/v1/portfolio/upload
+```
+
+#### 4.2.1 Request Body
+```http
+Content-Type: multipart/form-data
+```
+
+#### 4.2.2 Response (200 OK)
+```json
+{
+  "portfolio_id": 1,
+  "positions_created": 35,
+  "positions_updated": 0,
+  "historical_data_status": "processing",
+  "historical_data_job_id": "uuid",
+  "message": "Portfolio uploaded successfully. Historical data backfill in progress."
+}
+```
+
+**Note**: The upload endpoint triggers automatic fetching of 90 days of historical market data.
+This process runs asynchronously and typically completes within 5-10 minutes depending on 
+the number of unique tickers.
+
+### 4.3 Get Portfolio Summary
 ```http
 GET /api/v1/portfolio/summary
 ```
 
-#### 4.2.1 Execution
+#### 4.3.1 Execution
 - Sync only
 
-#### 4.2.2 Response
+#### 4.3.2 Response
 ```json
 {
   "data": {
@@ -339,21 +365,21 @@ GET /api/v1/portfolio/summary
 }
 ```
 
-### 4.3 Get Portfolio Timeline
+### 4.4 Get Portfolio Timeline
 ```http
 GET /api/v1/portfolio/timeline
 ```
 
-#### 4.3.1 Query Parameters
+#### 4.4.1 Query Parameters
 ```http
 ?start=2024-01-01&end=2024-12-31&mode=sync|async
 ```
 
-#### 4.3.2 Execution
+#### 4.4.2 Execution
 - Sync by default
 - Async for large date ranges
 
-#### 4.3.3 Async Response
+#### 4.4.3 Async Response
 ```json
 {
   "success": true,

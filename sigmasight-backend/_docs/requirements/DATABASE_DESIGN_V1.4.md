@@ -1,5 +1,5 @@
 # Database Design Documentation
-
+Please be sure to consider DATABASE_DESIGN_ADDENDUM_V1.4.1.md which is an updated addendum.
 ## 1. Core Tables
 
 ### 1.1 Modeling Session Snapshots
@@ -30,14 +30,34 @@ CREATE TABLE modeling_session_snapshots (
 CREATE TABLE export_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
-  portfolio_id UUID REFERENCES portfolios(id),
-  export_type VARCHAR(50) NOT NULL, -- 'positions', 'trades', 'analytics', 'risk_report'
-  export_format VARCHAR(20) NOT NULL, -- 'csv', 'json', 'fix', 'pdf'
-  filters JSONB,
+  export_type VARCHAR(50) NOT NULL, -- 'portfolio', 'trades', 'modeling_session'
+  export_format VARCHAR(20) NOT NULL, -- 'csv', 'json', 'fix'
   file_name VARCHAR(255),
-  file_size INTEGER,
+  file_size_bytes INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
+
+### 1.3 Modeling Session Snapshots
+```sql
+CREATE TABLE modeling_session_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id VARCHAR(50) UNIQUE NOT NULL, -- e.g., "session_789"
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL, -- e.g., "Tech Exposure Reduction"
+  status VARCHAR(20) NOT NULL CHECK (status IN ('active', 'completed', 'cancelled')),
+  base_portfolio_snapshot JSONB NOT NULL, -- Original portfolio state
+  modified_portfolio_snapshot JSONB, -- Current modified state
+  changes JSONB, -- Array of change objects
+  impact_summary JSONB, -- Calculated impact metrics
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+-- Index for active sessions lookup
+CREATE INDEX idx_modeling_sessions_user_status ON modeling_session_snapshots(user_id, status)
+  WHERE status = 'active';
 ```
 
 ### 1.3 Calculation Audit Log
@@ -126,6 +146,20 @@ INSERT INTO stress_scenarios (name, scenario_type, sort_order) VALUES
 ('Oil Down 5%', 'sensitivity', 6),
 ('2008 Financial Crisis', 'historical', 7),
 ('COVID-19 Crash', 'historical', 8);
+```
+
+### 4.3 Historical Market Data
+```sql
+-- After positions are loaded, populate with real historical data:
+-- 1. Fetch from Polygon.io API
+-- 2. Store in market_data_cache
+-- 3. Generate portfolio_snapshots using actual prices
+
+-- Example of what gets stored (but with real data):
+INSERT INTO market_data_cache (ticker, date, open, high, low, close, volume, data_source)
+SELECT ticker, date, open, high, low, close, volume, 'polygon'
+FROM polygon_api_results
+WHERE date >= CURRENT_DATE - INTERVAL '90 days';
 ```
 
 ## 5. API Data Models
