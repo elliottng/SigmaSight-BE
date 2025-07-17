@@ -54,6 +54,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Aligns with V1.4 hybrid real/mock approach
 - Simple to implement and understand
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q1.2: Factor Beta Calculation Window
 **Question:** What time window should we use for factor beta calculations?
 
@@ -72,6 +78,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Sufficient sample size for regression analysis
 - Can be made configurable later
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q1.3: Position vs Portfolio Level Betas
 **Question:** Should we calculate factor betas at position level or portfolio level?
 
@@ -79,6 +91,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Legacy code calculates position-level betas then aggregates
 - Database has `factor_exposures` table at portfolio level
 - Need to decide calculation approach
+
+**Legacy Approach For Reference:**
+- `factors_utils.py` calculates position-level betas using covariance method
+- Formula: `beta = cov(position_rf, factor_rf) / var(factor_rf)`
+- Reshapes results into DataFrame with positions as index, factors as columns
+- Aggregation to portfolio level done separately
 
 **Options:**
 - **Option A:** Position-level betas aggregated to portfolio (legacy approach)
@@ -90,6 +108,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Allows for position-level risk attribution
 - More flexible for future enhancements
 - Database schema supports this approach
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ---
 
@@ -103,6 +127,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Need return series for regression analysis
 - Position quantities and prices available
 
+**Legacy Approach For Reference:**
+- `get_data.py` uses simple price-based returns: `ret = close / prev_close - 1`
+- Uses NYSE trading calendar to find previous trading day
+- Handles missing data with `np.nan` values
+- No exposure weighting or position size adjustments
+
 **Design Decision Needed:**
 - **Method 1:** Daily return = (today_exposure - yesterday_exposure) / yesterday_exposure
 - **Method 2:** Daily return = daily_pnl / position_market_value
@@ -114,6 +144,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Handles both stocks and options uniformly
 - Uses existing exposure calculations
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q2.2: Missing Data Handling
 **Question:** How should we handle missing historical data?
 
@@ -121,6 +157,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Market data fetching may have gaps
 - Some positions may lack sufficient history
 - Need robust fallback strategy
+
+**Legacy Approach For Reference:**
+- `get_data.py` uses `np.nan` for missing previous close prices
+- Continues calculations with available data points
+- No minimum data requirements enforced
+- Graceful degradation without blocking entire calculation
 
 **Scenarios & Recommendations:**
 - **New positions (<60 days history):** Skip factor calculation, use zeros
@@ -130,6 +172,12 @@ This document identifies clarifying questions and design decisions needed for im
 
 ### Q2.3: Factor Return Data Storage
 **Question:** Should we cache factor returns or calculate on-demand?
+
+**Legacy Approach For Reference:**
+- `get_data.py` shows no evidence of cached factor returns
+- Calculations performed fresh each time from market data
+- Uses direct database queries to fetch price data on-demand
+- No intermediate storage of computed factor returns
 
 **Options:**
 - **Option A:** Cache factor returns in database table
@@ -142,6 +190,36 @@ This document identifies clarifying questions and design decisions needed for im
 - Less database complexity
 - Can add caching in Phase 2 if needed
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
+### Q2.4: Missing Data Handling Strategy
+**Question:** How to handle positions with insufficient price history for factor regression?
+
+**Context:**
+- New positions may not have 60 days of history
+- ETF proxies might have missing data for holidays/halts
+
+**Options:**
+- **Option A:** Skip positions with <30 days of data
+- **Option B:** Use available data with minimum 20 observations
+- **Option C:** Assign neutral (zero) betas to new positions
+
+**Recommendation:** **Option B - Flexible Minimum**
+- Require minimum 20 trading days for regression
+- Log warning for positions with limited history
+- Include data quality flag in response
+- Graceful degradation rather than exclusion
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ---
 
 ## 3. Calculation Implementation Questions
@@ -153,6 +231,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Legacy uses `statsmodels.api` for OLS regression
 - Already included in dependencies
 
+**Legacy Approach For Reference:**
+- `get_data.py` imports `statsmodels.api as sm`
+- Uses `model = sm.OLS(dependent_variable, X).fit()` for regression
+- Adds constant term with `X = sm.add_constant(X)`
+- Extracts beta coefficients with `model.params[1:].values`
+
 **Analysis:**
 - **statsmodels:** Mature, statistical significance testing, matches legacy
 - **sklearn:** Machine learning focused, might be overkill
@@ -163,6 +247,12 @@ This document identifies clarifying questions and design decisions needed for im
 - Provides statistical significance metrics
 - Industry standard for financial factor models
 - Already a project dependency
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ### Q3.2: Portfolio Beta Aggregation Method
 **Question:** How should we aggregate position-level betas to portfolio level?
@@ -182,12 +272,25 @@ This document identifies clarifying questions and design decisions needed for im
 - Matches legacy implementation approach
 - Consistent with Section 1.4.3 aggregation methods
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q3.3: Factor Covariance Matrix
 **Question:** How should we handle the factor covariance matrix for V1.4?
 
 **Current State:**
 - Legacy mentions identity matrix for simplicity
 - Real correlations would require significant historical analysis
+
+**Legacy Approach For Reference:**
+- `var_utils.py` has both simple and sophisticated covariance methods
+- `covariance_matrix()`: Simple `factor_returns.cov()` calculation
+- `decay_covariance_matrix()`: Uses 0.94 exponential decay weighting
+- `correlation_matrix()`: Calculates real factor correlations from returns
+- Legacy used actual correlations, not identity matrix
 
 **Options:**
 - **Option A:** Identity matrix (no correlations, σ = 0.01)
@@ -199,6 +302,84 @@ This document identifies clarifying questions and design decisions needed for im
 - Simpler implementation and testing
 - Real correlations can be Phase 2 enhancement
 - Provides baseline risk attribution functionality
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
+### Q3.4: Outlier Handling for Factor Betas
+**Question:** How should we handle extreme factor beta values from regression?
+
+**Context:**
+- Regression can produce extreme betas for positions with limited history
+- Outliers can distort portfolio-level risk assessments
+
+**Options:**
+- **Option A:** No capping, use raw regression outputs
+- **Option B:** Cap betas at ±3 (99.7% of normal distribution)
+- **Option C:** Winsorize at 5th/95th percentiles
+
+**Recommendation:** **Option B - Cap at ±3**
+- Prevents extreme outliers from dominating portfolio risk
+- Maintains mathematical interpretability
+- Simple to implement and explain
+- Can be made configurable later
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
+### Q3.5: Greeks Integration with Factor Models
+**Question:** How should option Greeks interact with factor risk calculations?
+
+**Context:**
+- Options have non-linear risk profiles via Greeks
+- Delta-adjusted exposure already calculated in Section 1.4.3
+
+**Options:**
+- **Option A:** Use market value exposure for all positions
+- **Option B:** Use delta-adjusted exposure for options
+- **Option C:** Hybrid based on calculation type
+
+**Recommendation:** **Option B - Delta-Adjusted for Options**
+- More accurate risk representation for options
+- Consistent with industry practices
+- Already calculated in portfolio aggregation
+- Use `calculate_delta_adjusted_exposure()` output
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
+### Q3.6: Correlation Stability Monitoring
+**Question:** How to handle time-varying correlations between factors?
+
+**Context:**
+- Factor correlations change during market regimes
+- Identity matrix assumption may be too simple
+
+**Options:**
+- **Option A:** Static identity matrix (current plan)
+- **Option B:** Rolling correlation calculation
+- **Option C:** Regime-based correlation matrices
+
+**Recommendation:** **Option A for V1.4, with Monitoring**
+- Implement identity matrix as planned
+- Add correlation calculation function (not used)
+- Log actual correlations for future analysis
+- Upgrade path clear for V1.5
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ---
 
@@ -277,6 +458,28 @@ This document identifies clarifying questions and design decisions needed for im
 - Daily batch job refreshes cache anyway
 - Reduces computational load
 
+### Q5.3: Real-time vs Batch Calculation Trade-offs
+**Question:** Which calculations must be real-time vs batch only?
+
+**Context:**
+- Some metrics needed for trading decisions
+- Others only for reporting
+
+**Real-time Requirements:**
+- Portfolio Greeks (already real-time)
+- Current exposures (already real-time)
+
+**Batch Sufficient:**
+- Factor betas (change slowly)
+- VaR calculations (daily sufficient)
+- Historical risk metrics
+
+**Recommendation:** **Batch-First Approach**
+- All Section 1.4.4/1.4.5 calculations in batch
+- API serves cached results
+- Add real-time triggers later if needed
+- Optimize for reliability over latency
+
 ---
 
 ## 6. Integration & API Questions
@@ -331,7 +534,25 @@ This document identifies clarifying questions and design decisions needed for im
 - Comparison with legacy output where possible
 - Performance tests with large portfolios
 
-### Q7.2: Mock Factor Implementation
+### Q7.2: Data Quality Monitoring
+**Question:** How to detect and handle data quality issues?
+
+**Context:**
+- Bad prices can corrupt risk calculations
+- Missing data can skew regression results
+
+**Quality Checks Needed:**
+- Price continuity (>20% daily moves)
+- Data completeness (missing observations)
+- Regression diagnostics (R-squared, p-values)
+
+**Recommendation:** **Basic Quality Flags**
+- Add quality_score to calculation results
+- Log warnings for suspicious data
+- Include diagnostic stats in metadata
+- Don't block calculations, just flag issues
+
+### Q7.3: Mock Factor Implementation
 **Question:** How should we implement the Short Interest mock factor?
 
 **Current State:**
@@ -422,6 +643,12 @@ Based on the analysis above, here are the required functions:
 - Need 95% and 99% confidence levels
 - Integration with factor exposures from Section 1.4.4
 
+**Legacy Approach For Reference:**
+- `var_utils.py` implements `multiply_matrices()` function
+- Formula: `exposure_t.dot(factor_betas).dot(matrix_cov).dot(factor_betas_t).T`
+- Returns `(position_exposure ** 0.5)` - square root for standard deviation
+- Uses actual covariance matrix, not simplified version
+
 **Options:**
 - **Option A:** Factor model VaR using matrix multiplication (legacy approach)
 - **Option B:** Historical simulation VaR from return series
@@ -434,6 +661,12 @@ Based on the analysis above, here are the required functions:
 - More stable than historical methods
 - Industry standard for portfolio risk management
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q11.2: Portfolio Return Calculation for Risk Metrics
 **Question:** How should we calculate portfolio returns for empyrical library metrics?
 
@@ -441,6 +674,12 @@ Based on the analysis above, here are the required functions:
 - Have position-level P&L from Section 1.4.1
 - Need portfolio-level return series
 - empyrical requires pandas Series of returns
+
+**Legacy Approach For Reference:**
+- `get_data.py` shows portfolio return calculations in various functions
+- `calculate_contribution_to_return()` uses position weights × returns
+- `calculate_adjusted_cumulative_returns()` aggregates position returns
+- No single standard method - varies by use case
 
 **Options:**
 - **Option A:** Aggregate daily P&L / total portfolio value
@@ -452,6 +691,12 @@ Based on the analysis above, here are the required functions:
 - Uses existing P&L infrastructure
 - Formula: `portfolio_return = total_daily_pnl / portfolio_market_value`
 - Handles position changes automatically
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ### Q11.3: Risk Metrics Selection
 **Question:** Which risk metrics should we implement using empyrical?
@@ -468,6 +713,12 @@ Based on the analysis above, here are the required functions:
 - **Volatility:** Annualized standard deviation
 - **VaR (95%, 99%):** Historical VaR for comparison
 - **Calmar Ratio:** Return/max drawdown ratio
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ---
 
@@ -492,6 +743,12 @@ var_estimate = (position_exposure ** 0.5)
 - Portfolio exposure vector × factor betas × covariance × factor betas transpose
 - Apply confidence multipliers for final VaR estimates
 
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
+
 ### Q12.2: Time Horizon for VaR
 **Question:** What time horizon should VaR calculations use?
 
@@ -505,6 +762,12 @@ var_estimate = (position_exposure ** 0.5)
 - Standard for portfolio management
 - Can scale to longer horizons using √t scaling
 - Legacy approach uses 1-day horizon
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ### Q12.3: Risk-Free Rate Source
 **Question:** How should we obtain risk-free rate for Sharpe ratio calculations?
@@ -522,6 +785,12 @@ var_estimate = (position_exposure ** 0.5)
 - Consistency with existing Greeks calculations
 - Simpler implementation
 - Real Treasury integration can be Phase 2 enhancement
+
+**Elliott comments:**
+- 
+
+**Ben comments:**
+- 
 
 ---
 
@@ -684,7 +953,30 @@ var_estimate = (position_exposure ** 0.5)
 
 ---
 
-## 18. Key Design Decisions Summary
+## 18. Summary of Key Recommendations
+
+### Critical Design Recommendations:
+1. **60-day regression window** with 20-day minimum for factor betas
+2. **Position-level betas** aggregated to portfolio using exposure weights  
+3. **Delta-adjusted exposures** for options in factor calculations
+4. **Identity matrix** for factor covariance with future upgrade path
+5. **Batch-first architecture** with 24-hour cache TTL
+6. **Quality flags** without blocking calculations
+7. **Cap factor betas at ±3** to prevent outliers
+
+### Deferred to V1.5:
+1. Factor attribution and performance decomposition
+2. Stress testing scenarios
+3. Benchmark-relative risk metrics  
+4. Real-time correlation monitoring
+5. Multi-currency support
+
+### Testing Strategy Additions:
+1. Regression quality metrics (R-squared, residuals)
+2. Edge cases for limited price history
+3. Greeks integration validation
+4. Cache invalidation scenarios
+5. Data quality flag accuracy
 
 ### **Section 1.4.4: Risk Factor Analysis**
 **Data Sources:**
@@ -736,43 +1028,7 @@ var_estimate = (position_exposure ** 0.5)
 
 ## 19. Additional Design Considerations
 
-### 19.1: Outlier Handling for Factor Betas
-**Question:** How should we handle extreme factor beta values from regression?
-
-**Context:**
-- Regression can produce extreme betas for positions with limited history
-- Outliers can distort portfolio-level risk assessments
-
-**Options:**
-- **Option A:** No capping, use raw regression outputs
-- **Option B:** Cap betas at ±3 (99.7% of normal distribution)
-- **Option C:** Winsorize at 5th/95th percentiles
-
-**Recommendation:** **Option B - Cap at ±3**
-- Prevents extreme outliers from dominating portfolio risk
-- Maintains mathematical interpretability
-- Simple to implement and explain
-- Can be made configurable later
-
-### 19.2: Missing Data Handling Strategy
-**Question:** How to handle positions with insufficient price history for factor regression?
-
-**Context:**
-- New positions may not have 60 days of history
-- ETF proxies might have missing data for holidays/halts
-
-**Options:**
-- **Option A:** Skip positions with <30 days of data
-- **Option B:** Use available data with minimum 20 observations
-- **Option C:** Assign neutral (zero) betas to new positions
-
-**Recommendation:** **Option B - Flexible Minimum**
-- Require minimum 20 trading days for regression
-- Log warning for positions with limited history
-- Include data quality flag in response
-- Graceful degradation rather than exclusion
-
-### 19.3: Factor Attribution Reporting
+### 19.1: Factor Attribution Reporting
 **Question:** Should we calculate and store factor contributions to portfolio returns?
 
 **Context:**
@@ -790,25 +1046,7 @@ var_estimate = (position_exposure ** 0.5)
 - Add TODO comment in code for future enhancement
 - Keep data structures compatible for future addition
 
-### 19.4: Greeks Integration with Factor Models
-**Question:** How should option Greeks interact with factor risk calculations?
-
-**Context:**
-- Options have non-linear risk profiles via Greeks
-- Delta-adjusted exposure already calculated in Section 1.4.3
-
-**Options:**
-- **Option A:** Use market value exposure for all positions
-- **Option B:** Use delta-adjusted exposure for options
-- **Option C:** Hybrid based on calculation type
-
-**Recommendation:** **Option B - Delta-Adjusted for Options**
-- More accurate risk representation for options
-- Consistent with industry practices
-- Already calculated in portfolio aggregation
-- Use `calculate_delta_adjusted_exposure()` output
-
-### 19.5: Stress Testing Scenarios
+### 19.2: Stress Testing Scenarios
 **Question:** Should we implement pre-defined stress scenarios beyond VaR?
 
 **Context:**
@@ -826,25 +1064,7 @@ var_estimate = (position_exposure ** 0.5)
 - Add infrastructure comments for future
 - Focus on core risk metrics first
 
-### 19.6: Correlation Stability Monitoring
-**Question:** How to handle time-varying correlations between factors?
-
-**Context:**
-- Factor correlations change during market regimes
-- Identity matrix assumption may be too simple
-
-**Options:**
-- **Option A:** Static identity matrix (current plan)
-- **Option B:** Rolling correlation calculation
-- **Option C:** Regime-based correlation matrices
-
-**Recommendation:** **Option A for V1.4, with Monitoring**
-- Implement identity matrix as planned
-- Add correlation calculation function (not used)
-- Log actual correlations for future analysis
-- Upgrade path clear for V1.5
-
-### 19.7: Benchmark-Relative Risk Metrics
+### 19.3: Benchmark-Relative Risk Metrics
 **Question:** Should risk metrics be calculated relative to a benchmark?
 
 **Context:**
@@ -862,47 +1082,7 @@ var_estimate = (position_exposure ** 0.5)
 - Structure code to allow easy addition
 - Comment future enhancement points
 
-### 19.8: Real-time vs Batch Calculation Trade-offs
-**Question:** Which calculations must be real-time vs batch only?
-
-**Context:**
-- Some metrics needed for trading decisions
-- Others only for reporting
-
-**Real-time Requirements:**
-- Portfolio Greeks (already real-time)
-- Current exposures (already real-time)
-
-**Batch Sufficient:**
-- Factor betas (change slowly)
-- VaR calculations (daily sufficient)
-- Historical risk metrics
-
-**Recommendation:** **Batch-First Approach**
-- All Section 1.4.4/1.4.5 calculations in batch
-- API serves cached results
-- Add real-time triggers later if needed
-- Optimize for reliability over latency
-
-### 19.9: Data Quality Monitoring
-**Question:** How to detect and handle data quality issues?
-
-**Context:**
-- Bad prices can corrupt risk calculations
-- Missing data can skew regression results
-
-**Quality Checks Needed:**
-- Price continuity (>20% daily moves)
-- Data completeness (missing observations)
-- Regression diagnostics (R-squared, p-values)
-
-**Recommendation:** **Basic Quality Flags**
-- Add quality_score to calculation results
-- Log warnings for suspicious data
-- Include diagnostic stats in metadata
-- Don't block calculations, just flag issues
-
-### 19.10: Multi-Currency Future Considerations
+### 19.4: Multi-Currency Future Considerations
 **Question:** How to structure code for future multi-currency support?
 
 **Context:**
@@ -920,50 +1100,23 @@ var_estimate = (position_exposure ** 0.5)
 - Don't add complexity, just awareness
 - Keep data structures extensible
 
-### 19.11: Batch Job Runtime Environment
+### 19.5: Batch Job Runtime Environment
 **Question:** Where should the 5:00 PM factor job and 5:25 PM risk-metrics job run (e.g., Kubernetes CronJob, Celery beat, other)?
 
-### 19.12: Database Schema for New Outputs
+### 19.6: Database Schema for New Outputs
 **Question:** What exact schema and indexing strategy will store factor exposures and risk metrics (JSONB columns in `portfolio_snapshots` vs dedicated tables)?
 
-### 19.13: API Error-Handling & Auth Conventions
+### 19.7: API Error-Handling & Auth Conventions
 **Question:** What standard error codes and payload shapes should the new `/risk/*` endpoints follow, and how should they integrate with existing JWT/role checks?
 
-### 19.14: Monitoring & Alerting
+### 19.8: Monitoring & Alerting
 **Question:** Which runtime metrics and alert thresholds should be emitted for the factor and risk-metrics batch jobs?
 
-### 19.15: Configuration Surface
+### 19.9: Configuration Surface
 **Question:** Which parameters (e.g., regression window, beta cap, cache TTL) must be environment-configurable versus hard-coded?
 
-### 19.16: Test Dataset Size Limits
+### 19.10: Test Dataset Size Limits
 **Question:** How should the system handle portfolios exceeding 10 k positions with respect to performance targets and chunking?
-
----
-
-## 20. Summary of Key Recommendations
-
-### Critical Design Decisions:
-1. **60-day regression window** with 20-day minimum for factor betas
-2. **Position-level betas** aggregated to portfolio using exposure weights  
-3. **Delta-adjusted exposures** for options in factor calculations
-4. **Identity matrix** for factor covariance with future upgrade path
-5. **Batch-first architecture** with 24-hour cache TTL
-6. **Quality flags** without blocking calculations
-7. **Cap factor betas at ±3** to prevent outliers
-
-### Deferred to V1.5:
-1. Factor attribution and performance decomposition
-2. Stress testing scenarios
-3. Benchmark-relative risk metrics  
-4. Real-time correlation monitoring
-5. Multi-currency support
-
-### Testing Strategy Additions:
-1. Regression quality metrics (R-squared, residuals)
-2. Edge cases for limited price history
-3. Greeks integration validation
-4. Cache invalidation scenarios
-5. Data quality flag accuracy
 
 ---
 
