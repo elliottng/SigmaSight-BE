@@ -235,5 +235,5 @@ For technical readers interested in the implementation details:
 
 ---
 
-*Last Updated: January 2024*
-*Version: 1.0 - Section 1.4.1 Implementation*
+*Last Updated: July 2025*
+*Version: 1.4 - Section 1.4.1 Implementation*
