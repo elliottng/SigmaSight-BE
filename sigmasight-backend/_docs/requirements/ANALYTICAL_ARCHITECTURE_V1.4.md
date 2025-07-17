@@ -7,11 +7,19 @@ This document details the technical rationale behind our quantitative library ch
 
 ### Tier 1: Core Calculations
 
-#### py_vollib
-- **Purpose**: Options pricing and Greeks calculations
+#### mibian
+- **Purpose**: Options pricing and Greeks calculations (Primary)
+- **Implementation**: Pure Python Black-Scholes model with analytical Greeks
+- **Institutional Heritage**: Lightweight, stable Black-Scholes implementation
+- **Why This Choice**: Better Python 3.11+ compatibility, no C extension dependencies
+- **Advantage**: No `_testcapi` import issues that plague py_vollib
+
+#### py_vollib (Fallback)
+- **Purpose**: Options pricing and Greeks calculations (Fallback only)
 - **Implementation**: Black-Scholes model with analytical Greeks
 - **Institutional Heritage**: Created by Gammon Capital Management
-- **Why Not QuantLib**: QuantLib is better suited for fixed income and exotic derivatives; overkill for listed equity options
+- **Limitation**: Has `_testcapi` compatibility issues on Python 3.11+
+- **Why Not Primary**: Dependency on `py_lets_be_rational` causes import errors
 
 #### empyrical  
 - **Purpose**: Portfolio risk and performance metrics
@@ -76,8 +84,9 @@ This document details the technical rationale behind our quantitative library ch
 ```
 Market Data → Core Calculations → Risk Aggregation → Reporting
      ↓              ↓                    ↓              ↓
-  Polygon      py_vollib           empyrical      Database
+  Polygon        mibian            empyrical      Database
               statsmodels            numpy
+              (py_vollib fallback)
 ```
 
 ### 2. Fallback Pattern (Production Best Practice)
@@ -96,10 +105,11 @@ except:
 ## Validation Against Industry Standards
 
 ### Greeks Validation
-- Compare py_vollib output with:
+- Compare mibian output with:
   - Bloomberg Terminal OVDV function
   - Interactive Brokers option analytics
   - CBOE published theoretical values
+- Fallback to py_vollib when mibian unavailable (with compatibility warnings)
 
 ### Factor Model Validation
 - Regression methodology matches:
@@ -139,24 +149,46 @@ except:
    - Stress testing framework
    - Correlation breakdowns
 
+## V1.4 Implementation Notes
+
+### Library Priority Changes
+- **Primary**: `mibian` v0.1.3 - Stable, pure Python Black-Scholes implementation
+- **Fallback**: `py_vollib` v1.0.1 - Kept for compatibility but has known issues
+- **Issue**: `py_vollib` dependency `py_lets_be_rational` imports `_testcapi` (private CPython testing module)
+- **Solution**: Use `mibian` as primary with `py_vollib` fallback pattern
+
+### Hybrid Calculation Pattern
+```python
+try:
+    # Try mibian first (primary)
+    return calculate_with_mibian(params)
+except ImportError:
+    try:
+        # Fallback to py_vollib
+        return calculate_with_py_vollib(params)
+    except ImportError:
+        # Final fallback to mock values
+        return get_mock_greeks(position_type)
+```
+
 ## Appendix: Library Version Requirements
 
 ```toml
-[tool.poetry.dependencies]
-# Core Calculations
-py_vollib = "^1.0.1"
-empyrical = "^0.5.5"
-statsmodels = "^0.14.0"
-mibian = "^0.1.3"  # Fallback for Greeks
+[project.dependencies]
+# Core Calculations (V1.4 Hybrid Engine)
+mibian = ">=0.1.3"          # Primary: Black-Scholes Greeks calculations
+py-vollib = ">=1.0.1"       # Fallback: Has _testcapi compatibility issues on Python 3.11+
+empyrical = ">=0.5.5"       # Risk metrics (Sharpe, VaR, etc.)
+statsmodels = ">=0.14.0"    # Factor regression analysis
 
 # Data Infrastructure  
-pandas = "^2.0.0"
-numpy = "^1.24.0"
-scipy = "^1.10.0"
+pandas = ">=2.1.0"
+numpy = ">=1.25.0"
+scipy = ">=1.11.0"
 
 # Market Data
-polygon-api-client = "^1.12.0"
-yfinance = "^0.2.18"
+polygon-api-client = ">=1.14.0"
+yfinance = ">=0.2.28"
 ```
 
 ## References
