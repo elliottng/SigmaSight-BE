@@ -4,7 +4,7 @@
 Build a FastAPI backend for SigmaSight portfolio risk management platform with Railway deployment, PostgreSQL database, Polygon.io/YFinance market data integration, and **V1.4 hybrid real/mock calculation engine**.
 
 ### V1.4 Hybrid Calculation Approach
-- **Real calculations** for Greeks (py_vollib), factor betas (statsmodels), and risk metrics (empyrical)
+- **Real calculations** for Greeks (mibian), factor betas (statsmodels), and risk metrics (empyrical)
 - **Fallback to mock values** when data unavailable or calculations fail
 - **Legacy business logic** modernized with async patterns and type safety
 - **Batch processing** for heavy calculations, API serves cached results
@@ -45,8 +45,7 @@ Build a FastAPI backend for SigmaSight portfolio risk management platform with R
 
 # Calculations (V1.4 Hybrid Engine)
 - [x] scipy *(v1.16.0 installed)*
-- [x] py_vollib *(v1.0.1 installed - real Greeks)*
-- [x] mibian *(v0.1.3 installed - fallback Greeks calculations)*
+- [x] mibian *(v0.1.3 installed - real Greeks)*
 - [x] statsmodels *(v0.14.5 installed - factor beta regressions)*
 - [x] empyrical *(v0.5.5 installed - risk metrics: Sharpe, VaR, etc.)*
 
@@ -233,7 +232,7 @@ sigmasight-backend/
 *Individual calculation functions designed for both batch processing and future real-time APIs*
 
 **📚 LIBRARY STACK**: 
-- **py_vollib**: Options Greeks (Black-Scholes standard)
+- **mibian**: Options Greeks (Black-Scholes standard)
 - **empyrical**: Risk metrics (Sharpe, VaR, max drawdown)  
 - **statsmodels**: Factor regression analysis
 - **pandas/numpy**: Data manipulation and matrix operations
