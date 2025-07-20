@@ -55,7 +55,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Simple to implement and understand
 
 **Elliott comments:**
-- 
+- Option C.  Basically Option A for the 7 factors with ETF proxies. That's what the legacy scripts did. Legacy Scripts did not do Short Interest. Ben mocked it in the V0.dev Front End prototype. What data source is needed and what calcuations are needed? Should we drop it for now or figure it out?
 
 **Ben comments:**
 - 
@@ -79,7 +79,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Can be made configurable later
 
 **Elliott comments:**
-- 
+- Let's do Option C, but not expose this ability to the user right now. Just plan for the future. Adds some testing complexity but future proofing.
 
 **Ben comments:**
 - 
@@ -110,7 +110,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Database schema supports this approach
 
 **Elliott comments:**
-- 
+- Option A. Need position-level granularity.
 
 **Ben comments:**
 - 
@@ -145,7 +145,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Uses existing exposure calculations
 
 **Elliott comments:**
-- 
+- Method 1: this makes sense to me for stocks, but what about options? Claude is recommending delta-adjusted exposure. Also what if you make trades and increase/decrease your exposure? That muddies the meaning of the position returns for factor regression.  Does this mean that for us factor regression is specific to a portfolio? so each portfolio would have a different factor beta regression analysis.
 
 **Ben comments:**
 - 
@@ -169,6 +169,16 @@ This document identifies clarifying questions and design decisions needed for im
 - **Missing market data:** Use last available price, log warning
 - **ETF proxy data gaps:** Skip that day from regression, require minimum 30 days
 - **Complete data failure:** Fall back to mock factor exposures (small random values)
+
+**Elliott comments:**
+- need to ask about general philosophy of this.
+- scenario 1: new positions with <90 day history.  Skip factor calculation, use zeros
+- scenario 2: missing market data.  Use last available price, log warning
+- scenario 3: ETF proxy data gaps.  Skip that day from regression, require minimum 30 days
+- scenario 4: complete data failure.  Fall back to mock factor exposures (small random values)
+- scenario 5: market holidays/weekend gaps
+- scenario 6: corporate actions/stock splits
+- scenario 7: position size changes.
 
 ### Q2.3: Factor Return Data Storage
 **Question:** Should we cache factor returns or calculate on-demand?
