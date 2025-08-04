@@ -233,14 +233,16 @@ sigmasight-backend/
 
 **📚 LIBRARY STACK**: 
 - **mibian**: Options Greeks (Black-Scholes standard)
-- **empyrical**: Risk metrics (Sharpe, VaR, max drawdown)  
+- **empyrical**: Risk metrics (Sharpe, VaR, max drawdown) - *Postponed to V1.5*
 - **statsmodels**: Factor regression analysis
 - **pandas/numpy**: Data manipulation and matrix operations
 
 **🎯 V1.4 APPROACH**: Hybrid real/mock calculations
-- Real: Greeks, risk metrics, factor betas (7/8), portfolio aggregations
-- Mock: Short interest factor, fallback values
-- See ANALYTICAL_ARCHITECTURE_V1.4.md for detailed rationale
+- Real: Greeks, factor betas (7 factors, 12-month window), portfolio aggregations
+- Mock: Fallback values when calculations fail
+- Postponed to V1.5: Risk metrics (VaR, Sharpe), Short Interest factor
+- Forward-looking: 252-day regression window for better predictive power
+- See ANALYTICAL_ARCHITECTURE_V1.4.md and RISK_FACTOR_AND_METRICS_V1.4.md for details
 
 **⚠️ IMPORTANT**: Before implementing any calculation function, review the legacy analytics code in:
 - `_docs/requirements/legacy_scripts_for_reference_only/legacy_analytics_for_reference/`
@@ -423,48 +425,161 @@ sigmasight-backend/
 - Sector/industry aggregation (currently use tags)
 - Real-time aggregation updates (currently batch-first approach)
 
-#### 1.4.4 Risk Factor Analysis - V1.4 Hybrid (Depends on 1.4.2)
-- [ ] **`calculate_factor_betas_hybrid(position_returns, factor_returns)`**
-  - Input: 60-day position returns, factor ETF returns
-  - Output: 8-factor betas (7 real via statsmodels, 1 mock for Short Interest)
-  - Implementation: Uses legacy `factors_utils.py` logic with statsmodels OLS
+#### 1.4.4 Risk Factor Analysis - V1.4 Implementation (Depends on 1.4.2)
+
+**Prerequisites - Database Schema & Historical Data:**
+- [ ] **Create `position_factor_exposures` table**
+  - Add new table: position_id, factor_id, calculation_date, exposure_value, created_at, updated_at
+  - Add foreign keys: position_id → positions.id, factor_id → factor_definitions.id
+  - Add indexes: (position_id, factor_id), (calculation_date), unique constraint on (position_id, factor_id, calculation_date)
+  - Create Alembic migration
+
+- [ ] **Fix Pydantic schema mismatch**
+  - Keep existing `FactorExposureCreate` with portfolio_id for portfolio-level storage
+  - Create new `PositionFactorExposureCreate` with position_id for position-level storage
+  - Update schemas in `app/schemas/factors.py`
+  - Update imports in `app/schemas/__init__.py`
+
+- [ ] **Create database models**
+  - Add `PositionFactorExposure` model in `app/models/market_data.py`
+  - Add relationships: Position.factor_exposures, FactorDefinition.position_exposures
+  - Update `app/models/__init__.py` exports
+
+- [ ] **Update `calculate_daily_pnl()` in Section 1.4.1** 
+  - Modify to support 252-day historical price lookups
+  - Ensure market_data_cache has sufficient historical data (12+ months)
+  - Run data backfill using existing `fetch_missing_historical_data()` if needed
+
+- [ ] **Verify market_data_cache historical depth**
+  - Check if existing portfolios have 252 trading days of price history
+  - Check if factor ETFs (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV) have 12+ months of data
+  - Run backfill job if needed to populate missing historical data
+  - Update market data sync job to maintain 12+ month rolling window
+  - Create database query to validate minimum data requirements before factor calculations
+
+**Core Factor Analysis Functions:**
+- [ ] **`calculate_factor_betas_hybrid(portfolio_id, calculation_date, use_delta_adjusted=False)`**
+  - Input: Portfolio ID, calculation date, and exposure type option
+  - Output: 7-factor betas via statsmodels OLS regression
+  - Process: Internally calls position/factor return functions, performs regression
+  - Implementation: 252-day (12-month) window, 60-day minimum, beta cap at ±3
+  - Exposure options: Dollar exposure (default) or delta-adjusted exposure
+  - Note: Short Interest factor postponed to V1.5
   - File: `app/calculations/factors.py`
 
-- [ ] **`calculate_position_betas(factor_returns_df, position_returns_df)`**
-  - Input: Factor returns DataFrame, position returns DataFrame
-  - Output: Adjusted position-level betas using legacy logic
+- [ ] **`fetch_factor_returns(symbols, start_date, end_date)`**
+  - Input: Factor ETF symbols (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV), date range
+  - Output: DataFrame with daily factor returns calculated from ETF prices
+  - Implementation: On-demand calculation from Polygon adjusted close prices
   - File: `app/calculations/factors.py`
 
-- [ ] **`get_factor_covariance_matrix()`**
-  - Input: None (uses static identity matrix for V1.4)
-  - Output: 8x8 covariance matrix (np.eye(8) * 0.01)
-  - Note: Real correlations deferred to Phase 2
+- [ ] **`calculate_position_returns(portfolio_id, start_date, end_date, use_delta_adjusted=False)`**
+  - Input: Portfolio ID, date range, and exposure type option
+  - Output: DataFrame with exposure-based daily returns for each position
+  - Implementation: Configurable exposure type for options:
+    - Dollar exposure (default): quantity × price × multiplier
+    - Delta-adjusted exposure: dollar_exposure × delta
+  - Process: Accounts for position size changes and corporate actions
+  - Dependencies: Greeks calculation (if delta-adjusted)
   - File: `app/calculations/factors.py`
 
-#### 1.4.5 Risk Metrics - V1.4 Real Calculations (Depends on 1.4.3, 1.4.4)
-- [ ] **`calculate_portfolio_var_hybrid(portfolio_exposures, covariance_matrix)`**
-  - Input: Portfolio exposures, factor covariance matrix
-  - Output: 1-day VaR (95%, 99% confidence)
-  - Implementation: Uses legacy `var_utils.py` matrix multiplication
-  - File: `app/calculations/risk_metrics.py`
+- [ ] **`store_position_factor_exposures(position_betas, calculation_date)`**
+  - Input: Position-level betas dictionary, calculation date
+  - Output: Store individual position factor exposures in database
+  - Implementation: Store results in `position_factor_exposures` table
+  - Process: One record per position per factor per date
+  - File: `app/calculations/factors.py`
 
-- [ ] **`calculate_risk_metrics_empyrical(returns_series)`**
-  - Input: Historical portfolio returns (pandas Series)
-  - Output: Dict with Sharpe ratio, max drawdown, volatility, VaR
-  - Implementation: Uses `empyrical` library for all metrics
-  - File: `app/calculations/risk_metrics.py`
+- [ ] **`aggregate_portfolio_factor_exposures(position_betas, portfolio_exposures)`**
+  - Input: Position-level betas and current portfolio exposures
+  - Output: Portfolio-level factor exposures (exposure-weighted average)
+  - Implementation: Store results in `factor_exposures` table (portfolio-level)
+  - Process: Aggregate from position-level betas, weighted by exposure
+  - File: `app/calculations/factors.py`
 
-- [ ] **`multiply_matrices(cov_matrix, exposures, factor_betas)`**
-  - Input: Covariance matrix, exposures, factor betas
-  - Output: Position exposure for VaR calculation
-  - Implementation: Legacy `var_utils.py` logic
-  - File: `app/calculations/risk_metrics.py`
+- [ ] **Create factor configuration constants**
+  - Create: `app/constants/factors.py`
+  - Constants: REGRESSION_WINDOW_DAYS=252, MIN_REGRESSION_DAYS=60, BETA_CAP_LIMIT=3.0, POSITION_CHUNK_SIZE=1000
+  - Environment variables: FACTOR_CACHE_TTL, FACTOR_CALCULATION_TIMEOUT, FACTOR_USE_DELTA_ADJUSTED
+  - Integration: Use in all factor calculation functions
 
-#### 1.4.6 Snapshot Generation (Depends on All Above)
+#### 1.4.5 Market Risk Scenarios (Depends on 1.4.4)
+*Calculate portfolio responses to market and interest rate movements*
+
+**Prerequisites:**
+- Portfolio-level factor exposures from Section 1.4.4
+- Portfolio beta calculations (market factor exposure)
+- Historical market data for beta calculations
+
+**Core Market Risk Functions:**
+- [ ] **`calculate_portfolio_market_beta(portfolio_id, calculation_date)`**
+  - Input: Portfolio ID, calculation date
+  - Output: Portfolio market beta (from factor exposure to SPY)
+  - Process: Extract market factor beta from factor exposures
+  - Implementation: Use existing factor calculation results
+  - File: `app/calculations/market_risk.py`
+
+- [ ] **`calculate_market_scenarios(portfolio_id, market_moves=[0.01, -0.01])`**
+  - Input: Portfolio ID, market moves (default: +1%, -1%)
+  - Output: Portfolio P&L response to market scenarios
+  - Process: Apply portfolio_beta × market_move to current portfolio value
+  - Implementation: scenario_pnl = portfolio_value × portfolio_beta × market_move
+  - Dependencies: Portfolio beta, current portfolio value
+  - File: `app/calculations/market_risk.py`
+
+- [ ] **`calculate_position_interest_rate_betas(portfolio_id, start_date, end_date)`**
+  - Input: Portfolio ID, historical date range (252 days)
+  - Output: Interest rate beta per position using 10-year Treasury yield
+  - Process: Regress position returns vs 10-year Treasury yield changes
+  - Implementation: Use statsmodels OLS, fetch Treasury data from FRED API
+  - Dependencies: Position returns, Treasury yield historical data
+  - File: `app/calculations/market_risk.py`
+
+- [ ] **`calculate_interest_rate_scenarios(portfolio_id, rate_moves=[0.005, -0.005])`**
+  - Input: Portfolio ID, rate moves (default: +50bp, -50bp)
+  - Output: Portfolio P&L response to interest rate scenarios
+  - Process: Apply position_ir_beta × rate_move for each position, aggregate
+  - Implementation: scenario_pnl = sum(position_value × ir_beta × rate_move)
+  - Dependencies: Position-level interest rate betas, current position values
+  - File: `app/calculations/market_risk.py`
+
+- [ ] **`backtest_scenario_accuracy(portfolio_id, days_back=90)`**
+  - Input: Portfolio ID, historical period for testing
+  - Output: Accuracy metrics for scenario predictions vs actual performance
+  - Process: Compare predicted vs actual portfolio responses to market moves
+  - Implementation: Calculate RMSE, correlation between predicted and actual returns
+  - Purpose: Backend optimization to test and adjust scenario accuracy
+  - File: `app/calculations/market_risk.py`
+
+**Database Storage:**
+- [ ] **Create `market_risk_scenarios` table**
+  - Fields: portfolio_id, scenario_type, scenario_value, predicted_pnl, calculation_date
+  - Scenarios: 'market_up_1pct', 'market_down_1pct', 'rates_up_50bp', 'rates_down_50bp'
+  
+- [ ] **Create `position_interest_rate_betas` table**
+  - Fields: position_id, ir_beta, calculation_date, r_squared, created_at
+  - Store position-level interest rate sensitivities
+
+**API Integration:**
+- [ ] **GET /api/v1/risk/scenarios/market** - Market scenario results
+- [ ] **GET /api/v1/risk/scenarios/rates** - Interest rate scenario results
+- [ ] **POST /api/v1/risk/scenarios/calculate** - Trigger scenario calculations
+- [ ] **GET /api/v1/risk/scenarios/accuracy** - Backtest accuracy metrics
+
+**Batch Job Integration:**
+- [ ] **Add to Batch Job 3: Market Risk Scenarios (5:20 PM weekdays)**
+  - Call `calculate_market_scenarios()` for each portfolio
+  - Call `calculate_interest_rate_scenarios()` for each portfolio
+  - Store results in `market_risk_scenarios` table
+  - Run weekly: `backtest_scenario_accuracy()` for accuracy monitoring
+  - 5-minute timeout
+
+#### 1.4.6 Snapshot Generation (Depends on 1.4.1-1.4.4)
 - [ ] **`create_portfolio_snapshot(portfolio_id, calculation_date)`**
   - Input: Portfolio ID, date
   - Output: Complete portfolio snapshot record
-  - Dependencies: All calculation functions
+  - Dependencies: Market data, Greeks, portfolio aggregations, factor exposures
+  - Note: Risk metrics (VaR, Sharpe, etc.) postponed to V1.5
   - File: `app/calculations/snapshots.py`
 
 - [ ] **`generate_historical_snapshots(portfolio_id, days_back=90)`**
@@ -472,13 +587,148 @@ sigmasight-backend/
   - Output: Historical snapshot records with realistic variations
   - File: `app/calculations/snapshots.py`
 
+#### 1.4.7 Comprehensive Stress Testing Framework (Optional - Can be Postponed)
+*Advanced stress testing with 10+ predefined scenarios and factor correlation modeling*
+
+**Prerequisites:**
+- Section 1.4.4 (Factor Analysis) completed
+- Factor correlation matrix calculations
+- Historical crisis event data
+
+**Core Stress Testing Infrastructure:**
+- [ ] **Create `stress_scenarios.json` configuration system**
+  - External scenario definitions (not hardcoded)
+  - Support for single-factor and multi-factor shocks
+  - Scenario metadata: name, shock_amount, shocked_variable, factor_mapping
+  - Historical crisis replay configurations
+  - File: `app/config/stress_scenarios.json`
+
+- [ ] **`calculate_factor_correlation_matrix(lookback_days=252)`**
+  - Input: Historical factor returns, lookback period
+  - Output: Factor cross-correlation matrix with exponential decay weighting
+  - Implementation: 94% decay factor for historical data weighting
+  - Dependencies: Factor return history from Section 1.4.4
+  - File: `app/calculations/stress_testing.py`
+
+- [ ] **`load_stress_scenarios(config_path="stress_scenarios.json")`**
+  - Input: JSON configuration file path
+  - Output: Parsed stress scenario definitions
+  - Validation: Ensure all referenced factors exist in factor model
+  - File: `app/calculations/stress_testing.py`
+
+**Two-Tier Stress Testing Engine:**
+- [ ] **`calculate_direct_stress_impact(portfolio_id, scenario_config)`**
+  - Input: Portfolio ID, single scenario configuration
+  - Output: Direct impact without factor correlations
+  - Formula: `direct_pnl = 100 × shock_amount × factor_exposure`
+  - Implementation: Apply shock directly to specific factor exposure
+  - File: `app/calculations/stress_testing.py`
+
+- [ ] **`calculate_correlated_stress_impact(portfolio_id, scenario_config, correlation_matrix)`**
+  - Input: Portfolio ID, scenario, factor correlation matrix
+  - Output: Total impact including cross-factor correlations
+  - Formula: `correlated_pnl = factor_exposure × shock_amount × factor_betas × 100`
+  - Implementation: Account for factor correlations and cascading effects
+  - File: `app/calculations/stress_testing.py`
+
+- [ ] **`run_comprehensive_stress_test(portfolio_id, scenario_list=None)`**
+  - Input: Portfolio ID, optional scenario filter
+  - Output: Complete stress test results for all scenarios
+  - Process: Run both direct and correlated calculations for each scenario
+  - Implementation: Aggregate results by scenario type and severity
+  - File: `app/calculations/stress_testing.py`
+
+**Predefined Stress Scenarios (Legacy-Compatible):**
+
+**Market Risk Scenarios:**
+- [ ] **Market Up/Down 10%** - SPY factor shock (±0.10)
+- [ ] **Market Crash 35%** - Severe market decline (-0.35, COVID-like)
+- [ ] **Market Rally 25%** - Strong bull market scenario (+0.25)
+
+**Interest Rate Scenarios:**
+- [ ] **Rates Up/Down 25bp** - Treasury yield shock (±0.0025)
+- [ ] **Rates Up/Down 100bp** - Aggressive Fed policy shock (±0.01)
+- [ ] **Rate Spike 300bp** - Volcker-style shock (+0.03)
+
+**Commodity & Sector Scenarios:**
+- [ ] **Oil Up/Down 5%** - WTI crude price shock, energy sector impact (±0.05)
+- [ ] **Oil Crash 65%** - Supply disruption scenario (-0.65, COVID-like)
+- [ ] **Gold Rally 20%** - Safe haven flight scenario (+0.20)
+
+**International Market Scenarios:**
+- [ ] **Europe (DAX) Up/Down 10%** - European market shock (±0.10)
+- [ ] **Emerging Markets Crash 25%** - EM currency/equity crisis (-0.25)
+- [ ] **China Slowdown 15%** - Chinese growth concerns (-0.15)
+
+**Factor-Specific Scenarios:**
+- [ ] **Value Rotation 20%** - Value vs Growth factor shock (+0.20 value, -0.10 growth)
+- [ ] **Growth Rally 15%** - Tech/growth momentum (+0.15 growth factor)
+- [ ] **Small Cap Outperformance 10%** - Size factor shock (+0.10)
+- [ ] **Quality Flight 12%** - Flight to quality scenario (+0.12 quality factor)
+
+**Volatility & Risk-Off Scenarios:**
+- [ ] **VIX Spike 150%** - Fear index explosion (+1.5 VIX factor)
+- [ ] **Credit Spread Widening 600bp** - Credit crunch scenario (+0.06)
+- [ ] **Liquidity Crisis** - Multi-factor risk-off scenario
+
+**Historical Crisis Replay Scenarios:**
+- [ ] **2008 Financial Crisis Replay**
+  - Multi-factor simultaneous shocks:
+  - Market: -45%, Credit: +600bp, Volatility: +150%, Value: -30%
+  
+- [ ] **COVID-19 Crash Replay (March 2020)**
+  - Multi-factor simultaneous shocks:
+  - Market: -35%, Oil: -65%, Travel: -70%, Tech: +15%
+
+- [ ] **Dot-Com Crash Replay (2000-2002)**
+  - Multi-factor simultaneous shocks:
+  - Growth: -60%, Tech: -80%, Market: -45%, Value: +20%
+
+**Database Storage:**
+- [ ] **Create `stress_test_scenarios` table**
+  - Fields: scenario_id, name, description, shock_config (JSONB), active, created_at
+  - Store scenario definitions and configurations
+
+- [ ] **Create `stress_test_results` table**
+  - Fields: portfolio_id, scenario_id, direct_pnl, correlated_pnl, total_pnl, calculation_date
+  - Store historical stress test results for tracking
+
+- [ ] **Create `factor_correlations` table**
+  - Fields: factor_1, factor_2, correlation, calculation_date, lookback_days
+  - Store factor correlation matrix results
+
+**API Integration:**
+- [ ] **GET /api/v1/stress/scenarios** - List available stress scenarios
+- [ ] **POST /api/v1/stress/test/{portfolio_id}** - Run stress test for portfolio
+- [ ] **GET /api/v1/stress/results/{portfolio_id}** - Get historical stress test results
+- [ ] **GET /api/v1/stress/correlations** - Get factor correlation matrix
+- [ ] **POST /api/v1/stress/scenarios** - Create custom stress scenario
+- [ ] **GET /api/v1/stress/historical/{crisis_type}** - Get historical crisis scenarios
+
+**Batch Job Integration:**
+- [ ] **Add to Batch Job 4: Stress Testing (5:35 PM weekdays)**
+  - Calculate factor correlation matrix (weekly)
+  - Run comprehensive stress tests for all portfolios (daily)
+  - Store results in stress_test_results table
+  - Generate stress test reports and alerts
+  - 10-minute timeout
+
+**Advanced Features:**
+- [ ] **Monte Carlo Stress Testing** - Random scenario generation
+- [ ] **Custom Scenario Builder** - User-defined stress scenarios
+- [ ] **Stress Test Alerts** - Threshold-based risk alerts
+- [ ] **Historical Backtesting** - Validate stress predictions against actual events
+- [ ] **Stress Test Reports** - PDF/Excel export of comprehensive results
+
+**Note:** This entire section can be postponed to V1.5+ if needed to reduce scope. The basic market risk scenarios in Section 1.4.5 provide essential functionality, while this section adds enterprise-grade stress testing capabilities.
+
 ### 1.5 Demo Data Seeding
 *Create comprehensive demo data for testing and demonstration*
 
 - [ ] Create sample portfolio data:
-  - [ ] Sample portfolios with strategy characteristics (from SAMPLE_PORTFOLIO_SPEC.md)
+  - [ ] Sample portfolios with strategy characteristics (from Ben Mock Portfolios.md)
   - [ ] Historical positions (90 days) with realistic variations
-  - [ ] Pre-calculated risk metrics for demo purposes
+  - [ ] Pre-calculated factor exposures for demo purposes
   - [ ] Sample tags and strategies for each portfolio
 
 - [ ] Generate historical snapshots:
@@ -491,7 +741,7 @@ sigmasight-backend/
   - [ ] `app/db/seed_demo_portfolios.py` - Create 3 demo portfolios
   - [ ] `app/db/seed_historical_data.py` - Fetch and store 90 days of market data
   - [ ] `app/db/seed_portfolio_snapshots.py` - Generate historical snapshots
-  - [ ] `app/db/seed_risk_metrics.py` - Pre-calculate risk metrics for demos
+  - [ ] `app/db/seed_factor_exposures.py` - Pre-calculate factor exposures for demos
 
 ### 1.6 Batch Processing Framework
 *Orchestrates calculation functions for automated daily processing*
@@ -499,26 +749,34 @@ sigmasight-backend/
 - [ ] Create batch job framework:
   - [x] Implement `batch_jobs` table for job tracking *(Table created in initial migration)*
   - [x] Create `batch_job_schedules` table for cron management *(Table created in initial migration)*
-  - [ ] Build job runner service (using APScheduler, not Celery for V1.4)
+  - [ ] Build job runner service using APScheduler (runs within FastAPI app)
+  - [ ] Configure APScheduler with PostgreSQL job store for persistence
 
-- [ ] **Batch Job 1: `update_market_data()` (4 PM weekdays)**
-  - [ ] Call `fetch_and_cache_prices()` for all portfolio symbols
+- [ ] **Batch Job 1: `update_market_data()` (4:00 PM weekdays)**
+  - [ ] Call `fetch_and_cache_prices()` for all portfolio symbols + factor ETFs
   - [ ] Call `calculate_position_market_value()` for all positions
   - [ ] Call `calculate_daily_pnl()` for all positions
   - [ ] Update market_data_cache and positions tables
+  - [ ] Maintain 12+ month rolling window for factor calculations
   - [ ] 5-minute timeout
 
-- [ ] **Batch Job 2: `calculate_all_risk_metrics()` (5 PM weekdays)**
-  - [ ] Call `calculate_position_greeks()` for all positions
-  - [ ] Call `calculate_factor_exposures()` for all positions
+- [ ] **Batch Job 2: `calculate_portfolio_greeks()` (5:00 PM weekdays)**
+  - [ ] Call `calculate_greeks_hybrid()` for all positions
   - [ ] Call `aggregate_portfolio_greeks()` for each portfolio
-  - [ ] Call `calculate_portfolio_exposures()` for each portfolio
-  - [ ] Store results in position_greeks and factor_exposures tables
+  - [ ] Store results in position_greeks table
   - [ ] 10-minute timeout
 
-- [ ] **Batch Job 3: `create_portfolio_snapshots()` (5:30 PM weekdays)**
+- [ ] **Batch Job 3: `calculate_factor_exposures()` (5:15 PM weekdays)**
+  - [ ] Call `calculate_factor_betas_hybrid()` for each portfolio
+  - [ ] Call `store_position_factor_exposures()` to store position-level data
+  - [ ] Call `aggregate_portfolio_factor_exposures()` to store portfolio-level data
+  - [ ] Store results in both `position_factor_exposures` and `factor_exposures` tables
+  - [ ] 15-minute timeout
+  - [ ] Process large portfolios in 1000-position chunks
+
+- [ ] **Batch Job 4: `create_portfolio_snapshots()` (5:30 PM weekdays)**
   - [ ] Call `create_portfolio_snapshot()` for each portfolio
-  - [ ] Call `calculate_portfolio_var()` and risk metrics
+  - [ ] Aggregate all calculated metrics (no VaR/risk metrics in V1.4)
   - [ ] Store in portfolio_snapshots table
   - [ ] Implement 365-day retention policy
 
@@ -553,7 +811,7 @@ sigmasight-backend/
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
 - [ ] **GET /api/v1/risk/factors** - Factor exposures (mock initially)
-- [ ] **GET /api/v1/risk/metrics** - Risk metrics (VaR, Sharpe, etc.)
+- [ ] **GET /api/v1/risk/metrics** - Risk metrics (POSTPONED TO V1.5)
 - [ ] Create Greeks aggregation logic
 - [ ] Implement delta-adjusted exposure calculations
 
@@ -600,7 +858,8 @@ sigmasight-backend/
 
 **✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3  
 **🔄 In Progress:** None  
-**📋 Remaining:** 1.4.4-1.4.6, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13
+**📋 Remaining:** 1.4.4, 1.4.6, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13  
+**🚫 Postponed to V1.5:** 1.4.5 (Risk Metrics)
 
 **Key Achievements:**
 - **Authentication system** with JWT tokens fully tested ✅
@@ -622,10 +881,10 @@ sigmasight-backend/
 - **Ready for**: Batch processing integration, API endpoints, real-time calculations
 
 **Next Priority:**
-- Section 1.4.4: Risk Factor Analysis - V1.4 Hybrid (depends on 1.4.3) ✅
-- Section 1.4.5: Risk Metrics - V1.4 Real Calculations (depends on 1.4.3, 1.4.4) 
-- Section 1.4.6: Snapshot Generation (depends on all above)
+- Section 1.4.4: Risk Factor Analysis - 7-factor model implementation
+- Section 1.4.6: Snapshot Generation (without risk metrics)
 - Section 1.5: Demo Data Seeding (sample portfolios)
+- Section 1.6: Batch Processing Framework with APScheduler
 
 ---
 
