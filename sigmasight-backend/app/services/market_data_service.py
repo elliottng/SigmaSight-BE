@@ -448,6 +448,139 @@ class MarketDataService:
             end_date=end_date,
             include_gics=True
         )
+    
+    async def fetch_factor_etf_data_yfinance(
+        self,
+        db: AsyncSession,
+        symbols: List[str],
+        start_date: date,
+        end_date: date
+    ) -> Dict[str, Any]:
+        """
+        Fetch historical data for factor ETFs using YFinance (free API)
+        Specifically designed for factor ETFs that may not be available on free Polygon tier
+        
+        Args:
+            db: Database session
+            symbols: List of ETF symbols (SPY, VTV, etc.)
+            start_date: Start date for historical data
+            end_date: End date for historical data
+            
+        Returns:
+            Dictionary with processing statistics
+        """
+        logger.info(f"Fetching factor ETF data from YFinance for {len(symbols)} symbols")
+        logger.info(f"Date range: {start_date} to {end_date}")
+        
+        results = {
+            "symbols_processed": 0,
+            "symbols_updated": 0,
+            "total_records": 0,
+            "errors": []
+        }
+        
+        for symbol in symbols:
+            try:
+                logger.info(f"Fetching YFinance data for {symbol}")
+                
+                # Fetch data from YFinance
+                ticker = yf.Ticker(symbol)
+                hist_data = ticker.history(
+                    start=start_date,
+                    end=end_date,
+                    interval="1d",
+                    auto_adjust=True,  # Use adjusted prices
+                    prepost=False
+                )
+                
+                if hist_data.empty:
+                    logger.warning(f"No data returned from YFinance for {symbol}")
+                    results["errors"].append(f"No data for {symbol}")
+                    continue
+                
+                # Convert DataFrame to our format
+                records_to_insert = []
+                for date_idx, row in hist_data.iterrows():
+                    # Extract date from pandas Timestamp
+                    trade_date = date_idx.date()
+                    
+                    record = {
+                        "symbol": symbol.upper(),
+                        "date": trade_date,
+                        "open": Decimal(str(round(row['Open'], 4))),
+                        "high": Decimal(str(round(row['High'], 4))),
+                        "low": Decimal(str(round(row['Low'], 4))),
+                        "close": Decimal(str(round(row['Close'], 4))),
+                        "volume": int(row['Volume']) if pd.notna(row['Volume']) else None,
+                        "data_source": "yfinance"
+                    }
+                    records_to_insert.append(record)
+                
+                # Bulk insert using PostgreSQL upsert
+                if records_to_insert:
+                    stmt = pg_insert(MarketDataCache).values(records_to_insert)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['symbol', 'date'],
+                        set_={
+                            'open': stmt.excluded.open,
+                            'high': stmt.excluded.high,
+                            'low': stmt.excluded.low,
+                            'close': stmt.excluded.close,
+                            'volume': stmt.excluded.volume,
+                            'data_source': stmt.excluded.data_source,
+                            'updated_at': datetime.utcnow()
+                        }
+                    )
+                    
+                    await db.execute(stmt)
+                    await db.commit()
+                    
+                    results["symbols_processed"] += 1
+                    results["symbols_updated"] += 1
+                    results["total_records"] += len(records_to_insert)
+                    
+                    logger.info(f"✓ {symbol}: Inserted {len(records_to_insert)} records")
+                else:
+                    logger.warning(f"No valid records to insert for {symbol}")
+                
+                # Small delay to be respectful to YFinance
+                await asyncio.sleep(0.1)
+                
+            except Exception as e:
+                error_msg = f"Error fetching {symbol} from YFinance: {str(e)}"
+                logger.error(error_msg)
+                results["errors"].append(error_msg)
+        
+        logger.info(f"YFinance fetch complete: {results['symbols_processed']} symbols, {results['total_records']} records")
+        return results
+    
+    async def bulk_fetch_factor_etfs(
+        self,
+        db: AsyncSession,
+        symbols: List[str],
+        days_back: int = 365
+    ) -> Dict[str, Any]:
+        """
+        Bulk fetch factor ETF data using YFinance
+        Wrapper around fetch_factor_etf_data_yfinance for convenience
+        
+        Args:
+            db: Database session
+            symbols: List of factor ETF symbols
+            days_back: Number of days of historical data to fetch
+            
+        Returns:
+            Processing statistics
+        """
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days_back)
+        
+        return await self.fetch_factor_etf_data_yfinance(
+            db=db,
+            symbols=symbols,
+            start_date=start_date,
+            end_date=end_date
+        )
 
 
 # Global service instance
