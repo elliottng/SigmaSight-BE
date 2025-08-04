@@ -50,25 +50,58 @@ class FactorDefinitionResponse(FactorDefinitionInDB):
 
 
 class FactorExposureCreate(BaseSchema):
-    """Request schema for creating factor exposure"""
-    position_id: UUID
+    """Request schema for creating portfolio-level factor exposure"""
+    portfolio_id: UUID
     factor_id: UUID
     exposure_value: float = Field(..., ge=-10.0, le=10.0)
+    exposure_dollar: Optional[float] = None
     calculation_date: datetime
 
 
 class FactorExposureInDB(TimestampedSchema):
-    """Database representation of factor exposure"""
+    """Database representation of portfolio-level factor exposure"""
     id: UUID
-    position_id: UUID
+    portfolio_id: UUID
     factor_id: UUID
     exposure_value: float
+    exposure_dollar: Optional[float] = None
     calculation_date: datetime
 
 
 class FactorExposureResponse(BaseSchema):
-    """API response for factor exposure with factor details"""
+    """API response for portfolio-level factor exposure with factor details"""
     factor_name: str
     factor_type: str
     exposure_value: float
+    exposure_dollar: Optional[float] = None
+    calculation_date: datetime
+
+
+class PositionFactorExposureCreate(BaseSchema):
+    """Request schema for creating position-level factor exposure"""
+    position_id: UUID
+    factor_id: UUID
+    exposure_value: float = Field(..., ge=-10.0, le=10.0)
+    quality_flag: Optional[str] = Field(None, pattern="^(full_history|limited_history)$")
+    calculation_date: datetime
+
+
+class PositionFactorExposureInDB(BaseSchema):
+    """Database representation of position-level factor exposure"""
+    id: UUID
+    position_id: UUID
+    factor_id: UUID
+    exposure_value: float
+    quality_flag: Optional[str] = None
+    calculation_date: datetime
+    created_at: datetime
+
+
+class PositionFactorExposureResponse(BaseSchema):
+    """API response for position-level factor exposure with factor details"""
+    position_id: UUID
+    factor_name: str
+    factor_type: str
+    exposure_value: float
+    quality_flag: Optional[str] = None
     calculation_date: datetime

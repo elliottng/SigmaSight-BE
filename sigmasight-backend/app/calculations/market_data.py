@@ -4,9 +4,10 @@ Implements core position valuation and P&L calculations with database integratio
 """
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_, func
+import pandas as pd
 
 from app.models.positions import Position, PositionType
 from app.models.market_data import MarketDataCache
@@ -89,7 +90,8 @@ async def calculate_position_market_value(
 async def get_previous_trading_day_price(
     db: AsyncSession, 
     symbol: str,
-    current_date: Optional[date] = None
+    current_date: Optional[date] = None,
+    lookback_days: int = 1
 ) -> Optional[Decimal]:
     """
     Get the most recent price before current_date from market_data_cache
@@ -98,6 +100,7 @@ async def get_previous_trading_day_price(
         db: Database session
         symbol: Symbol to lookup
         current_date: Date to look before (defaults to today)
+        lookback_days: Number of days to look back (default 1 for previous trading day)
         
     Returns:
         Previous trading day closing price, or None if not found
@@ -105,21 +108,25 @@ async def get_previous_trading_day_price(
     if not current_date:
         current_date = date.today()
     
-    logger.debug(f"Looking up previous trading day price for {symbol} before {current_date}")
+    # Calculate the earliest date to search for
+    earliest_date = current_date - timedelta(days=lookback_days)
+    
+    logger.debug(f"Looking up price for {symbol} between {earliest_date} and {current_date}")
     
     stmt = select(MarketDataCache.close).where(
         MarketDataCache.symbol == symbol.upper(),
-        MarketDataCache.date < current_date
+        MarketDataCache.date < current_date,
+        MarketDataCache.date >= earliest_date
     ).order_by(MarketDataCache.date.desc()).limit(1)
     
     result = await db.execute(stmt)
     price_record = result.scalar_one_or_none()
     
     if price_record:
-        logger.debug(f"Found previous price for {symbol}: ${price_record}")
+        logger.debug(f"Found price for {symbol}: ${price_record}")
         return price_record
     else:
-        logger.warning(f"No previous trading day price found for {symbol}")
+        logger.warning(f"No price found for {symbol} in {lookback_days} day lookback window")
         return None
 
 
@@ -389,5 +396,146 @@ async def bulk_update_position_values(
         logger.error(f"Error committing bulk updates: {str(e)}")
         await db.rollback()
         raise
+    
+    return results
+
+
+async def fetch_historical_prices(
+    db: AsyncSession,
+    symbols: List[str],
+    start_date: date,
+    end_date: date
+) -> pd.DataFrame:
+    """
+    Fetch historical prices for multiple symbols over a date range
+    Used for factor analysis calculations requiring 252-day history
+    
+    Args:
+        db: Database session
+        symbols: List of symbols to fetch
+        start_date: Start date for historical data
+        end_date: End date for historical data
+        
+    Returns:
+        DataFrame with dates as index and symbols as columns, containing closing prices
+        
+    Note:
+        This function is designed for factor calculations requiring long lookback periods
+        It ensures data availability and handles missing data gracefully
+    """
+    logger.info(f"Fetching historical prices for {len(symbols)} symbols from {start_date} to {end_date}")
+    
+    if not symbols:
+        logger.warning("Empty symbols list provided")
+        return pd.DataFrame()
+    
+    # Query historical prices from market_data_cache
+    stmt = select(
+        MarketDataCache.symbol,
+        MarketDataCache.date,
+        MarketDataCache.close
+    ).where(
+        and_(
+            MarketDataCache.symbol.in_([s.upper() for s in symbols]),
+            MarketDataCache.date >= start_date,
+            MarketDataCache.date <= end_date
+        )
+    ).order_by(MarketDataCache.date, MarketDataCache.symbol)
+    
+    result = await db.execute(stmt)
+    records = result.all()
+    
+    if not records:
+        logger.warning(f"No historical data found for symbols {symbols} between {start_date} and {end_date}")
+        return pd.DataFrame()
+    
+    # Convert to DataFrame
+    data = []
+    for record in records:
+        data.append({
+            'symbol': record.symbol,
+            'date': record.date,
+            'close': float(record.close)  # Convert Decimal to float for pandas
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Pivot to have dates as index and symbols as columns
+    price_df = df.pivot(index='date', columns='symbol', values='close')
+    
+    # Log data availability
+    logger.info(f"Retrieved {len(price_df)} days of data for {len(price_df.columns)} symbols")
+    
+    # Check for missing data
+    missing_data = price_df.isnull().sum()
+    if missing_data.any():
+        logger.warning(f"Missing data points: {missing_data[missing_data > 0].to_dict()}")
+    
+    return price_df
+
+
+async def validate_historical_data_availability(
+    db: AsyncSession,
+    symbols: List[str],
+    required_days: int = 252,
+    as_of_date: Optional[date] = None
+) -> Dict[str, Tuple[bool, int, Optional[date], Optional[date]]]:
+    """
+    Validate if symbols have sufficient historical data for factor calculations
+    
+    Args:
+        db: Database session
+        symbols: List of symbols to validate
+        required_days: Minimum number of days required (default 252 for factor analysis)
+        as_of_date: Date to calculate lookback from (defaults to today)
+        
+    Returns:
+        Dictionary mapping symbol to tuple of:
+        - has_sufficient_data: Boolean indicating if minimum days available
+        - actual_days: Number of days actually available
+        - first_date: Earliest date with data
+        - last_date: Latest date with data
+    """
+    if not as_of_date:
+        as_of_date = date.today()
+    
+    logger.info(f"Validating data availability for {len(symbols)} symbols")
+    
+    results = {}
+    
+    for symbol in symbols:
+        # Query to get date range and count
+        stmt = select(
+            MarketDataCache.symbol,
+            func.count(MarketDataCache.date).label('day_count'),
+            func.min(MarketDataCache.date).label('first_date'),
+            func.max(MarketDataCache.date).label('last_date')
+        ).where(
+            and_(
+                MarketDataCache.symbol == symbol.upper(),
+                MarketDataCache.date <= as_of_date
+            )
+        ).group_by(MarketDataCache.symbol)
+        
+        result = await db.execute(stmt)
+        record = result.one_or_none()
+        
+        if record:
+            has_sufficient = record.day_count >= required_days
+            results[symbol] = (
+                has_sufficient,
+                record.day_count,
+                record.first_date,
+                record.last_date
+            )
+            
+            if not has_sufficient:
+                logger.warning(
+                    f"{symbol} has insufficient data: {record.day_count} days "
+                    f"(required: {required_days})"
+                )
+        else:
+            results[symbol] = (False, 0, None, None)
+            logger.warning(f"{symbol} has no historical data")
     
     return results

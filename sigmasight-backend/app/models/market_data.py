@@ -87,6 +87,7 @@ class FactorDefinition(Base):
     
     # Relationships
     exposures: Mapped[list["FactorExposure"]] = relationship("FactorExposure", back_populates="factor")
+    position_exposures: Mapped[list["PositionFactorExposure"]] = relationship("PositionFactorExposure", back_populates="factor")
 
 
 class FactorExposure(Base):
@@ -111,4 +112,29 @@ class FactorExposure(Base):
                         name='uq_factor_exposures_portfolio_factor_date'),
         Index('ix_factor_exposures_portfolio_id_factor_id', 'portfolio_id', 'factor_id'),
         Index('ix_factor_exposures_calculation_date', 'calculation_date'),
+    )
+
+
+class PositionFactorExposure(Base):
+    """Position factor exposures - stores position-level factor exposures"""
+    __tablename__ = "position_factor_exposures"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    position_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("positions.id"), nullable=False)
+    factor_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("factor_definitions.id"), nullable=False)
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    exposure_value: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False)
+    quality_flag: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # 'full_history', 'limited_history'
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    
+    # Relationships
+    position: Mapped["Position"] = relationship("Position", back_populates="factor_exposures")
+    factor: Mapped["FactorDefinition"] = relationship("FactorDefinition", back_populates="position_exposures")
+    
+    __table_args__ = (
+        UniqueConstraint('position_id', 'factor_id', 'calculation_date', 
+                        name='uq_position_factor_date'),
+        Index('idx_pfe_factor_date', 'factor_id', 'calculation_date'),
+        Index('idx_pfe_position_date', 'position_id', 'calculation_date'),
+        Index('idx_pfe_calculation_date', 'calculation_date'),
     )

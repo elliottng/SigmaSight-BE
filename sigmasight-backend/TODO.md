@@ -427,12 +427,31 @@ sigmasight-backend/
 
 #### 1.4.4 Risk Factor Analysis - V1.4 Implementation (Depends on 1.4.2)
 
+**Design Decisions (2025-08-04):**
+1. **Database Migration**: Single Alembic migration for all schema changes
+2. **Factor ETF Validation**: Will validate historical data availability before calculations
+3. **Delta-Adjusted Parameter**: Runtime parameter passed to calculation functions
+4. **Insufficient Data Handling**: Include positions with <60 days but flag with quality warning
+5. **Batch Processing**: Chunk at both portfolio level (1000 positions) and calculation level
+6. **Storage Granularity**: One record per position per factor per date (Option B) for better analytical queries
+
 **Prerequisites - Database Schema & Historical Data:**
 - [ ] **Create `position_factor_exposures` table**
-  - Add new table: position_id, factor_id, calculation_date, exposure_value, created_at, updated_at
-  - Add foreign keys: position_id → positions.id, factor_id → factor_definitions.id
-  - Add indexes: (position_id, factor_id), (calculation_date), unique constraint on (position_id, factor_id, calculation_date)
-  - Create Alembic migration
+  - Schema design (Option B - granular storage):
+    ```sql
+    CREATE TABLE position_factor_exposures (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        position_id UUID NOT NULL REFERENCES positions(id),
+        factor_id UUID NOT NULL REFERENCES factor_definitions(id),
+        calculation_date DATE NOT NULL,
+        exposure_value NUMERIC(12, 6) NOT NULL,
+        quality_flag VARCHAR(20), -- 'full_history', 'limited_history', etc.
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT uq_position_factor_date UNIQUE (position_id, factor_id, calculation_date)
+    );
+    ```
+  - Add indexes: (factor_id, calculation_date), (position_id, calculation_date), (calculation_date)
+  - Create single Alembic migration for all changes
 
 - [ ] **Fix Pydantic schema mismatch**
   - Keep existing `FactorExposureCreate` with portfolio_id for portfolio-level storage
@@ -453,8 +472,8 @@ sigmasight-backend/
   - Run data backfill using existing `fetch_missing_historical_data()` if needed
 
 - [ ] **Verify market_data_cache historical depth**
+  - Validate factor ETFs (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV) have 12+ months of data
   - Check if existing portfolios have 252 trading days of price history
-  - Check if factor ETFs (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV) have 12+ months of data
   - Run backfill job if needed to populate missing historical data
   - Update market data sync job to maintain 12+ month rolling window
   - Create database query to validate minimum data requirements before factor calculations
@@ -724,13 +743,15 @@ sigmasight-backend/
 
 **Note:** This entire section can be postponed to V1.5+ if needed to reduce scope. The basic market risk scenarios in Section 1.4.5 provide essential functionality, while this section adds enterprise-grade stress testing capabilities.
 
+### 1.X Swap Polygon API for a new data API
+
 ### 1.5 Demo Data Seeding
 *Create comprehensive demo data for testing and demonstration*
 
-- [ ] Create sample portfolio data:
+- [ ] Create sample portfolio data: from Ben Mock Portfolios.md
   - [ ] Sample portfolios with strategy characteristics (from Ben Mock Portfolios.md)
-  - [ ] Historical positions (90 days) with realistic variations
-  - [ ] Pre-calculated factor exposures for demo purposes
+  - [ ] No need for historical positions
+  - [ ] Calculate factor exposures for demo purposes
   - [ ] Sample tags and strategies for each portfolio
 
 - [ ] Generate historical snapshots:
@@ -743,7 +764,7 @@ sigmasight-backend/
   - [ ] `app/db/seed_demo_portfolios.py` - Create 3 demo portfolios
   - [ ] `app/db/seed_historical_data.py` - Fetch and store 90 days of market data
   - [ ] `app/db/seed_portfolio_snapshots.py` - Generate historical snapshots
-  - [ ] `app/db/seed_factor_exposures.py` - Pre-calculate factor exposures for demos
+  - [ ] `app/db/seed_factor_exposures.py` - Calculate factor exposures for demos
 
 ### 1.6 Batch Processing Framework
 *Orchestrates calculation functions for automated daily processing*
@@ -796,7 +817,7 @@ sigmasight-backend/
 - [ ] **POST /api/v1/portfolio/upload** - CSV upload endpoint
 - [ ] Implement CSV parsing based on SAMPLE_CSV_FORMAT.md
 - [ ] Add position type detection logic
-- [ ] Implement exposure calculations (notional & delta-adjusted)
+- [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
 
 ### 1.8 Position Management APIs
 - [ ] **GET /api/v1/positions** - List positions with filtering
@@ -809,19 +830,26 @@ sigmasight-backend/
 - [ ] Implement position grouping logic
 
 ### 1.9 Risk Analytics APIs
-- [ ] Implement simplified Black-Scholes calculator
+- [ ] Implement py_vollib Greeks calculator (hybrid real/mock approach)
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
-- [ ] **GET /api/v1/risk/factors** - Factor exposures (mock initially)
+- [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
+- [ ] **GET /api/v1/risk/factors/positions** - Position-level factor exposures
 - [ ] **GET /api/v1/risk/metrics** - Risk metrics (POSTPONED TO V1.5)
-- [ ] Create Greeks aggregation logic
-- [ ] Implement delta-adjusted exposure calculations
+- [ ] Create Greeks aggregation logic (completed in Section 1.4.3)
+- [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
+- [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
 
 ### 1.10 Factor Analysis APIs
-- [ ] **GET /api/v1/factors/definitions** - List factor definitions
-- [ ] **GET /api/v1/factors/exposures** - Portfolio factor exposures
-- [ ] **GET /api/v1/factors/correlation** - Factor correlation matrix
-- [ ] Implement factor exposure calculations
+- [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
+- [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
+- [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
+- [ ] **POST /api/v1/factors/calculate** - Calculate factor exposures (252-day regression)
+- [ ] **GET /api/v1/factors/correlation** - Factor correlation matrix (POSTPONED TO V1.5)
+- [ ] Implement 252-day regression factor calculations (7-factor model)
+- [ ] Create factor regression analysis using statsmodels OLS
+- [ ] Add factor performance attribution
+- [ ] Store both position-level and portfolio-level factor exposures
 
 ### 1.11 Tag Management APIs
 - [ ] **GET /api/v1/tags** - List all tags
@@ -833,7 +861,8 @@ sigmasight-backend/
 ### 1.12 API Infrastructure  
 - [ ] Add user activity logging
 - [ ] Create data validation middleware
-- [ ] Add rate limiting (100 requests/minute per user)
+- [x] Add rate limiting (100 requests/minute per user) - COMPLETED
+- [x] Polygon.io API rate limiting with token bucket algorithm - COMPLETED
 - [ ] Set up request/response logging
 
 ### 1.13 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)

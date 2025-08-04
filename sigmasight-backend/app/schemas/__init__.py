@@ -29,7 +29,10 @@ from .factors import (
     FactorDefinitionResponse,
     FactorExposureCreate,
     FactorExposureInDB,
-    FactorExposureResponse
+    FactorExposureResponse,
+    PositionFactorExposureCreate,
+    PositionFactorExposureInDB,
+    PositionFactorExposureResponse
 )
 
 __all__ = [
@@ -61,4 +64,7 @@ __all__ = [
     "FactorExposureCreate",
     "FactorExposureInDB",
     "FactorExposureResponse",
+    "PositionFactorExposureCreate",
+    "PositionFactorExposureInDB",
+    "PositionFactorExposureResponse",
 ]

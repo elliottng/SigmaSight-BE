@@ -73,6 +73,7 @@ class Position(Base):
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="positions")
     tags: Mapped[List["Tag"]] = relationship("Tag", secondary=position_tags, back_populates="positions")
     greeks: Mapped[Optional["PositionGreeks"]] = relationship("PositionGreeks", back_populates="position", uselist=False)
+    factor_exposures: Mapped[List["PositionFactorExposure"]] = relationship("PositionFactorExposure", back_populates="position")
     
     __table_args__ = (
         Index('ix_positions_portfolio_id', 'portfolio_id'),

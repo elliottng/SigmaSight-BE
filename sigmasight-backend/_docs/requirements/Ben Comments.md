@@ -51,17 +51,22 @@ Elliott's Comments: Discussing with Ben today 8/4/25. Sent email summarizing the
 - I think *Forward Looking* guidance might be more valuable than the historical view.  (Not to say historical isn't relevant, but the backward look might be more valuable to an institution than to an prosumer).
 - This would mean comparing the last twelve month performance of each name in a portfolio to the last twelve month performance of the factor ETFs, weighting this by the position size of the name in the portfolio and then aggregating the results to give a forward looking view of the portfolio's factor exposures.  This methodology probably needs to be run though Claude to confirm. 
 ### 4.4 Concentration
-#### 4.4.1 ETF Lookthrough
-Elliott's Comments: I can imagine an isolated separate ETF concentration report that wouldn't interact with any of the pipeline of the rest of our analyses.  Maybe that could list out top positions after the ETF lookthrough and then calculate factor exposures based on those positions and the updated portfolio weighting. For us to plumb this through the entire platform would be a major rewrite.  We need to decide if we want to do this. It would definitely add a lot of complexity.
+#### 4.4.1 Mutual Fund/ETF Lookthrough
+Elliott's Comments: I can imagine an isolated separate Mutual Fund/ETF concentration report that wouldn't interact with any of the pipeline of the rest of our analyses.  Maybe that could list out top positions after the ETF lookthrough and then calculate factor exposures based on those positions and the updated portfolio weighting. For us to plumb this through the entire platform would be a major rewrite.  We need to decide if we want to do this. It would definitely add a lot of complexity.
+After Ben/Elliott meeting:
+- Change API from Polygon to something else so we can get access to Mutual Funds as single names.
+- Treat them as Tickers in the overall portfolio.  That powers Factor Analysis.
+- Create a concentration report that includes Mutual Fund/ETF lookthrough.
+- Ben to pick the APIs
+Original comments:
 - Don't see calculations for these
 -Position size: if a portfolio is all stock, this is easy enough. But if a portfolio holds options or ETFs, it is worth highlighting the expected impact of a position to returns. On ETFS, Grok tells me API feeds from Finnworlds, Tradefeeds, TwelveData  and Financial Modeling Prep can provide ETF look through data, and on review of their websites it seems like that is true (and they also provide stock data. I was perhaps too quick ito suggest Polyon without looking at all the offerings.
 
 #### 4.4.2 Position Correlation
 - Position Correlation: This is likely a high value add for both all 3 user types. It is easy to have multiple positions that all move in the same direction. This would requrie a historical correlation analysis of each name to each other name in the book. Bloomberg provided this analysis, but it only looked at one stock vs another or vs. the portfolio. 
 Elliott's Comments: We need to discuss what this might look like:
-- Portfolio-level correlation metrics?
-- Pairwise correlation grid? how do we show this for large portfolios?
-
+- Pairwise correlation grid by name, ordered by exposure
+- Portfolio-level correlation metrics - 0 to 1 in a bar chart format
 
 ### 4.5. Market Risks: Market Up/Down and Interest Rates
 Elliott's Comments: Added this to the plan under 1.4.5 Market Risk Scenarios.  But the rest of the Stress Scenarios from the legacy script are not in the plan. I added it to 1.4.7 Comprehensive Stress Testing Framework. 
