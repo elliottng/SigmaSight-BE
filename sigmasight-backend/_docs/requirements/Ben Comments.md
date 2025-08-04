@@ -54,3 +54,12 @@
 We have market down 10% - probably should be market down 1%. Easy enough, I think, just use the portfolio beta and apply it to the market down 1% and up 1%. Probably should be a back end that optimizes this calculation to see how accurate it acutally is and adjusts accordingly. 
 - Interest rate risks. Would have to run back tested calculations of yields and the underlying names in the portfolio and then use this back test of interest rate beta and apply it to each name in the portfolio. 
 - Query other risks? This seems harder...tariff risk to earnigns, for example. Would be a lot to model...
+
+### 4.6. Defer work on historical analysis features
+- simplify the plan based on deferring the historical analysis features
+
+### 4.7. UI will become a chat-centric experience, not a dashboard
+
+### 4.8. Look at where you would pre-calculate for 95% of the market universe daily, and then just pull from the table for an individual portfolio.
+- precalculate 98% of market universe daily (approximately 3000 names - Russell, Nasdaq, S&P)
+- if a portfolio adds a name not in the precalculated table, then calculate on the fly, and add to the list.

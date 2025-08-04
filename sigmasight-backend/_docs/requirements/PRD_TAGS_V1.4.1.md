@@ -4,14 +4,14 @@
 
 ### Regular Tags
 - General categorization tags for organizing positions
-- Examples: "momentum", "tech", "hedge", "value", "defensive"
+- Examples: "momentum", "tech", "hedge", "value", "defensive", "semi"
 - User-created and managed
 - Can be applied to any position type
 
 ### Strategy Tags
 - Special tags prefixed with `#strategy:` for grouping related positions
 - Used to track multi-leg strategies as a single unit
-- Examples: "#strategy:pairs-trade", "#strategy:butterfly", "#strategy:collar"
+- Examples: "#strategy:pairs-trade", "#strategy:butterfly", "#strategy:collar", "#strategy:iron condor", "#strategy:box spread", "#strategy:put spread", "#strategy:call spread"
 - Show combined metrics for all positions with the same strategy tag
 
 ## 2. Core Tag Operations

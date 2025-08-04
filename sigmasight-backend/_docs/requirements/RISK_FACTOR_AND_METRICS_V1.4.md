@@ -55,7 +55,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Simple to implement and understand
 
 **Elliott comments:**
-- Option C.  Basically Option A for the 7 factors with ETF proxies. That's what the legacy scripts did. Legacy Scripts did not do Short Interest. Ben mocked it in the V0.dev Front End prototype. What data source is needed and what calcuations are needed? Should we drop it for now or figure it out?
+- Basically Option A for the 7 factors with ETF proxies. Postpone implementing Short Interest for now. Decision.
 
 **Ben comments:**
 - 
@@ -110,7 +110,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Database schema supports this approach
 
 **Elliott comments:**
-- Option A. Need position-level granularity.
+- Option A. Need position-level granularity. Then calculate portfolio-level betas off of position-level betas. Decision. Will then in the future will feed into future forecasting.
 
 **Ben comments:**
 - 
@@ -145,7 +145,9 @@ This document identifies clarifying questions and design decisions needed for im
 - Uses existing exposure calculations
 
 **Elliott comments:**
-- Method 1: this makes sense to me for stocks, but what about options? Claude is recommending delta-adjusted exposure. Also what if you make trades and increase/decrease your exposure? That muddies the meaning of the position returns for factor regression.  Does this mean that for us factor regression is specific to a portfolio? so each portfolio would have a different factor beta regression analysis.
+- Method 1: this makes sense to me for stocks, but what about options? Ben says use delta-adjusted notional exposure.
+- In the front-end, we will have a toggle to see "include options or exclude options."  This will be a toggle for the user to choose.
+- Also what if you make trades and increase/decrease your exposure? That muddies the meaning of the position returns for factor regression.  Does this mean that for us factor regression is specific to a portfolio? YES, this makes sense to me.
 
 **Ben comments:**
 - 
@@ -172,13 +174,13 @@ This document identifies clarifying questions and design decisions needed for im
 
 **Elliott comments:**
 - need to ask about general philosophy of this.
-- scenario 1: new positions with <90 day history.  Skip factor calculation, use zeros
-- scenario 2: missing market data.  Use last available price, log warning
-- scenario 3: ETF proxy data gaps.  Skip that day from regression, require minimum 30 days
-- scenario 4: complete data failure.  Fall back to mock factor exposures (small random values)
-- scenario 5: market holidays/weekend gaps
-- scenario 6: corporate actions/stock splits
-- scenario 7: position size changes.
+- scenario 1: new positions with <90 day history.  Skip factor calculation, use zeros. Decision.
+- scenario 2: missing market data.  Skip calculations for that day, log warning. Decision.
+- scenario 3: ETF proxy data gaps.  Skip that day from regression, require minimum 30 days. Decision.
+- scenario 4: complete data failure.  Return error. DO NOT fallback to mock factor exposures (small random values). Decision.
+- scenario 5: market holidays/weekend gaps.  Skip data pull and calculations for that day, log warning. Decision.
+- scenario 6: corporate actions/stock splits. This raises the question of are pulling the right data from Polygon and then calculating the returns correctly? Might be options for pulling ETF performance and position performance, and then using that to calculate the position correlation.  Vs. using the prices. Need to research this more and see what our options are.
+- scenario 7: position size changes.  Yes, it's fine.
 
 ### Q2.3: Factor Return Data Storage
 **Question:** Should we cache factor returns or calculate on-demand?
@@ -225,7 +227,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Graceful degradation rather than exclusion
 
 **Elliott comments:**
-- 
+- Option B. Decision.
 
 **Ben comments:**
 - 
@@ -283,7 +285,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Consistent with Section 1.4.3 aggregation methods
 
 **Elliott comments:**
-- 
+- Option A. Decision.
 
 **Ben comments:**
 - 
@@ -314,7 +316,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Provides baseline risk attribution functionality
 
 **Elliott comments:**
-- 
+- Let's decision to eliminate this feature for now.  Postpone to next version.
 
 **Ben comments:**
 - 
@@ -338,7 +340,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Can be made configurable later
 
 **Elliott comments:**
-- 
+- Option B. Decision.
 
 **Ben comments:**
 - 
@@ -362,7 +364,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Use `calculate_delta_adjusted_exposure()` output
 
 **Elliott comments:**
-- 
+- Candidate for elimination or postpone. What is the easiest way to implement this?
 
 **Ben comments:**
 - 
@@ -386,7 +388,7 @@ This document identifies clarifying questions and design decisions needed for im
 - Upgrade path clear for V1.5
 
 **Elliott comments:**
-- 
+- This is probably not needed right now. Can postpone to next version.
 
 **Ben comments:**
 - 
@@ -672,7 +674,7 @@ Based on the analysis above, here are the required functions:
 - Industry standard for portfolio risk management
 
 **Elliott comments:**
-- 
+- Postpone this to next version.
 
 **Ben comments:**
 - 
@@ -703,7 +705,8 @@ Based on the analysis above, here are the required functions:
 - Handles position changes automatically
 
 **Elliott comments:**
-- 
+- For the demo, focus on forward-look of where the portfolio is going.
+- Postpone this to next version.
 
 **Ben comments:**
 - 
@@ -725,7 +728,7 @@ Based on the analysis above, here are the required functions:
 - **Calmar Ratio:** Return/max drawdown ratio
 
 **Elliott comments:**
-- 
+- Postpone all 5 of these metrics to next version. Decision.
 
 **Ben comments:**
 - 
@@ -754,7 +757,7 @@ var_estimate = (position_exposure ** 0.5)
 - Apply confidence multipliers for final VaR estimates
 
 **Elliott comments:**
-- 
+- Postpone this to next version. Decision.
 
 **Ben comments:**
 - 
@@ -774,7 +777,7 @@ var_estimate = (position_exposure ** 0.5)
 - Legacy approach uses 1-day horizon
 
 **Elliott comments:**
-- 
+- Postpone this to next version. Decision.
 
 **Ben comments:**
 - 
@@ -797,7 +800,7 @@ var_estimate = (position_exposure ** 0.5)
 - Real Treasury integration can be Phase 2 enhancement
 
 **Elliott comments:**
-- 
+- Still need the risk-free rate. Find a way to pull 10-year US treasury rate.
 
 **Ben comments:**
 - 
