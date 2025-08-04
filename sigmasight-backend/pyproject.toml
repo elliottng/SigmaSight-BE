@@ -33,6 +33,7 @@ dependencies = [
     # Market Data
     "polygon-api-client>=1.14.0",
     "yfinance>=0.2.28",
+    "fredapi>=0.5.1",
     "pandas>=2.1.0",
     "numpy>=1.25.0",
     # Options Calculations (V1.4 Hybrid Engine)

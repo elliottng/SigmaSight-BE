@@ -138,3 +138,43 @@ class PositionFactorExposure(Base):
         Index('idx_pfe_position_date', 'position_id', 'calculation_date'),
         Index('idx_pfe_calculation_date', 'calculation_date'),
     )
+
+
+class MarketRiskScenario(Base):
+    """Market risk scenarios - stores portfolio scenario results"""
+    __tablename__ = "market_risk_scenarios"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    portfolio_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=False)
+    scenario_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'market_up_5', 'market_down_10', etc.
+    scenario_value: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)  # The scenario change (e.g., 0.05 for +5%)
+    predicted_pnl: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)  # Predicted P&L for this scenario
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    
+    # Relationships
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="market_risk_scenarios")
+    
+    __table_args__ = (
+        Index('idx_market_risk_portfolio_date', 'portfolio_id', 'calculation_date'),
+        Index('idx_market_risk_scenario_type', 'scenario_type'),
+    )
+
+
+class PositionInterestRateBeta(Base):
+    """Position interest rate betas - stores position-level interest rate sensitivities"""
+    __tablename__ = "position_interest_rate_betas"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    position_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("positions.id"), nullable=False)
+    ir_beta: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)  # Interest rate beta
+    r_squared: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 4), nullable=True)  # Regression R²
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    
+    # Relationships
+    position: Mapped["Position"] = relationship("Position", back_populates="interest_rate_betas")
+    
+    __table_args__ = (
+        Index('idx_ir_betas_position_date', 'position_id', 'calculation_date'),
+    )
