@@ -387,17 +387,18 @@ The following features have been postponed to reduce scope and complexity for V1
 - Daily factor beta calculations via batch job
 - Portfolio-level factor exposure storage
 - Basic API endpoints for factor data retrieval
-- 60-day regression window with 20-day minimum
+- 252-day regression window with 60-day minimum
 - Quality flags for data issues
 - Configurable exposure types (dollar vs delta-adjusted) for options
 - Greeks integration for delta-adjusted calculations
+- Position-level factor exposure storage in database
+- Portfolio-level factor exposure aggregation
 
 **What we are NOT implementing in V1.4:**
 - Any risk metrics (VaR, Sharpe, drawdown, etc.)
 - Factor covariance matrix
 - Short Interest factor (8th factor)
 - Real-time calculations
-- Position-level factor storage
 
 **Next Steps:** 
 1. Review and resolve open questions in Section 10

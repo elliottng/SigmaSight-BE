@@ -446,7 +446,9 @@ sigmasight-backend/
   - Update `app/models/__init__.py` exports
 
 - [ ] **Update `calculate_daily_pnl()` in Section 1.4.1** 
-  - Modify to support 252-day historical price lookups
+  - **MODIFY EXISTING FUNCTION** to support 252-day historical price lookups for factor analysis
+  - Add new parameter `lookback_days` with default 252 for factor calculations
+  - Maintain backward compatibility for existing daily P&L calculations
   - Ensure market_data_cache has sufficient historical data (12+ months)
   - Run data backfill using existing `fetch_missing_historical_data()` if needed
 
