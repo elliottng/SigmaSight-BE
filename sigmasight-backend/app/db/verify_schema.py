@@ -9,8 +9,7 @@ from app.database import get_db
 from app.models import (
     FactorDefinition,
     ModelingSessionSnapshot,
-    ExportHistory,
-    HistoricalBackfillProgress
+    ExportHistory
 )
 
 
@@ -39,9 +38,6 @@ async def verify_schema(db: AsyncSession) -> None:
     export_count = await db.scalar(select(func.count(ExportHistory.id)))
     print(f"✓ Export History table created: {export_count} exports")
     
-    # Check historical backfill progress table
-    backfill_count = await db.scalar(select(func.count(HistoricalBackfillProgress.id)))
-    print(f"✓ Historical Backfill Progress table created: {backfill_count} backfills")
     
     print("\n=== Schema verification complete! ===")
 

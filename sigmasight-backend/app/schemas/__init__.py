@@ -16,11 +16,7 @@ from .modeling import (
 from .history import (
     ExportHistoryCreate,
     ExportHistoryInDB,
-    ExportHistoryResponse,
-    BackfillProgressCreate,
-    BackfillProgressUpdate,
-    BackfillProgressInDB,
-    BackfillProgressResponse
+    ExportHistoryResponse
 )
 from .factors import (
     FactorDefinitionCreate,
@@ -65,10 +61,6 @@ __all__ = [
     "ExportHistoryCreate",
     "ExportHistoryInDB",
     "ExportHistoryResponse",
-    "BackfillProgressCreate",
-    "BackfillProgressUpdate",
-    "BackfillProgressInDB",
-    "BackfillProgressResponse",
     
     # Factor schemas
     "FactorDefinitionCreate",

@@ -27,7 +27,7 @@ from app.models.correlations import (
     CorrelationCalculation, CorrelationCluster, 
     CorrelationClusterPosition, PairwiseCorrelation
 )
-from app.models.history import ExportHistory, HistoricalBackfillProgress
+from app.models.history import ExportHistory
 from app.models.modeling import ModelingSessionSnapshot
 
 # Setup logging
