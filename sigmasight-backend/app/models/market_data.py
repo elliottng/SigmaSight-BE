@@ -5,9 +5,9 @@ from datetime import datetime, date
 from uuid import uuid4
 from decimal import Decimal
 from sqlalchemy import String, DateTime, ForeignKey, Index, Numeric, Date, UniqueConstraint, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import Optional
+from typing import Optional, Dict, List
 from app.database import Base
 
 
@@ -88,6 +88,8 @@ class FactorDefinition(Base):
     # Relationships
     exposures: Mapped[list["FactorExposure"]] = relationship("FactorExposure", back_populates="factor")
     position_exposures: Mapped[list["PositionFactorExposure"]] = relationship("PositionFactorExposure", back_populates="factor")
+    correlations_as_factor_1: Mapped[List["FactorCorrelation"]] = relationship("FactorCorrelation", foreign_keys="FactorCorrelation.factor_1_id", back_populates="factor_1")
+    correlations_as_factor_2: Mapped[List["FactorCorrelation"]] = relationship("FactorCorrelation", foreign_keys="FactorCorrelation.factor_2_id", back_populates="factor_2")
 
 
 class FactorExposure(Base):
@@ -177,4 +179,81 @@ class PositionInterestRateBeta(Base):
     
     __table_args__ = (
         Index('idx_ir_betas_position_date', 'position_id', 'calculation_date'),
+    )
+
+
+class StressTestScenario(Base):
+    """Stress test scenarios - stores scenario definitions and configurations"""
+    __tablename__ = "stress_test_scenarios"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    scenario_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)  # market, rates, rotation, volatility, historical
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)  # mild, moderate, severe, extreme
+    shock_config: Mapped[Dict] = mapped_column(JSONB, nullable=False)  # JSON config for shocked factors
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    stress_test_results: Mapped[List["StressTestResult"]] = relationship("StressTestResult", back_populates="scenario")
+    
+    __table_args__ = (
+        Index('idx_stress_scenarios_category', 'category'),
+        Index('idx_stress_scenarios_severity', 'severity'),
+        Index('idx_stress_scenarios_active', 'active'),
+    )
+
+
+class StressTestResult(Base):
+    """Stress test results - stores historical stress test results for tracking"""
+    __tablename__ = "stress_test_results"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    portfolio_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=False)
+    scenario_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stress_test_scenarios.id"), nullable=False)
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    direct_pnl: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)  # Direct impact P&L
+    correlated_pnl: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)  # Correlated impact P&L
+    correlation_effect: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)  # Difference between correlated and direct
+    factor_impacts: Mapped[Dict] = mapped_column(JSONB, nullable=True)  # Detailed factor-level impacts
+    calculation_metadata: Mapped[Optional[Dict]] = mapped_column(JSONB, nullable=True)  # Calculation details
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    
+    # Relationships
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="stress_test_results")
+    scenario: Mapped["StressTestScenario"] = relationship("StressTestScenario", back_populates="stress_test_results")
+    
+    __table_args__ = (
+        Index('idx_stress_results_portfolio_date', 'portfolio_id', 'calculation_date'),
+        Index('idx_stress_results_scenario', 'scenario_id'),
+        Index('idx_stress_results_calculation_date', 'calculation_date'),
+    )
+
+
+class FactorCorrelation(Base):
+    """Factor correlations - stores factor correlation matrix results"""
+    __tablename__ = "factor_correlations"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    factor_1_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("factor_definitions.id"), nullable=False)
+    factor_2_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("factor_definitions.id"), nullable=False)
+    correlation: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)  # Correlation coefficient (-1 to 1)
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    lookback_days: Mapped[int] = mapped_column(nullable=False)  # Historical period used
+    decay_factor: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)  # Exponential decay factor
+    data_points: Mapped[int] = mapped_column(nullable=False)  # Number of data points used
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    
+    # Relationships
+    factor_1: Mapped["FactorDefinition"] = relationship("FactorDefinition", foreign_keys=[factor_1_id], back_populates="correlations_as_factor_1")
+    factor_2: Mapped["FactorDefinition"] = relationship("FactorDefinition", foreign_keys=[factor_2_id], back_populates="correlations_as_factor_2")
+    
+    __table_args__ = (
+        UniqueConstraint('factor_1_id', 'factor_2_id', 'calculation_date', 
+                        name='uq_factor_correlations_factors_date'),
+        Index('idx_factor_correlations_date', 'calculation_date'),
+        Index('idx_factor_correlations_factors', 'factor_1_id', 'factor_2_id'),
     )

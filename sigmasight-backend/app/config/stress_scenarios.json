@@ -1,0 +1,253 @@
+{
+  "stress_scenarios": {
+    "market_risk": {
+      "market_up_10": {
+        "name": "Market Rally 10%",
+        "description": "Moderate bull market scenario with 10% market appreciation",
+        "shocked_factors": {
+          "Market": 0.10
+        },
+        "category": "market",
+        "severity": "moderate",
+        "active": true
+      },
+      "market_down_10": {
+        "name": "Market Decline 10%",
+        "description": "Moderate bear market scenario with 10% market decline",
+        "shocked_factors": {
+          "Market": -0.10
+        },
+        "category": "market",
+        "severity": "moderate",
+        "active": true
+      },
+      "market_crash_35": {
+        "name": "Market Crash 35%",
+        "description": "Severe market crash similar to COVID-19 March 2020",
+        "shocked_factors": {
+          "Market": -0.35
+        },
+        "category": "market",
+        "severity": "severe",
+        "active": true
+      },
+      "market_rally_25": {
+        "name": "Market Rally 25%",
+        "description": "Strong bull market scenario with 25% appreciation",
+        "shocked_factors": {
+          "Market": 0.25
+        },
+        "category": "market",
+        "severity": "severe",
+        "active": true
+      }
+    },
+    "interest_rate_risk": {
+      "rates_up_25bp": {
+        "name": "Rates Up 25bp",
+        "description": "Moderate Fed policy tightening with 25 basis point increase",
+        "shocked_factors": {
+          "Interest_Rate": 0.0025
+        },
+        "category": "rates",
+        "severity": "mild",
+        "active": true
+      },
+      "rates_down_25bp": {
+        "name": "Rates Down 25bp",
+        "description": "Moderate Fed policy easing with 25 basis point decrease",
+        "shocked_factors": {
+          "Interest_Rate": -0.0025
+        },
+        "category": "rates",
+        "severity": "mild",
+        "active": true
+      },
+      "rates_up_100bp": {
+        "name": "Rates Up 100bp",
+        "description": "Aggressive Fed policy tightening with 100 basis point increase",
+        "shocked_factors": {
+          "Interest_Rate": 0.01
+        },
+        "category": "rates",
+        "severity": "moderate",
+        "active": true
+      },
+      "rates_down_100bp": {
+        "name": "Rates Down 100bp",
+        "description": "Aggressive Fed policy easing with 100 basis point decrease",
+        "shocked_factors": {
+          "Interest_Rate": -0.01
+        },
+        "category": "rates",
+        "severity": "moderate",
+        "active": true
+      },
+      "rate_spike_300bp": {
+        "name": "Rate Spike 300bp",
+        "description": "Volcker-style monetary shock with 300 basis point increase",
+        "shocked_factors": {
+          "Interest_Rate": 0.03
+        },
+        "category": "rates",
+        "severity": "severe",
+        "active": true
+      }
+    },
+    "factor_rotations": {
+      "value_rotation_20": {
+        "name": "Value Rotation 20%",
+        "description": "Strong rotation from growth to value stocks",
+        "shocked_factors": {
+          "Value": 0.20,
+          "Growth": -0.10
+        },
+        "category": "rotation",
+        "severity": "moderate",
+        "active": true
+      },
+      "growth_rally_15": {
+        "name": "Growth Rally 15%",
+        "description": "Technology and growth momentum rally",
+        "shocked_factors": {
+          "Growth": 0.15,
+          "Momentum": 0.10
+        },
+        "category": "rotation",
+        "severity": "moderate",
+        "active": true
+      },
+      "small_cap_outperformance_10": {
+        "name": "Small Cap Outperformance 10%",
+        "description": "Small cap stocks outperform large caps",
+        "shocked_factors": {
+          "Size": 0.10
+        },
+        "category": "rotation",
+        "severity": "mild",
+        "active": true
+      },
+      "quality_flight_12": {
+        "name": "Flight to Quality 12%",
+        "description": "Risk-off scenario favoring high-quality stocks",
+        "shocked_factors": {
+          "Quality": 0.12,
+          "Market": -0.05
+        },
+        "category": "rotation",
+        "severity": "mild",
+        "active": true
+      }
+    },
+    "volatility_risk": {
+      "vix_spike_150": {
+        "name": "VIX Spike 150%",
+        "description": "Fear index explosion indicating market panic",
+        "shocked_factors": {
+          "Low Volatility": -0.25,
+          "Market": -0.15
+        },
+        "category": "volatility",
+        "severity": "severe",
+        "active": true
+      },
+      "liquidity_crisis": {
+        "name": "Liquidity Crisis",
+        "description": "Multi-factor risk-off scenario with liquidity constraints",
+        "shocked_factors": {
+          "Market": -0.20,
+          "Low Volatility": -0.30,
+          "Quality": 0.15,
+          "Size": -0.10
+        },
+        "category": "volatility",
+        "severity": "severe",
+        "active": true
+      }
+    },
+    "historical_replays": {
+      "financial_crisis_2008": {
+        "name": "2008 Financial Crisis Replay",
+        "description": "Multi-factor simultaneous shocks replicating 2008 crisis",
+        "shocked_factors": {
+          "Market": -0.45,
+          "Value": -0.30,
+          "Size": -0.25,
+          "Quality": 0.20,
+          "Low Volatility": -0.35
+        },
+        "category": "historical",
+        "severity": "extreme",
+        "active": true,
+        "historical_period": "2008-09-15 to 2009-03-15"
+      },
+      "covid_crash_2020": {
+        "name": "COVID-19 Crash Replay (March 2020)",
+        "description": "Pandemic-induced market crash with sector rotation",
+        "shocked_factors": {
+          "Market": -0.35,
+          "Growth": 0.15,
+          "Value": -0.40,
+          "Size": -0.30,
+          "Quality": 0.10
+        },
+        "category": "historical",
+        "severity": "extreme",
+        "active": true,
+        "historical_period": "2020-02-19 to 2020-03-23"
+      },
+      "dotcom_crash_2000": {
+        "name": "Dot-Com Crash Replay (2000-2002)",
+        "description": "Technology bubble burst with growth factor collapse",
+        "shocked_factors": {
+          "Market": -0.45,
+          "Growth": -0.60,
+          "Value": 0.20,
+          "Momentum": -0.50,
+          "Quality": 0.15
+        },
+        "category": "historical",
+        "severity": "extreme",
+        "active": true,
+        "historical_period": "2000-03-10 to 2002-10-09"
+      }
+    }
+  },
+  "configuration": {
+    "default_lookback_days": 252,
+    "correlation_decay_factor": 0.94,
+    "min_factor_correlation": -0.95,
+    "max_factor_correlation": 0.95,
+    "stress_magnitude_cap": 1.0,
+    "enable_cross_correlations": true,
+    "default_confidence_level": 0.95
+  },
+  "factor_mappings": {
+    "Market": "SPY",
+    "Value": "VTV", 
+    "Growth": "VUG",
+    "Momentum": "MTUM",
+    "Quality": "QUAL",
+    "Size": "SIZE",
+    "Low Volatility": "USMV",
+    "Interest_Rate": "Treasury_10Y"
+  },
+  "severity_levels": {
+    "mild": {
+      "description": "Minor market movements, typical daily/weekly volatility",
+      "impact_range": "0-5%"
+    },
+    "moderate": {
+      "description": "Significant but manageable market stress",
+      "impact_range": "5-15%"
+    },
+    "severe": {
+      "description": "Major market disruption requiring risk management",
+      "impact_range": "15-35%"
+    },
+    "extreme": {
+      "description": "Crisis-level market stress, historical rare events",
+      "impact_range": "35%+"
+    }
+  }
+}
