@@ -691,35 +691,45 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - Frontend Integration: Risk scenario visualization
 - Advanced Features: Custom scenarios, historical backtesting
 
-#### 1.4.5.1 Remove User Portfolio Historical Backfill Code (Pre-requisite for 1.4.6)
+#### 1.4.5.1 Remove User Portfolio Historical Backfill Code (Pre-requisite for 1.4.6) ✅
 *Remove 90-day historical snapshot generation for user portfolios while preserving all system analytical infrastructure*
+
+**Status: COMPLETED** (2025-08-05)
 
 **IMPORTANT DISTINCTION:**
 - **REMOVE**: User portfolio 90-day historical snapshot backfill (removed from V1.4 scope)
 - **PRESERVE**: All system historical data collection for tickers, factors, Greeks, and analytics
 
-**Items to Remove:**
-- [ ] **Database Model & Table: `HistoricalBackfillProgress`**
-  - File: `app/models/history.py` (lines 75-144)
+**Items Removed:**
+- [x] **Database Model & Table: `HistoricalBackfillProgress`**
+  - File: `app/models/history.py` (removed 70 lines)
   - Purpose: Tracked user portfolio backfill progress
-  - Action: Remove entire model class
+  - Action: ✅ Removed entire model class
 
-- [ ] **Database Migration for `historical_backfill_progress` table**
-  - File: `alembic/versions/81d5d976093e_add_modeling_and_history_tables.py`
-  - Action: Remove table creation and drop from migration
+- [x] **Database Migration for `historical_backfill_progress` table**
+  - File: Created new migration `a4bf86e9a003_remove_historical_backfill_progress_.py`
+  - Action: ✅ Created migration to drop table (not from original migration)
 
-- [ ] **Backfill Progress Schemas**
-  - File: `app/schemas/history.py` (lines 37-64)
+- [x] **Backfill Progress Schemas**
+  - File: `app/schemas/history.py` (removed lines 37-76)
   - Classes: `BackfillProgressCreate`, `BackfillProgressUpdate`, `BackfillProgressInDB`, `BackfillProgressResponse`
-  - Action: Remove all backfill-related schemas
+  - Action: ✅ Removed all backfill-related schemas
 
-- [ ] **Schema Exports**
+- [x] **Schema Exports**
   - File: `app/schemas/__init__.py`
-  - Action: Remove imports and exports for backfill progress schemas
+  - Action: ✅ Removed imports and exports for backfill progress schemas
 
-- [ ] **Schema Verification**
+- [x] **Schema Verification**
   - File: `app/db/verify_schema.py`
-  - Action: Remove references to `historical_backfill_progress` table
+  - Action: ✅ Removed references to `historical_backfill_progress` table
+
+- [x] **Model Exports**
+  - File: `app/models/__init__.py`
+  - Action: ✅ Removed HistoricalBackfillProgress from exports
+
+- [x] **Database Initialization Script**
+  - File: `scripts/init_database.py`
+  - Action: ✅ Removed HistoricalBackfillProgress import
 
 **Items to PRESERVE (System Infrastructure):**
 - ✅ `scripts/backfill_factor_etfs.py` - Fetches factor ETF reference data for calculations
@@ -732,6 +742,12 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - V1.4 focuses on daily forward snapshots from CSV upload date
 - Historical analytical data (prices, factors, Greeks) still needed for calculations
 - Only removing the feature that generated 90 days of user portfolio snapshots
+
+**Completion Notes:**
+- Total lines removed: 126
+- Verification completed: All imports work, unit tests pass, no dangling references
+- Migration created but not yet applied to database
+- Commit: 128a490 "feat: Remove HistoricalBackfillProgress functionality (Task 1.4.5.1)"
 
 #### 1.4.6 Snapshot Generation (Depends on 1.4.1-1.4.4)
 *Daily forward snapshot generation for portfolios starting from CSV upload date*
