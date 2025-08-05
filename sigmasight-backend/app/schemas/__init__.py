@@ -34,6 +34,20 @@ from .factors import (
     PositionFactorExposureInDB,
     PositionFactorExposureResponse
 )
+from .correlations import (
+    PositionFilterConfig,
+    CorrelationCalculationCreate,
+    CorrelationCalculationUpdate,
+    CorrelationCalculationResponse,
+    ClusterPositionResponse,
+    CorrelationClusterResponse,
+    PairwiseCorrelationCreate,
+    PairwiseCorrelationResponse,
+    CorrelationMatrixResponse,
+    PortfolioCorrelationMetricsResponse,
+    CalculateCorrelationRequest,
+    CorrelationMatrixRequest
+)
 
 __all__ = [
     # Base schemas
@@ -67,4 +81,18 @@ __all__ = [
     "PositionFactorExposureCreate",
     "PositionFactorExposureInDB",
     "PositionFactorExposureResponse",
+    
+    # Correlation schemas
+    "PositionFilterConfig",
+    "CorrelationCalculationCreate",
+    "CorrelationCalculationUpdate",
+    "CorrelationCalculationResponse",
+    "ClusterPositionResponse",
+    "CorrelationClusterResponse",
+    "PairwiseCorrelationCreate",
+    "PairwiseCorrelationResponse",
+    "CorrelationMatrixResponse",
+    "PortfolioCorrelationMetricsResponse",
+    "CalculateCorrelationRequest",
+    "CorrelationMatrixRequest",
 ]

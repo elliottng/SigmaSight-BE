@@ -27,6 +27,8 @@ Implement comprehensive position correlation analysis providing investors with p
 **Query Parameters**:
 - `min_position_value`: Optional float, minimum absolute position value for inclusion (default: $10,000)
 - `min_portfolio_weight`: Optional float, minimum portfolio weight for inclusion (default: 0.01)
+- `filter_mode`: Optional string ("value_only", "weight_only", "both", "either"), defaults to "both"
+- `correlation_threshold`: Optional float (0.0 to 1.0), correlation threshold for cluster detection (default: 0.7)
 - `view`: Optional string ("portfolio", "longs", "shorts"), defaults to "portfolio"
 
 **Response Schema**:
@@ -122,8 +124,8 @@ Implement comprehensive position correlation analysis providing investors with p
   "position_filters": {
     "min_position_value": 10000.00,
     "min_portfolio_weight": 0.01,
-    "positions_included": 45,
-    "positions_filtered": 12
+    "filter_mode": "both",
+    "correlation_threshold": 0.7
   },
   "force_recalculate": false
 }
@@ -144,6 +146,11 @@ CREATE TABLE correlation_calculations (
     correlation_concentration_score DECIMAL(8,6) NOT NULL,
     effective_positions DECIMAL(8,2) NOT NULL,
     data_quality VARCHAR(20) NOT NULL,
+    -- Position filtering configuration (stored per-portfolio)
+    min_position_value DECIMAL(18,4),
+    min_portfolio_weight DECIMAL(8,6),
+    filter_mode VARCHAR(20) DEFAULT 'both', -- 'value_only', 'weight_only', 'both', 'either'
+    correlation_threshold DECIMAL(8,6) DEFAULT 0.7,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(portfolio_id, duration_days, calculation_date)
 );
@@ -193,12 +200,12 @@ CREATE TABLE pairwise_correlations (
 ### Service Layer Architecture
 
 **New Service: CorrelationService**
-- `calculate_portfolio_correlations(portfolio_id, min_position_value, min_portfolio_weight)`: Main calculation orchestrator with position filtering
-- `filter_significant_positions(positions, min_value, min_weight)`: Filter positions by value and weight thresholds
-- `calculate_pairwise_correlations(returns_data)`: Compute full correlation matrix using pandas.DataFrame.corr()
-- `detect_correlation_clusters(correlation_matrix, threshold=0.7)`: Identify position clusters using graph connectivity
+- `calculate_portfolio_correlations(portfolio_id, min_position_value, min_portfolio_weight, filter_mode='both', correlation_threshold=0.7)`: Main calculation orchestrator with configurable position filtering
+- `filter_significant_positions(positions, min_value, min_weight, filter_mode)`: Filter positions by value and/or weight thresholds based on filter_mode ('value_only', 'weight_only', 'both', 'either')
+- `calculate_pairwise_correlations(returns_data)`: Compute full correlation matrix using pandas.DataFrame.corr() with log returns
+- `detect_correlation_clusters(correlation_matrix, threshold=0.7)`: Identify position clusters using graph connectivity (configurable threshold)
 - `calculate_portfolio_metrics(correlations, positions)`: Compute overall correlation and concentration scores
-- `generate_cluster_nicknames(clusters, positions)`: Create human-readable cluster names based on sector/industry
+- `generate_cluster_nicknames(clusters, positions)`: Create human-readable cluster names using waterfall: tags → sector → largest position (e.g., "AAPL lookalikes")
 
 **Enhanced Service: MarketDataService**
 - `get_position_returns(significant_positions, start_date, end_date)`: Retrieve 90-day daily returns for filtered positions
@@ -218,14 +225,23 @@ CREATE TABLE pairwise_correlations (
 ### Calculation Engine Design
 
 **Core Algorithm Flow**:
-1. Filter portfolio positions by minimum value ($10K) and weight (1%) thresholds
-2. Fetch 90-day daily returns for significant positions only
-3. Filter positions with insufficient data points (require minimum 20 days)
-4. Calculate full pairwise correlation matrix using Pearson correlation coefficient
-5. Identify correlation clusters using depth-first search on correlation graph (threshold >0.7)
-6. Generate cluster nicknames using sector/industry classification heuristics
-7. Calculate portfolio-level metrics: overall correlation, concentration score, effective positions
-8. Store complete correlation matrix and metadata in database tables
+1. Filter portfolio positions based on configurable filter_mode:
+   - 'value_only': Only apply minimum value threshold
+   - 'weight_only': Only apply minimum weight threshold
+   - 'both': Positions must meet BOTH thresholds (default)
+   - 'either': Positions must meet at least ONE threshold
+2. Fetch 90-day daily price data for filtered positions
+3. Calculate log returns: ln(price_t / price_t-1)
+4. Exclude positions with insufficient data points (<20 days)
+5. Calculate full pairwise correlation matrix using Pearson correlation on log returns
+6. Store full matrix including self-correlations (A,A) and both directions (A,B) and (B,A)
+7. Identify correlation clusters using depth-first search on correlation graph (configurable threshold, default 0.7)
+8. Generate cluster nicknames using waterfall logic:
+   - Check if positions share common tags
+   - Check if positions share common sector
+   - Use largest position symbol + "lookalikes" (e.g., "AAPL lookalikes")
+9. Calculate portfolio-level metrics: overall correlation, concentration score, effective positions
+10. Store complete correlation matrix and metadata in database tables
 
 **Performance Optimizations**:
 - Position filtering reduces matrix size by ~90% (500 positions → 50 significant positions)

@@ -9,6 +9,7 @@ from app.models.market_data import MarketDataCache, PositionGreeks, FactorDefini
 from app.models.snapshots import PortfolioSnapshot, BatchJob, BatchJobSchedule
 from app.models.modeling import ModelingSessionSnapshot
 from app.models.history import ExportHistory, HistoricalBackfillProgress
+from app.models.correlations import CorrelationCalculation, CorrelationCluster, CorrelationClusterPosition, PairwiseCorrelation
 
 # Export all models
 __all__ = [
@@ -41,4 +42,10 @@ __all__ = [
     # History module
     "ExportHistory",
     "HistoricalBackfillProgress",
+    
+    # Correlations module
+    "CorrelationCalculation",
+    "CorrelationCluster",
+    "CorrelationClusterPosition",
+    "PairwiseCorrelation",
 ]

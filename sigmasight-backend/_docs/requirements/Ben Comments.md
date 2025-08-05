@@ -45,7 +45,7 @@ Elliott's comments: let's postpone this to V1.5.
 ### 4.2 Exposure
 - Calculations for Gross/Net appear accurate
 ### 4.3. Factor Exposure
-Elliott's Comments: Discussing with Ben today 8/4/25. Sent email summarizing the issues.
+Elliott's Comments: Discussing with Ben today 8/4/25. Sent email summarizing the issues.  Issue resolved and integrated into the todo.md
 - I thought there was a Parametric script built to do this, but I don't see it in the calculations section
 - Believe the approach used was to run a co-variance calculation comparing the historical portfolio to the factor ETF performance 
 - I think *Forward Looking* guidance might be more valuable than the historical view.  (Not to say historical isn't relevant, but the backward look might be more valuable to an institution than to an prosumer).
