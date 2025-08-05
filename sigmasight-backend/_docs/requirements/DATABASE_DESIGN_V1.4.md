@@ -148,19 +148,21 @@ INSERT INTO stress_scenarios (name, scenario_type, sort_order) VALUES
 ('COVID-19 Crash', 'historical', 8);
 ```
 
-### 4.3 Historical Market Data
+### ~~4.3 Historical Market Data~~ *(REMOVED - V1.4 scope change)*
 ```sql
--- After positions are loaded, populate with real historical data:
--- 1. Fetch from Polygon.io API
--- 2. Store in market_data_cache
--- 3. Generate portfolio_snapshots using actual prices
+-- ~~After positions are loaded, populate with real historical data:~~
+-- ~~1. Fetch from Polygon.io API~~
+-- ~~2. Store in market_data_cache~~
+-- ~~3. Generate portfolio_snapshots using actual prices~~
 
--- Example of what gets stored (but with real data):
-INSERT INTO market_data_cache (ticker, date, open, high, low, close, volume, data_source)
-SELECT ticker, date, open, high, low, close, volume, 'polygon'
-FROM polygon_api_results
-WHERE date >= CURRENT_DATE - INTERVAL '90 days';
+-- ~~Example of what gets stored (but with real data):~~
+-- ~~INSERT INTO market_data_cache (ticker, date, open, high, low, close, volume, data_source)~~
+-- ~~SELECT ticker, date, open, high, low, close, volume, 'polygon'~~
+-- ~~FROM polygon_api_results~~
+-- ~~WHERE date >= CURRENT_DATE - INTERVAL '90 days';~~
 ```
+
+**Updated Approach**: *Market data will be fetched daily for current pricing only. Portfolio snapshots generated daily going forward from upload date.*
 
 ## 5. API Data Models
 

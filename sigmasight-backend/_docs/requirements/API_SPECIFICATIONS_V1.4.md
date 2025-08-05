@@ -348,15 +348,17 @@ Content-Type: multipart/form-data
   "portfolio_id": 1,
   "positions_created": 35,
   "positions_updated": 0,
-  "historical_data_status": "processing",
-  "historical_data_job_id": "uuid",
-  "message": "Portfolio uploaded successfully. Historical data backfill in progress."
+  ~~"historical_data_status": "processing",~~
+  ~~"historical_data_job_id": "uuid",~~
+  "message": "Portfolio uploaded successfully."
 }
 ```
 
-**Note**: The upload endpoint triggers automatic fetching of 90 days of historical market data.
-This process runs asynchronously and typically completes within 5-10 minutes depending on 
-the number of unique tickers.
+~~**Note**: The upload endpoint triggers automatic fetching of 90 days of historical market data.~~
+~~This process runs asynchronously and typically completes within 5-10 minutes depending on~~
+~~the number of unique tickers.~~
+
+**Note (Updated)**: *Historical data generation removed from V1.4 scope. Portfolio snapshots will be generated daily going forward from upload date.*
 
 ### 4.3 Get Portfolio Summary
 ```http

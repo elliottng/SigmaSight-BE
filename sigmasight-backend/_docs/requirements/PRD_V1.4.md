@@ -63,13 +63,15 @@ Requirements:
 - **Database Integration**: Automated previous price lookup from market_data_cache
 - **Fallback Logic**: Uses position.last_price if no market data available
 
-#### Historical Data Generation
-Upon successful CSV upload:
-- System fetches 90 days of real historical market data from Polygon.io for all positions
-- Generates authentic historical portfolio snapshots using actual closing prices
-- Calculates real historical P&L based on actual market movements
-- Creates realistic risk metrics derived from true market volatility
-- Handles weekends/holidays by only creating snapshots for actual trading days
+#### ~~Historical Data Generation~~ *(REMOVED - Decision: Not needed for V1.4)*
+~~Upon successful CSV upload:~~
+- ~~System fetches 90 days of real historical market data from Polygon.io for all positions~~
+- ~~Generates authentic historical portfolio snapshots using actual closing prices~~
+- ~~Calculates real historical P&L based on actual market movements~~
+- ~~Creates realistic risk metrics derived from true market volatility~~
+- ~~Handles weekends/holidays by only creating snapshots for actual trading days~~
+
+**Note:** *Historical data generation was removed from scope. V1.4 will focus on current portfolio state and daily forward snapshots only.*
 
 #### Portfolio Overview
 ```
@@ -212,12 +214,12 @@ Steps:
 5. Update factor exposures
 6. Create new portfolio snapshot
 
-Historical Backfill Process:
-- Triggered automatically after CSV upload
-- Fetches 90 days of historical daily prices for all positions
-- Respects Polygon.io rate limits (implements retry logic)
-- Caches historical data to minimize API calls
-- Generates portfolio snapshots for each trading day using real prices
+~~Historical Backfill Process~~ *(REMOVED - V1.4 scope change)*:
+- ~~Triggered automatically after CSV upload~~
+- ~~Fetches 90 days of historical daily prices for all positions~~
+- ~~Respects Polygon.io rate limits (implements retry logic)~~
+- ~~Caches historical data to minimize API calls~~
+- ~~Generates portfolio snapshots for each trading day using real prices~~
 
 ##### Rate Limiting Strategy for Polygon.io
 
@@ -942,7 +944,7 @@ The AI agent should extract the core data transformation logic while replacing t
 - Preserve position type determination - The logic for determining long/short based on quantity sign should be maintained
 - Adapt the exposure percentage calculations - The fund-level calculations for exposure% should be reimplemented
 - Replace S3 uploads with direct database writes - Instead of creating Parquet files, write directly to PostgreSQL tables
-- Generate historical snapshots programmatically - Rather than processing years of files, create 90 days of synthetic historical data based on the uploaded positions
+- ~~Generate historical snapshots programmatically - Rather than processing years of files, create 90 days of synthetic historical data based on the uploaded positions~~ *(REMOVED - V1.4 scope change)*
 
 **Key Business Logic to Preserve:**
 
@@ -965,8 +967,8 @@ The AI agent should maintain the Polygon API integration while simplifying the s
 - Keep the same API endpoints and parameters - The Polygon API calls should remain identical
 - Remove minute-level data handling - Focus only on daily data for the demo
 - Replace S3 storage with PostgreSQL - Write market data directly to the database
-- **CRITICAL**: Use this integration to fetch real historical data for all positions after CSV upload
-- **Generate authentic 90-day historical snapshots using actual market prices, not mock data**
+- ~~**CRITICAL**: Use this integration to fetch real historical data for all positions after CSV upload~~ *(REMOVED - V1.4 scope change)*
+- ~~**Generate authentic 90-day historical snapshots using actual market prices, not mock data**~~ *(REMOVED - V1.4 scope change)*
 - Implement proper rate limiting and caching to optimize API usage
 
 **Key Integration Points:**

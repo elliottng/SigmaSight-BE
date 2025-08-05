@@ -691,13 +691,152 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - Frontend Integration: Risk scenario visualization
 - Advanced Features: Custom scenarios, historical backtesting
 
+#### 1.4.5.1 Remove User Portfolio Historical Backfill Code (Pre-requisite for 1.4.6)
+*Remove 90-day historical snapshot generation for user portfolios while preserving all system analytical infrastructure*
+
+**IMPORTANT DISTINCTION:**
+- **REMOVE**: User portfolio 90-day historical snapshot backfill (removed from V1.4 scope)
+- **PRESERVE**: All system historical data collection for tickers, factors, Greeks, and analytics
+
+**Items to Remove:**
+- [ ] **Database Model & Table: `HistoricalBackfillProgress`**
+  - File: `app/models/history.py` (lines 75-144)
+  - Purpose: Tracked user portfolio backfill progress
+  - Action: Remove entire model class
+
+- [ ] **Database Migration for `historical_backfill_progress` table**
+  - File: `alembic/versions/81d5d976093e_add_modeling_and_history_tables.py`
+  - Action: Remove table creation and drop from migration
+
+- [ ] **Backfill Progress Schemas**
+  - File: `app/schemas/history.py` (lines 37-64)
+  - Classes: `BackfillProgressCreate`, `BackfillProgressUpdate`, `BackfillProgressInDB`, `BackfillProgressResponse`
+  - Action: Remove all backfill-related schemas
+
+- [ ] **Schema Exports**
+  - File: `app/schemas/__init__.py`
+  - Action: Remove imports and exports for backfill progress schemas
+
+- [ ] **Schema Verification**
+  - File: `app/db/verify_schema.py`
+  - Action: Remove references to `historical_backfill_progress` table
+
+**Items to PRESERVE (System Infrastructure):**
+- ✅ `scripts/backfill_factor_etfs.py` - Fetches factor ETF reference data for calculations
+- ✅ `scripts/backfill_position_symbols.py` - Fetches market data for position symbols
+- ✅ `MarketDataService` historical methods - Needed for daily operations
+- ✅ Historical data validation scripts - System data quality checks
+- ✅ All market data fetching infrastructure - Essential for calculations
+
+**Rationale:**
+- V1.4 focuses on daily forward snapshots from CSV upload date
+- Historical analytical data (prices, factors, Greeks) still needed for calculations
+- Only removing the feature that generated 90 days of user portfolio snapshots
+
 #### 1.4.6 Snapshot Generation (Depends on 1.4.1-1.4.4)
+*Daily forward snapshot generation for portfolios starting from CSV upload date*
+
+**Core Function:**
 - [ ] **`create_portfolio_snapshot(portfolio_id, calculation_date)`**
-  - Input: Portfolio ID, date
-  - Output: Complete portfolio snapshot record
-  - Dependencies: Market data, Greeks, portfolio aggregations, factor exposures
-  - Note: Risk metrics (VaR, Sharpe, etc.) postponed to V1.5
-  - File: `app/calculations/snapshots.py`
+  - **Purpose**: Generate a complete daily snapshot of portfolio state
+  - **File**: `app/calculations/snapshots.py`
+  - **Input**: 
+    - `portfolio_id`: UUID of the portfolio
+    - `calculation_date`: Date for the snapshot (typically "today")
+  - **Output**: `PortfolioSnapshot` record saved to database
+
+**Implementation Steps:**
+
+- [ ] **Fetch Portfolio Positions**
+  - Query all active positions for the portfolio as of calculation_date
+  - Include positions where: `entry_date <= calculation_date AND (exit_date IS NULL OR exit_date > calculation_date)`
+
+- [ ] **Gather Pre-calculated Data**
+  - Market values from `calculate_position_market_value()` (Section 1.4.1)
+  - Greeks from `position_greeks` table (Section 1.4.2)
+  - Factor exposures from `position_factor_exposures` table (Section 1.4.4)
+  - Current market prices from `market_data_cache`
+
+- [ ] **Calculate Portfolio Aggregations**
+  - Call `calculate_portfolio_exposures()` for gross/net/long/short exposures
+  - Call `aggregate_portfolio_greeks()` for portfolio-level Greeks
+  - Use pre-calculated values, don't recalculate from scratch
+
+- [ ] **Calculate Daily P&L**
+  - Compare current market values with previous day's snapshot
+  - If no previous snapshot exists (first day), P&L = 0
+  - Store both dollar P&L and percentage return
+
+- [ ] **Create Snapshot Record**
+  ```python
+  snapshot = PortfolioSnapshot(
+      portfolio_id=portfolio_id,
+      snapshot_date=calculation_date,
+      total_value=total_market_value,
+      gross_exposure=aggregations['gross_exposure'],
+      net_exposure=aggregations['net_exposure'],
+      long_exposure=aggregations['long_exposure'],
+      short_exposure=aggregations['short_exposure'],
+      # Portfolio Greeks
+      portfolio_delta=greeks['portfolio_delta'],
+      portfolio_gamma=greeks['portfolio_gamma'],
+      portfolio_theta=greeks['portfolio_theta'],
+      portfolio_vega=greeks['portfolio_vega'],
+      portfolio_rho=greeks['portfolio_rho'],
+      # Daily P&L
+      daily_pnl=daily_pnl_amount,
+      daily_return=daily_return_pct,
+      # Position counts
+      position_count=len(active_positions),
+      long_count=aggregations['long_count'],
+      short_count=aggregations['short_count'],
+      option_count=aggregations['option_count'],
+      stock_count=aggregations['stock_count']
+  )
+  ```
+
+- [ ] **Store Snapshot**
+  - Save to `portfolio_snapshots` table
+  - Handle duplicate prevention (one snapshot per portfolio per day)
+  - Use database transaction for atomicity
+
+**Key Requirements:**
+
+- **Forward-Only**: Generate snapshots starting from CSV upload date, NOT historical
+- **Daily Frequency**: One snapshot per portfolio per trading day
+- **Dependencies**: Requires all Section 1.4.1-1.4.4 calculations to be complete
+- **Idempotent**: Running multiple times for same date should update, not duplicate
+- **Performance**: Should complete in <1 second per portfolio
+
+**Database Schema Reference:**
+- Table: `portfolio_snapshots` (see DATABASE_DESIGN_ADDENDUM_V1.4.1.md Section 1.6)
+- Includes all portfolio-level metrics and aggregations
+- Stores snapshot of portfolio state at end of each trading day
+
+**Integration Points:**
+
+1. **Batch Job Integration** (5:30 PM daily):
+   ```python
+   async def daily_snapshot_batch():
+       portfolios = await get_all_active_portfolios()
+       for portfolio in portfolios:
+           await create_portfolio_snapshot(
+               portfolio_id=portfolio.id,
+               calculation_date=date.today()
+           )
+   ```
+
+2. **API Endpoint** (for manual/on-demand snapshots):
+   - `POST /api/v1/portfolios/{portfolio_id}/snapshots`
+   - Allows regeneration of today's snapshot if needed
+
+**Testing Requirements:**
+- Unit tests with mock data
+- Integration tests with database
+- Edge cases: first snapshot, missing data, weekend dates
+- Performance test with 100+ positions
+
+**Note**: Risk metrics (VaR, Sharpe, Sortino) are postponed to V1.5. Focus on market values, exposures, Greeks, and P&L for V1.4.
 
 
 #### 1.4.7 Comprehensive Stress Testing Framework ✅ COMPLETED (2025-08-05)
@@ -933,7 +1072,7 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - **Remaining Tasks**: API endpoints (Section 1.9.5) and batch job implementation (moved to Section 1.6)
 - **Performance Validation**: Confirmed 99.8% computational load reduction through position filtering
 
-### 1.4.9 Swap Polygon API for a new data API
+### 1.4.9 Market Data Migration Plan
 
 ### 1.5 Demo Data Seeding
 *Create comprehensive demo data for testing and demonstration*
@@ -964,6 +1103,51 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
   - [ ] Build job runner service using APScheduler (runs within FastAPI app)
   - [ ] Configure APScheduler with PostgreSQL job store for persistence
 
+- [ ] **CRITICAL: Integrate Advanced Portfolio Aggregation Engine into Batch Processing**
+  - **Problem**: Current `app/batch/daily_calculations.py` uses legacy aggregation logic in `calculate_single_portfolio_aggregation()` 
+  - **Solution**: Replace with advanced `app/calculations/portfolio.py` engine (640 lines of optimized code)
+  - **Impact**: Performance, completeness, and consistency across batch jobs and API endpoints
+  
+  **Specific Integration Tasks:**
+  - [ ] **Replace legacy aggregation function**: Update `calculate_single_portfolio_aggregation()` in `app/batch/daily_calculations.py`
+    - Current: 9 basic metrics (total_market_value, exposures, counts) calculated individually
+    - Target: Use `calculate_portfolio_exposures()` from `app/calculations/portfolio.py`
+    - Benefits: 20+ comprehensive metrics, pandas optimization, proper error handling
+  
+  - [ ] **Add delta-adjusted exposure calculation**: Integrate `calculate_delta_adjusted_exposure()` for options portfolios
+    - Required for portfolios with options positions (LC, LP, SC, SP types)
+    - Provides delta-neutral exposure metrics critical for risk management
+    - Uses Greeks data when available, falls back to position_type heuristics
+  
+  - [ ] **Implement performance optimizations**: 
+    - Convert position lists to pandas DataFrames for vectorized operations
+    - Enable `timed_lru_cache` for 60-second TTL on repeated calculations
+    - Process large portfolios (1000+ positions) efficiently using chunking
+  
+  - [ ] **Update batch job return structure**: Expand response to include all advanced metrics
+    - Current: 9 basic fields in aggregation results
+    - Target: Full metric set from advanced engine (exposures, Greeks aggregations, notionals, etc.)
+    - Ensure backward compatibility for existing monitoring/logging
+  
+  - [ ] **Add comprehensive error handling**: Implement robust position validation
+    - Handle missing market_value, exposure, or Greeks data gracefully
+    - Log detailed warnings for positions with incomplete data
+    - Continue processing other positions when individual position fails
+  
+  - [ ] **Create integration tests**: Validate batch jobs use advanced engine correctly
+    - Test legacy vs advanced engine output for same portfolio data
+    - Verify performance improvements with large portfolio datasets
+    - Ensure cached results are properly invalidated between batch runs
+  
+  **Files to Modify:**
+  - `app/batch/daily_calculations.py` - Replace `calculate_single_portfolio_aggregation()`
+  - `tests/batch/` - Add integration tests for advanced engine usage
+  
+  **Dependencies:**
+  - Advanced portfolio engine already exists in `app/calculations/portfolio.py`
+  - Position market values must be updated first (handled by existing Batch Job 1)
+  - Greeks data should be available for options (handled by existing Batch Job 2)
+
 - [ ] **Batch Job 1: `update_market_data()` (4:00 PM weekdays)**
   - [ ] Call `fetch_and_cache_prices()` for all portfolio symbols + factor ETFs
   - [ ] Call `calculate_position_market_value()` for all positions
@@ -973,9 +1157,15 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
   - [ ] 5-minute timeout
 
 - [ ] **Batch Job 2: `calculate_portfolio_greeks()` (5:00 PM weekdays)**
-  - [ ] Call `calculate_greeks_hybrid()` for all positions
-  - [ ] Call `aggregate_portfolio_greeks()` for each portfolio
-  - [ ] Store results in position_greeks table
+  - [ ] **CRITICAL INTEGRATION**: Replace stub `update_options_greeks()` in `app/batch/daily_calculations.py`
+  - [ ] Call `bulk_update_portfolio_greeks()` from `app/calculations/greeks.py` for each portfolio
+    - Function already exists and is fully implemented with hybrid real/mock calculations
+    - Handles both py_vollib and mibian libraries with fallback logic
+    - Includes proper error handling and database upserts to position_greeks table
+  - [ ] Update batch job to pass market_data from Batch Job 1 to Greeks calculations
+  - [ ] Ensure Greeks calculation runs after market data updates (dependency on Batch Job 1)
+  - [ ] Add error handling for portfolios with no options positions
+  - [ ] Store results in position_greeks table (already implemented in bulk function)
   - [ ] 10-minute timeout
 
 - [ ] **Batch Job 3: `calculate_factor_exposures()` (5:15 PM weekdays)**

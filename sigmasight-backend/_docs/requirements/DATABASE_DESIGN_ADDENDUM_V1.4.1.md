@@ -508,21 +508,25 @@ INSERT INTO users (username, email, password_hash, is_demo) VALUES
 
 For the V1.4 demo, we need realistic portfolio data:
 
-1. **Historical Market Data**:
-   - Fetch real 90-day historical prices from Polygon.io for all positions
-   - Store in `market_data_cache` table with `data_source='polygon'`
-   - Include OHLCV data for accurate calculations
+1. ~~**Historical Market Data**~~ *(REMOVED - V1.4 scope change)*:
+   - ~~Fetch real 90-day historical prices from Polygon.io for all positions~~
+   - ~~Store in `market_data_cache` table with `data_source='polygon'`~~
+   - ~~Include OHLCV data for accurate calculations~~
 
-2. **Portfolio Snapshots**:
-   - Generate 90 daily snapshots using actual historical closing prices
-   - Calculate real P&L based on actual market movements
-   - Only create snapshots for trading days (skip weekends/holidays)
-   - Each snapshot should reflect realistic portfolio values
+2. **Portfolio Snapshots** *(MODIFIED - Forward-only)*:
+   - ~~Generate 90 daily snapshots using actual historical closing prices~~
+   - ~~Calculate real P&L based on actual market movements~~
+   - ~~Only create snapshots for trading days (skip weekends/holidays)~~
+   - ~~Each snapshot should reflect realistic portfolio values~~
+   - **NEW**: Generate daily forward snapshots from CSV upload date only
+   - **NEW**: Use current market data for daily P&L calculations
 
-3. **Demo Users** (demo_growth, demo_value, demo_balanced):
-   - Each portfolio will show actual historical performance
-   - Risk metrics calculated from real price volatility
-   - Factor exposures based on actual market correlations
+3. **Demo Users** (demo_growth, demo_value, demo_balanced) *(MODIFIED)*:
+   - ~~Each portfolio will show actual historical performance~~
+   - ~~Risk metrics calculated from real price volatility~~
+   - ~~Factor exposures based on actual market correlations~~
+   - **NEW**: Demo portfolios will show forward performance from upload date
+   - **NEW**: Risk metrics calculated from daily forward data collection
 
 ## 6. Batch Processing Schedule
 
