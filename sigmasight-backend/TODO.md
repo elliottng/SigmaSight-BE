@@ -749,13 +749,15 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - Migration created but not yet applied to database
 - Commit: 128a490 "feat: Remove HistoricalBackfillProgress functionality (Task 1.4.5.1)"
 
-#### 1.4.6 Snapshot Generation (Depends on 1.4.1-1.4.4)
+#### 1.4.6 Snapshot Generation (Depends on 1.4.1-1.4.4) ✅
 *Daily forward snapshot generation for portfolios starting from CSV upload date*
 
+**Status: COMPLETED** (2025-08-05)
+
 **Core Function:**
-- [ ] **`create_portfolio_snapshot(portfolio_id, calculation_date)`**
+- [x] **`create_portfolio_snapshot(portfolio_id, calculation_date)`**
   - **Purpose**: Generate a complete daily snapshot of portfolio state
-  - **File**: `app/calculations/snapshots.py`
+  - **File**: `app/calculations/snapshots.py` ✅ IMPLEMENTED
   - **Input**: 
     - `portfolio_id`: UUID of the portfolio
     - `calculation_date`: Date for the snapshot (typically "today")
@@ -763,27 +765,27 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 **Implementation Steps:**
 
-- [ ] **Fetch Portfolio Positions**
-  - Query all active positions for the portfolio as of calculation_date
-  - Include positions where: `entry_date <= calculation_date AND (exit_date IS NULL OR exit_date > calculation_date)`
+- [x] **Fetch Portfolio Positions**
+  - ✅ Query all active positions for the portfolio as of calculation_date
+  - ✅ Include positions where: `entry_date <= calculation_date AND (exit_date IS NULL OR exit_date > calculation_date)`
 
-- [ ] **Gather Pre-calculated Data**
-  - Market values from `calculate_position_market_value()` (Section 1.4.1)
-  - Greeks from `position_greeks` table (Section 1.4.2)
-  - Factor exposures from `position_factor_exposures` table (Section 1.4.4)
-  - Current market prices from `market_data_cache`
+- [x] **Gather Pre-calculated Data**
+  - ✅ Market values from `calculate_position_market_value()` (Section 1.4.1)
+  - ✅ Greeks from `position_greeks` table (Section 1.4.2)
+  - ✅ Factor exposures from `position_factor_exposures` table (Section 1.4.4)
+  - ✅ Current market prices from `market_data_cache`
 
-- [ ] **Calculate Portfolio Aggregations**
-  - Call `calculate_portfolio_exposures()` for gross/net/long/short exposures
-  - Call `aggregate_portfolio_greeks()` for portfolio-level Greeks
-  - Use pre-calculated values, don't recalculate from scratch
+- [x] **Calculate Portfolio Aggregations**
+  - ✅ Call `calculate_portfolio_exposures()` for gross/net/long/short exposures
+  - ✅ Call `aggregate_portfolio_greeks()` for portfolio-level Greeks
+  - ✅ Use pre-calculated values, don't recalculate from scratch
 
-- [ ] **Calculate Daily P&L**
-  - Compare current market values with previous day's snapshot
-  - If no previous snapshot exists (first day), P&L = 0
-  - Store both dollar P&L and percentage return
+- [x] **Calculate Daily P&L**
+  - ✅ Compare current market values with previous day's snapshot
+  - ✅ If no previous snapshot exists (first day), P&L = 0
+  - ✅ Store both dollar P&L and percentage return
 
-- [ ] **Create Snapshot Record**
+- [x] **Create Snapshot Record**
   ```python
   snapshot = PortfolioSnapshot(
       portfolio_id=portfolio_id,
@@ -793,7 +795,7 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
       net_exposure=aggregations['net_exposure'],
       long_exposure=aggregations['long_exposure'],
       short_exposure=aggregations['short_exposure'],
-      # Portfolio Greeks
+      # Portfolio Greeks (all 5 Greeks including rho)
       portfolio_delta=greeks['portfolio_delta'],
       portfolio_gamma=greeks['portfolio_gamma'],
       portfolio_theta=greeks['portfolio_theta'],
@@ -802,27 +804,31 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
       # Daily P&L
       daily_pnl=daily_pnl_amount,
       daily_return=daily_return_pct,
+      cumulative_pnl=cumulative_pnl_amount,  # From CSV upload date
       # Position counts
-      position_count=len(active_positions),
-      long_count=aggregations['long_count'],
-      short_count=aggregations['short_count'],
-      option_count=aggregations['option_count'],
-      stock_count=aggregations['stock_count']
+      num_positions=len(active_positions),
+      num_long_positions=aggregations['long_count'],
+      num_short_positions=aggregations['short_count'],
+      # Cash value (set to 0 for now - fully invested assumption)
+      cash_value=Decimal('0')
   )
   ```
 
-- [ ] **Store Snapshot**
-  - Save to `portfolio_snapshots` table
-  - Handle duplicate prevention (one snapshot per portfolio per day)
-  - Use database transaction for atomicity
+- [x] **Store Snapshot**
+  - ✅ Save to `portfolio_snapshots` table
+  - ✅ Handle duplicate prevention (one snapshot per portfolio per day)
+  - ✅ Use database transaction for atomicity
 
 **Key Requirements:**
 
-- **Forward-Only**: Generate snapshots starting from CSV upload date, NOT historical
-- **Daily Frequency**: One snapshot per portfolio per trading day
-- **Dependencies**: Requires all Section 1.4.1-1.4.4 calculations to be complete
-- **Idempotent**: Running multiple times for same date should update, not duplicate
-- **Performance**: Should complete in <1 second per portfolio
+- ✅ **Forward-Only**: Generate snapshots starting from CSV upload date, NOT historical
+- ✅ **Daily Frequency**: One snapshot per portfolio per trading day
+- ✅ **Trading Days Only**: Use pandas_market_calendars to check NYSE trading days
+- ✅ **Dependencies**: Requires all Section 1.4.1-1.4.4 calculations to be complete
+- ✅ **Idempotent**: Running multiple times for same date should update, not duplicate
+- ✅ **Performance**: Should complete in <1 second per portfolio
+- ✅ **P&L Calculation**: Use entry_price as cost basis; daily P&L from previous snapshot
+- ✅ **Missing Data**: Create snapshot with warnings if some pre-calculated data missing
 
 **Database Schema Reference:**
 - Table: `portfolio_snapshots` (see DATABASE_DESIGN_ADDENDUM_V1.4.1.md Section 1.6)
@@ -847,10 +853,23 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
    - Allows regeneration of today's snapshot if needed
 
 **Testing Requirements:**
-- Unit tests with mock data
-- Integration tests with database
-- Edge cases: first snapshot, missing data, weekend dates
-- Performance test with 100+ positions
+- [x] ✅ Unit tests with mock data (8 comprehensive test cases)
+- [x] ✅ Integration tests with database (manual testing script)
+- [x] ✅ Edge cases: first snapshot, missing data, weekend dates
+- [x] ✅ Performance test with 100+ positions
+
+**Completion Notes:**
+- **Files Created**: `app/calculations/snapshots.py`, `app/utils/trading_calendar.py`
+- **Dependencies Added**: `pandas_market_calendars>=4.0.0` for NYSE trading calendar
+- **Unit Tests**: 8 test cases in `tests/test_snapshot_generation.py`
+- **Manual Testing**: Complete test suite in `scripts/test_snapshot_generation.py`
+- **Trading Calendar**: NYSE market hours with previous/next trading day calculation
+- **Cash Value Handling**: Set to 0 (fully invested portfolio assumption)
+- **Greeks Integration**: Full support for all 5 Greeks (delta, gamma, theta, vega, rho)
+- **P&L Calculation**: Uses entry_price as cost basis, tracks daily and cumulative P&L
+- **Error Resilience**: Creates snapshots with warnings for missing pre-calculated data
+- **Idempotent Design**: Safe to run multiple times, updates existing snapshots
+- **Production Ready**: Core functionality implemented and tested
 
 **Note**: Risk metrics (VaR, Sharpe, Sortino) are postponed to V1.5. Focus on market values, exposures, Greeks, and P&L for V1.4.
 
