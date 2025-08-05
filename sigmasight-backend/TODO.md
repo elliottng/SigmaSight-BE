@@ -814,6 +814,13 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
   )
   ```
 
+- [x] **Trading Calendar Utility**
+  - ✅ Create `TradingCalendar` class in `app/utils/trading_calendar.py`
+  - ✅ Use `pandas_market_calendars` for NYSE trading day detection
+  - ✅ Implement `is_trading_day()`, `get_previous_trading_day()`, `get_next_trading_day()`
+  - ✅ Add `should_run_batch_job()` for batch processing integration
+  - ✅ LRU cache optimization for repeated date queries
+
 - [x] **Store Snapshot**
   - ✅ Save to `portfolio_snapshots` table
   - ✅ Handle duplicate prevention (one snapshot per portfolio per day)
