@@ -42,6 +42,7 @@ dependencies = [
     "py-vollib>=1.0.1",       # Fallback: Has _testcapi compatibility issues on Python 3.11+
     "statsmodels>=0.14.0",    # Factor regression analysis
     "empyrical>=0.5.5",       # Risk metrics (Sharpe, VaR, etc.)
+    "pandas_market_calendars>=4.0.0",  # Trading calendar for market days
     # Utils
     "httpx>=0.25.0",
     "redis>=5.0.0",

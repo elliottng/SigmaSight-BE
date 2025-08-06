@@ -23,6 +23,10 @@ from .portfolio import (
     clear_portfolio_cache
 )
 
+from .snapshots import (
+    create_portfolio_snapshot
+)
+
 __all__ = [
     # Market data calculations
     "calculate_position_market_value",
@@ -39,5 +43,8 @@ __all__ = [
     "calculate_delta_adjusted_exposure",
     "aggregate_by_tags",
     "aggregate_by_underlying",
-    "clear_portfolio_cache"
+    "clear_portfolio_cache",
+    
+    # Snapshot generation
+    "create_portfolio_snapshot"
 ]

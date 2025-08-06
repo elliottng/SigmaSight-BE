@@ -865,6 +865,19 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - [x] ✅ Edge cases: first snapshot, missing data, weekend dates
 - [x] ✅ Performance test with 100+ positions
 
+**Critical Bug Fix Required:**
+- [x] **Fix exposure calculation for short positions** ✅ FIXED (2025-08-05)
+  - **Issue**: Using unsigned `market_value` instead of signed `exposure` from calculation result
+  - **Impact**: Portfolio risk metrics completely wrong for portfolios with short positions
+  - **Root Cause 1**: Function call mismatch - calling with wrong parameters (db, as_of_date)
+  - **Root Cause 2**: Using `market_value` for `exposure` field instead of correct signed value
+  - **Fix Implemented**: 
+    - Fetch price from MarketDataCache for calculation_date
+    - Call `calculate_position_market_value` with correct signature (position, price)
+    - Use separate `market_value` (always positive) and `exposure` (signed) fields
+  - **Verification**: Created and ran `scripts/verify_exposure_fix.py` - all tests pass
+  - **Test Results**: TSLA short position correctly shows negative exposure
+
 **Completion Notes:**
 - **Files Created**: `app/calculations/snapshots.py`, `app/utils/trading_calendar.py`
 - **Dependencies Added**: `pandas_market_calendars>=4.0.0` for NYSE trading calendar
