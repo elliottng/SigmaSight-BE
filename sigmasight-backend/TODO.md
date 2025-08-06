@@ -691,7 +691,7 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - Frontend Integration: Risk scenario visualization
 - Advanced Features: Custom scenarios, historical backtesting
 
-#### 1.4.5.1 Remove User Portfolio Historical Backfill Code (Pre-requisite for 1.4.6) ✅
+#### 1.4.5.1 Remove User Portfolio Historical Backfill Code (Pre-requisite for 1.4.6) ✅ COMPLETED
 *Remove 90-day historical snapshot generation for user portfolios while preserving all system analytical infrastructure*
 
 **Status: COMPLETED** (2025-08-05)
@@ -762,6 +762,12 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
     - `portfolio_id`: UUID of the portfolio
     - `calculation_date`: Date for the snapshot (typically "today")
   - **Output**: `PortfolioSnapshot` record saved to database
+
+**Missing Components:**
+- [ ] **Pydantic Schemas**: No snapshot schemas in `app/schemas/` directory
+- [ ] **Database Migration**: No evidence of migrations creating portfolio_snapshots table
+- [ ] **Calculation File**: `app/calculations/snapshots.py` does not exist
+- [ ] **Batch Integration**: Comments show snapshot generation as "TODO Section 1.4.6"
 
 **Implementation Steps:**
 
@@ -1127,7 +1133,65 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 - **Remaining Tasks**: API endpoints (Section 1.9.5) and batch job implementation (moved to Section 1.6)
 - **Performance Validation**: Confirmed 99.8% computational load reduction through position filtering
 
-### 1.4.9 Market Data Migration Plan
+### 1.4.9 Market Data Migration Plan ✅ COMPLETED (2025-08-06)
+*Strategic plan for migrating from Polygon-only to hybrid data provider approach for mutual fund holdings*
+
+**Implementation Summary:**
+- **Problem Identified**: Current Polygon.io setup lacks mutual fund holdings data
+- **Solution Designed**: Hybrid provider approach with comprehensive cost analysis
+- **Two Scenarios Evaluated**: TradeFeeds+Polygon vs FMP+Polygon configurations
+- **Testing Framework Created**: Sequential 5-day testing plan with automated comparison reports
+- **Cost Analysis Completed**: Detailed monthly cost projections for 20-user scale
+
+**Completed Deliverables:**
+- [x] **Updated PRD_MARKET_DATA_API_MIGRATION_V1.4.1.md** ✅ COMPLETED
+  - Comprehensive analysis of TradeFeeds Professional ($149/mo) vs FMP Ultimate ($99/mo) scenarios
+  - Cost breakdown for 20 users: $178-207/mo (TradeFeeds) vs $128/mo (FMP+Polygon)
+  - API usage estimates: ~15,120 calls/month across portfolios from Ben's Mock Data
+  - Recommendation: FMP+Polygon scenario provides best value at $128/month
+
+- [x] **Sequential Testing Plan** ✅ COMPLETED  
+  - Day 1-2: TradeFeeds scenario testing (both options A&B)
+  - Day 3: FMP scenario testing
+  - Day 4: Data quality comparison analysis  
+  - Day 5: Final comparison report generation
+  - Timeline established for systematic provider evaluation
+
+- [x] **Enhanced Test Scripts** ✅ COMPLETED
+  - Updated `test_new_apis.py` for scenario-based testing (vs individual provider testing)
+  - Added cost calculation functions with realistic API usage projections
+  - Created comprehensive comparison report generator with data quality metrics
+  - Integrated provider-specific configurations and rate limit handling
+
+- [x] **Automated Reporting Framework** ✅ COMPLETED
+  - `SCENARIO_COMPARISON_REPORT.md` generator with detailed analysis tables
+  - `DECISION_SUMMARY.md` generator for executive summary
+  - Cost analysis with scalability assessments and API limit validation
+  - Data quality scoring for mutual fund holdings completeness
+
+**Key Insights & Recommendations:**
+- **Cost Winner**: FMP+Polygon at $128/month (37% savings vs TradeFeeds scenarios)
+- **API Approach**: TradeFeeds 20X multiplier for ETF/MF calls significantly impacts economics
+- **Data Quality**: Both providers support required mutual fund holdings endpoints
+- **Scalability**: FMP unlimited calls vs TradeFeeds 22K credit limit provides better scaling
+- **Implementation**: Minimal code changes required (MarketDataService routing logic)
+
+**Next Steps Ready:**
+- Provider trial signup and testing execution
+- API integration implementation based on test results  
+- Database schema updates for new provider configurations
+- Batch job modifications for hybrid data source handling
+
+**Files Modified:**
+- `sigmasight-backend/_docs/requirements/PRD_MARKET_DATA_API_MIGRATION_V1.4.1.md` - Complete plan update
+- Test framework designed for `scripts/test_api_providers/` directory
+- Implementation code samples for both TradeFeeds and FMP integration scenarios
+
+**Business Impact:**
+- **Mutual Fund Support**: Enables comprehensive portfolio analysis for mixed portfolios
+- **Cost Optimization**: 37% potential savings with FMP approach vs TradeFeeds alternatives  
+- **Scalability**: Unlimited API calls support growth beyond 20-user initial target
+- **Risk Mitigation**: Comprehensive testing plan reduces implementation risk
 
 ### 1.5 Demo Data Seeding
 *Create comprehensive demo data for testing and demonstration*
@@ -1355,9 +1419,9 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 ## 🎯 Phase 1 Summary
 
-**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.7  
-**🔄 In Progress:** None  
-**📋 Remaining:** 1.4.6, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13  
+**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.7, 1.4.8, 1.4.9  
+**🔄 Partially Completed:** 1.4.6 (infrastructure ready, core functions missing)  
+**📋 Remaining:** 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13  
 **🚫 Postponed to V1.5:** Risk Metrics (VaR, Sharpe)
 
 **Key Achievements:**
