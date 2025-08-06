@@ -1,11 +1,169 @@
 # Pragmatic Batch Processing Test Plan
 **For Demo-Stage Product (20 Users Max)**
+**✅ STATUS: ACTIVE - This is our current testing approach**
+
+> **IMPLEMENTED**: See `tests/batch/test_batch_pragmatic.py` for the actual test suite.
+> The comprehensive test plan (BATCH_PROCESSING_TEST_PLAN.md) is deferred for future scaling.
 
 ## Testing Philosophy
 - **Accuracy over scale** - Traders need correct numbers, not fast ones
 - **Manual verification acceptable** - We're not at automation scale yet
 - **Focus on demo scenarios** - Test what we'll actually show
 - **Skip premature optimization** - No need for 1000-position portfolios yet
+- **⚠️ REALITY FIRST** - Test basic functionality before complex scenarios
+
+---
+
+## 0. REALITY CHECK TESTING (ADDED 2025-01-06)
+**🔍 Test what exists before testing what should work**
+
+### 0.1 Import and Dependency Validation
+**This MUST pass before any other testing**
+
+```python
+# tests/batch/test_reality_check.py
+
+def test_critical_imports():
+    """Test if core components can even be imported"""
+    
+    # Test 1: APScheduler installed?
+    try:
+        import apscheduler
+        print("✓ APScheduler available")
+    except ImportError:
+        print("❌ APScheduler not installed - run: uv add apscheduler")
+        return False
+    
+    # Test 2: Batch orchestrator imports?
+    try:
+        from app.batch.batch_orchestrator import batch_orchestrator
+        print("✓ Batch orchestrator imports")
+    except Exception as e:
+        print(f"❌ Batch orchestrator import failed: {e}")
+        return False
+    
+    # Test 3: Admin endpoints work?
+    try:
+        from app.api.v1.endpoints.admin_batch import router
+        print("✓ Admin endpoints import")
+    except Exception as e:
+        print(f"❌ Admin endpoints broken: {e}")
+        return False
+        
+    return True
+```
+
+### 0.2 Function Mapping Validation  
+**Ensure orchestrator calls match actual function names**
+
+```python
+def test_calculation_engine_mapping():
+    """Test that orchestrator calls functions that actually exist"""
+    
+    engines_to_test = {
+        'Greeks': ('app.calculations.greeks', 'bulk_update_portfolio_greeks'),
+        'Portfolio': ('app.calculations.portfolio', 'calculate_portfolio_exposures'),
+        'Factors': ('app.calculations.factors', 'calculate_factor_betas_hybrid'),
+        'Correlations': ('app.services.correlation_service', 'CorrelationService'),
+        'Snapshots': ('app.calculations.snapshots', 'create_portfolio_snapshot'),
+    }
+    
+    working = []
+    broken = []
+    
+    for name, (module, function) in engines_to_test.items():
+        try:
+            exec(f"from {module} import {function}")
+            working.append(name)
+            print(f"✓ {name}: {function} exists")
+        except ImportError as e:
+            broken.append((name, str(e)))
+            print(f"❌ {name}: {function} missing - {e}")
+    
+    print(f"\nWorking engines: {len(working)}/5")
+    print(f"Broken engines: {len(broken)}/5")
+    
+    return len(working) >= 3  # Need at least 3 working engines for demo
+```
+
+### 0.3 Database Connectivity Test
+**Before testing complex batch jobs, ensure basic DB works**
+
+```python
+async def test_minimal_database_function():
+    """Test absolute minimum database functionality"""
+    
+    from app.models.snapshots import BatchJob
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import text
+    
+    try:
+        async with AsyncSessionLocal() as db:
+            # Test 1: Basic query works?
+            result = await db.execute(text("SELECT 1 as test"))
+            assert result.fetchone()[0] == 1
+            print("✓ Database connectivity works")
+            
+            # Test 2: Can create BatchJob?
+            job = BatchJob(
+                job_name="reality_check",
+                job_type="test",
+                status="running"
+            )
+            db.add(job)
+            await db.commit()
+            print(f"✓ BatchJob creation works: {job.id}")
+            
+            return True
+            
+    except Exception as e:
+        print(f"❌ Database basic function failed: {e}")
+        return False
+```
+
+### 0.4 Reality Check Test Suite
+**Run this FIRST before any other testing**
+
+```python
+async def run_reality_check():
+    """
+    Complete reality check - run this before attempting complex tests
+    """
+    print("🔍 BATCH PROCESSING REALITY CHECK")
+    print("="*50)
+    
+    # Step 1: Imports and dependencies
+    imports_ok = test_critical_imports()
+    if not imports_ok:
+        print("\n❌ STOP: Fix import issues before proceeding")
+        return False
+    
+    # Step 2: Function mapping
+    functions_ok = test_calculation_engine_mapping()  
+    if not functions_ok:
+        print("\n❌ STOP: Fix function mapping before proceeding")
+        return False
+    
+    # Step 3: Database basics
+    db_ok = await test_minimal_database_function()
+    if not db_ok:
+        print("\n❌ STOP: Fix database issues before proceeding")
+        return False
+    
+    print("\n✅ REALITY CHECK PASSED")
+    print("Ready for functional testing")
+    return True
+```
+
+**🚨 CRITICAL: Run reality check before every test session**
+```bash
+# Before any batch testing:
+PYTHONPATH=/path/to/project uv run python -c "
+import asyncio
+from tests.batch.test_reality_check import run_reality_check
+asyncio.run(run_reality_check())
+"
+```
 
 ---
 
@@ -266,7 +424,88 @@ Retail Trader     | $100,000      | $99,750    | -0.25%
 
 ---
 
-## 9. Emergency Demo Procedures
+## 9. UPDATED TEST STRATEGY (Based on Reality Check Results)
+
+### 9.1 What We Learned (2025-01-06)
+**Our original test plan assumed a working system. Reality check revealed:**
+
+❌ **Original Assumption**: "Test calculation accuracy for demo"  
+✅ **Reality**: Can't even import the orchestrator - fix imports first
+
+❌ **Original Assumption**: "Test 20-user scale"  
+✅ **Reality**: APScheduler not installed - add dependencies first  
+
+❌ **Original Assumption**: "Test demo scenarios"  
+✅ **Reality**: Function names don't match - fix API mapping first
+
+### 9.2 Revised Testing Priority (Reality-Based)
+
+**Phase 0: Make it importable (2-4 hours)**
+1. Install APScheduler: `uv add apscheduler`  
+2. Fix function name mappings in orchestrator
+3. Add missing `require_admin` dependency
+4. Fix SQL text expression issues
+
+**Phase 1: Make it minimally functional (4-8 hours)**
+1. Get one calculation engine working end-to-end
+2. Create one batch job successfully  
+3. Test with one demo portfolio
+4. Manual verification of basic numbers
+
+**Phase 2: Add demo readiness (1-2 days)**  
+1. Test with all 3 demo portfolios
+2. Manual verification against broker statements
+3. Test admin endpoints for demo recovery
+4. Create backup slides with pre-calculated results
+
+**Phase 3: Scale testing (deferred until Phase 2 works)**
+- Only test 20-user scale after basic functionality proven
+- Focus on "does it work" before "does it scale"
+
+### 9.3 Pragmatic Success Criteria (Updated)
+
+**Must Have Before Demo:**  
+✅ Orchestrator imports without errors  
+✅ Can create and update batch jobs in database  
+✅ At least 3 calculation engines working  
+✅ One complete portfolio calculation succeeds  
+✅ Results look reasonable to trader eye-test  
+
+**Nice to Have:**  
+📊 All 7 calculation engines working  
+📊 Automated daily scheduling  
+📊 Complete admin panel functionality  
+
+**Don't Need for Demo:**  
+❌ Perfect accuracy (within 2% is fine)  
+❌ All error handling edge cases  
+❌ Performance optimization  
+❌ Automated monitoring/alerts  
+
+### 9.4 Test-Driven Fix Approach
+
+Instead of fixing everything then testing, use tests to guide fixes:
+
+```python
+# Fix Step 1: Can we import?
+def test_import_fix():
+    from app.batch.batch_orchestrator import batch_orchestrator  # Should work
+    
+# Fix Step 2: Can we create a job?  
+async def test_job_creation():
+    job = await batch_orchestrator._create_batch_job("test")  # Should work
+    
+# Fix Step 3: Can we run one calculation?
+async def test_single_calculation():
+    result = await batch_orchestrator._calculate_portfolio_aggregation(db, portfolio_id)
+    assert result is not None  # Should work
+```
+
+**Fix until tests pass, then move to next level of testing.**
+
+---
+
+## 10. Emergency Demo Procedures
 
 ### If Batch Fails Day-of:
 1. Use yesterday's snapshot (usually fine)
@@ -300,11 +539,20 @@ Retail Trader     | $100,000      | $99,750    | -0.25%
 
 ---
 
-## Summary
+## Summary (Updated Based on Reality Check)
 
-**Focus on**: Accuracy, reliability for demos, handling 20 users
-**Skip**: Premature optimization, complex automation, enterprise scale
-**Test method**: Mostly manual verification with some automated checks
-**Time needed**: 2-3 days of testing, not 2-3 weeks
+**ORIGINAL PLAN** (assumed working system):
+- Focus on accuracy, demo scenarios, 20-user scale
+- Time needed: 2-3 days of testing
 
-This is appropriate for a demo-stage product that needs to work well enough to impress traders, not scale to thousands of users.
+**REVISED PLAN** (based on what actually exists):
+- **Phase 0**: Make it importable (fix dependencies, function names) - 2-4 hours
+- **Phase 1**: Make it minimally functional (one engine working) - 4-8 hours  
+- **Phase 2**: Demo readiness (3 portfolios, manual verification) - 1-2 days
+- **Phase 3**: Scale testing (deferred until Phase 2 works)
+
+**KEY LEARNING**: Always run reality check before functional testing
+**Test method**: Test-driven fixes → manual verification → automated checks  
+**Total time**: 2-3 days (same), but front-loaded with basic functionality fixes
+
+**This is appropriate for a demo-stage product, but we learned that "completed" code may not be functional without proper testing validation.**
