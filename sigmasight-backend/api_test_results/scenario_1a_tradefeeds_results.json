@@ -1,0 +1,16 @@
+{
+  "scenario": "Scenario 1A: TradeFeeds All + Polygon Options",
+  "test_date": "2025-08-05T22:01:17.485442",
+  "providers": {
+    "stocks": "TradeFeeds",
+    "funds": "TradeFeeds",
+    "options": "Polygon"
+  },
+  "stocks": {},
+  "mutual_funds": {},
+  "etfs": {},
+  "options": {},
+  "costs": {},
+  "summary": {},
+  "error": "TRADEFEEDS_API_KEY not configured"
+}

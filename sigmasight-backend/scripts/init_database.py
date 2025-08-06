@@ -20,7 +20,7 @@ from app.models.positions import Position, Tag
 from app.models.market_data import (
     MarketDataCache, PositionGreeks, FactorDefinition, FactorExposure,
     PositionFactorExposure, MarketRiskScenario, PositionInterestRateBeta,
-    StressTestScenario, StressTestResult, FactorCorrelation
+    StressTestScenario, StressTestResult, FactorCorrelation, FundHoldings
 )
 from app.models.snapshots import PortfolioSnapshot, BatchJob, BatchJobSchedule
 from app.models.correlations import (

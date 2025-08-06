@@ -1,5 +1,6 @@
 """
-Market Data Service - Handles external market data APIs (Polygon.io, YFinance)
+Market Data Service - Handles external market data APIs (Polygon.io, YFinance, FMP, TradeFeeds)
+Updated for Section 1.4.9 - Hybrid provider approach with mutual fund holdings support
 """
 import asyncio
 import logging
@@ -17,6 +18,7 @@ from app.config import settings
 from app.models.market_data import MarketDataCache
 from app.core.logging import get_logger
 from app.services.rate_limiter import polygon_rate_limiter, ExponentialBackoff
+from app.clients import market_data_factory, DataType
 
 logger = get_logger(__name__)
 
@@ -27,6 +29,168 @@ class MarketDataService:
     def __init__(self):
         self.polygon_client = RESTClient(api_key=settings.POLYGON_API_KEY)
         self._cache: Dict[str, Any] = {}
+        # Initialize the market data factory
+        market_data_factory.initialize()
+    
+    # New hybrid provider methods (Section 1.4.9)
+    
+    async def fetch_stock_prices_hybrid(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Fetch current stock prices using hybrid provider approach
+        
+        Priority: FMP -> TradeFeeds -> Polygon (fallback)
+        
+        Args:
+            symbols: List of stock symbols
+            
+        Returns:
+            Dictionary with symbol as key and price data as value
+        """
+        logger.info(f"Fetching stock prices (hybrid) for {len(symbols)} symbols")
+        
+        # Try FMP first
+        provider = market_data_factory.get_provider_for_data_type(DataType.STOCKS)
+        if provider:
+            try:
+                result = await provider.get_stock_prices(symbols)
+                if result:
+                    logger.info(f"Successfully fetched {len(result)} stock prices from {provider.provider_name}")
+                    return result
+            except Exception as e:
+                logger.error(f"Error fetching stock prices from {provider.provider_name}: {str(e)}")
+        
+        # Fallback to current Polygon implementation
+        logger.warning("Falling back to Polygon for stock prices")
+        current_prices = await self.fetch_current_prices(symbols)
+        
+        # Convert to hybrid format
+        result = {}
+        for symbol, price in current_prices.items():
+            if price is not None:
+                result[symbol] = {
+                    'price': price,
+                    'change': Decimal('0'),  # Not available from current implementation
+                    'change_percent': Decimal('0'),
+                    'volume': 0,
+                    'timestamp': datetime.now(),
+                    'provider': 'Polygon (fallback)'
+                }
+        
+        return result
+    
+    async def fetch_mutual_fund_holdings(self, symbol: str) -> List[Dict[str, Any]]:
+        """
+        Fetch mutual fund holdings using hybrid provider approach
+        
+        Priority: FMP -> TradeFeeds
+        
+        Args:
+            symbol: Mutual fund symbol (e.g., 'FXNAX')
+            
+        Returns:
+            List of fund holdings
+        """
+        logger.info(f"Fetching mutual fund holdings for {symbol}")
+        
+        provider = market_data_factory.get_provider_for_data_type(DataType.FUNDS)
+        if provider:
+            try:
+                holdings = await provider.get_fund_holdings(symbol)
+                logger.info(f"Successfully fetched {len(holdings)} holdings for {symbol} from {provider.provider_name}")
+                return holdings
+            except Exception as e:
+                logger.error(f"Error fetching fund holdings for {symbol} from {provider.provider_name}: {str(e)}")
+                raise
+        else:
+            logger.error("No provider available for mutual fund holdings")
+            raise Exception("No mutual fund holdings provider configured")
+    
+    async def fetch_etf_holdings(self, symbol: str) -> List[Dict[str, Any]]:
+        """
+        Fetch ETF holdings using hybrid provider approach
+        
+        Uses same endpoint as mutual funds for most providers
+        
+        Args:
+            symbol: ETF symbol (e.g., 'VTI', 'SPY')
+            
+        Returns:
+            List of ETF holdings
+        """
+        logger.info(f"Fetching ETF holdings for {symbol}")
+        return await self.fetch_mutual_fund_holdings(symbol)  # Same endpoint for most providers
+    
+    async def validate_fund_holdings(self, holdings: List[Dict[str, Any]], symbol: str) -> Dict[str, Any]:
+        """
+        Validate fund holdings data quality
+        
+        Args:
+            holdings: List of holdings data
+            symbol: Fund symbol for logging
+            
+        Returns:
+            Validation results
+        """
+        total_weight = sum(h.get('weight', 0) for h in holdings)
+        complete_holdings = [h for h in holdings if h.get('symbol') and h.get('name')]
+        
+        validation = {
+            'symbol': symbol,
+            'total_holdings': len(holdings),
+            'complete_holdings': len(complete_holdings),
+            'total_weight': float(total_weight),
+            'weight_percentage': float(total_weight * 100),
+            'data_quality': 'good' if total_weight >= 0.9 else 'partial',
+            'completeness': len(complete_holdings) / len(holdings) if holdings else 0
+        }
+        
+        logger.info(f"Fund holdings validation for {symbol}: {validation['total_holdings']} holdings, "
+                   f"{validation['weight_percentage']:.1f}% weight coverage, "
+                   f"{validation['data_quality']} quality")
+        
+        return validation
+    
+    async def get_provider_status(self) -> Dict[str, Any]:
+        """
+        Get status of all configured market data providers
+        
+        Returns:
+            Dictionary with provider status information
+        """
+        logger.info("Checking market data provider status")
+        
+        # Get available providers
+        providers = market_data_factory.get_available_providers()
+        
+        # Validate API keys
+        validation_results = await market_data_factory.validate_all_providers()
+        
+        status = {
+            'providers_configured': len(providers),
+            'providers_active': sum(validation_results.values()),
+            'provider_details': {}
+        }
+        
+        for name, info in providers.items():
+            status['provider_details'][name] = {
+                **info,
+                'api_key_valid': validation_results.get(name, False),
+                'status': 'active' if validation_results.get(name, False) else 'inactive'
+            }
+        
+        # Add configuration settings
+        status['configuration'] = {
+            'use_fmp_for_stocks': settings.USE_FMP_FOR_STOCKS,
+            'use_fmp_for_funds': settings.USE_FMP_FOR_FUNDS,
+            'polygon_available': bool(settings.POLYGON_API_KEY),
+            'fmp_configured': bool(settings.FMP_API_KEY),
+            'tradefeeds_configured': bool(settings.TRADEFEEDS_API_KEY)
+        }
+        
+        logger.info(f"Provider status: {status['providers_active']}/{status['providers_configured']} active")
+        return status
+    
+    # Legacy methods (maintained for backward compatibility)
     
     async def fetch_stock_prices(
         self, 
@@ -581,6 +745,11 @@ class MarketDataService:
             start_date=start_date,
             end_date=end_date
         )
+    
+    async def close(self):
+        """Close all provider client sessions"""
+        await market_data_factory.close_all()
+        logger.info("MarketDataService: All provider sessions closed")
 
 
 # Global service instance

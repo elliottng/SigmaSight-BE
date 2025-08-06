@@ -27,6 +27,22 @@ class Settings(BaseSettings):
     POLYGON_PLAN: str = Field(default="free", env="POLYGON_PLAN")  # free, starter, developer, advanced
     FRED_API_KEY: str = Field(default="", env="FRED_API_KEY")  # Optional for Treasury data
     
+    # New market data providers (Section 1.4.9)
+    FMP_API_KEY: str = Field(default="", env="FMP_API_KEY")  # Financial Modeling Prep
+    TRADEFEEDS_API_KEY: str = Field(default="", env="TRADEFEEDS_API_KEY")  # TradeFeeds backup
+    
+    # Provider selection flags
+    USE_FMP_FOR_STOCKS: bool = Field(default=True, env="USE_FMP_FOR_STOCKS")
+    USE_FMP_FOR_FUNDS: bool = Field(default=True, env="USE_FMP_FOR_FUNDS") 
+    USE_POLYGON_FOR_OPTIONS: bool = Field(default=True, env="USE_POLYGON_FOR_OPTIONS")  # Always true
+    
+    # Provider-specific settings
+    FMP_TIMEOUT_SECONDS: int = Field(default=30, env="FMP_TIMEOUT_SECONDS")
+    FMP_MAX_RETRIES: int = Field(default=3, env="FMP_MAX_RETRIES")
+    TRADEFEEDS_TIMEOUT_SECONDS: int = Field(default=30, env="TRADEFEEDS_TIMEOUT_SECONDS")
+    TRADEFEEDS_MAX_RETRIES: int = Field(default=3, env="TRADEFEEDS_MAX_RETRIES")
+    TRADEFEEDS_RATE_LIMIT: int = Field(default=30, env="TRADEFEEDS_RATE_LIMIT")  # calls per minute
+    
     # JWT settings
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
     ALGORITHM: str = "HS256"

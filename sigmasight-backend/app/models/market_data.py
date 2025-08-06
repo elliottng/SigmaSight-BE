@@ -27,7 +27,7 @@ class MarketDataCache(Base):
     # Sector/Industry data from YFinance
     sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     industry: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    data_source: Mapped[str] = mapped_column(String(20), nullable=False, default='polygon')
+    data_source: Mapped[str] = mapped_column(String(50), nullable=False, default='polygon')  # Updated for Section 1.4.9: supports 'polygon', 'fmp', 'tradefeeds', 'yfinance'
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -256,4 +256,36 @@ class FactorCorrelation(Base):
                         name='uq_factor_correlations_factors_date'),
         Index('idx_factor_correlations_date', 'calculation_date'),
         Index('idx_factor_correlations_factors', 'factor_1_id', 'factor_2_id'),
+    )
+
+
+class FundHoldings(Base):
+    """Fund holdings - stores mutual fund and ETF holdings data (Section 1.4.9)"""
+    __tablename__ = "fund_holdings"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    fund_symbol: Mapped[str] = mapped_column(String(20), nullable=False)  # Fund symbol (e.g., 'FXNAX', 'VTI')
+    holding_symbol: Mapped[str] = mapped_column(String(20), nullable=False)  # Holding symbol (e.g., 'AAPL')
+    holding_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Company/security name
+    weight: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)  # Weight as decimal (0.0525 for 5.25%)
+    shares: Mapped[Optional[int]] = mapped_column(nullable=True)  # Number of shares held
+    market_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)  # Market value of holding
+    
+    # Data quality and tracking
+    data_source: Mapped[str] = mapped_column(String(50), nullable=False)  # 'fmp', 'tradefeeds', etc.
+    last_updated: Mapped[date] = mapped_column(Date, nullable=False)  # Date when holdings data was fetched
+    data_quality: Mapped[str] = mapped_column(String(20), nullable=False, default='good')  # 'good', 'partial', 'incomplete'
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('fund_symbol', 'holding_symbol', 'last_updated', 
+                        name='uq_fund_holdings_fund_holding_date'),
+        Index('ix_fund_holdings_fund_symbol', 'fund_symbol'),
+        Index('ix_fund_holdings_holding_symbol', 'holding_symbol'),
+        Index('ix_fund_holdings_last_updated', 'last_updated'),
+        Index('ix_fund_holdings_data_source', 'data_source'),
+        Index('ix_fund_holdings_fund_date', 'fund_symbol', 'last_updated'),  # Composite index for queries
     )

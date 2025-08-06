@@ -183,11 +183,18 @@ We'll install these tools in order:
    ```
    - You should see a container named `sigmasight-backend_postgres_1` or similar
 
-3. **Set up database tables:**
+3. **Set up database tables (Development):**
+   ```bash
+   uv run python scripts/setup_dev_database.py
+   ```
+   - This creates all the necessary tables for development
+   - When prompted, type `y` and press Enter to continue
+   
+   **For Production Only:**
    ```bash
    uv run alembic upgrade head
    ```
-   - This creates all the necessary tables
+   - Use this command only for production deployments
 
 4. **Create demo users (optional):**
    ```bash
@@ -300,8 +307,8 @@ git pull
 # Install/update dependencies
 uv sync
 
-# Run database migrations
-uv run alembic upgrade head
+# Set up development database
+uv run python scripts/setup_dev_database.py
 
 # Seed demo users
 uv run python scripts/seed_demo_users.py
