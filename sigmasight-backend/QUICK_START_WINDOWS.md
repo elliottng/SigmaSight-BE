@@ -37,9 +37,9 @@ uv run python scripts/seed_demo_users.py
 ```
 
 Demo accounts created:
-- demo_growth@sigmasight.com (password: demo12345)
-- demo_value@sigmasight.com (password: demo12345)
-- demo_balanced@sigmasight.com (password: demo12345)
+- demo_individual@sigmasight.com (password: demo12345)
+- demo_hnw@sigmasight.com (password: demo12345)
+- demo_hedgefundstyle@sigmasight.com (password: demo12345)
 
 ### 5. Run SigmaSight
 ```bash

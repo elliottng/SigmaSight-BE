@@ -254,9 +254,9 @@ uv run python scripts/setup_dev_database_alembic.py
 if [ -f scripts/seed_demo_users.py ]; then
     uv run python scripts/seed_demo_users.py
     echo "✅ Demo users created:"
-    echo "  - Email: demo_growth@sigmasight.com | Password: demo12345"
-    echo "  - Email: demo_value@sigmasight.com | Password: demo12345"
-    echo "  - Email: demo_balanced@sigmasight.com | Password: demo12345"
+    echo "  - Email: demo_individual@sigmasight.com | Password: demo12345"
+    echo "  - Email: demo_hnw@sigmasight.com | Password: demo12345"
+    echo "  - Email: demo_hedgefundstyle@sigmasight.com | Password: demo12345"
     echo ""
     echo "Note: These demo accounts represent different investment strategies:"
     echo "  • Growth: Tech-heavy, momentum plays, some options"

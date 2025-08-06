@@ -140,9 +140,9 @@ uv run python scripts/seed_demo_users.py
 ```
 
 This creates three demo users:
-- demo_growth@sigmasight.com (password: demo12345)
-- demo_value@sigmasight.com (password: demo12345)
-- demo_balanced@sigmasight.com (password: demo12345)
+- demo_individual@sigmasight.com (password: demo12345)
+- demo_hnw@sigmasight.com (password: demo12345)
+- demo_hedgefundstyle@sigmasight.com (password: demo12345)
 
 **Option B: Use Existing PostgreSQL**
 1. Update DATABASE_URL in .env file with your PostgreSQL connection
@@ -197,7 +197,7 @@ This will test:
 # Login with demo user
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "demo_growth@sigmasight.com", "password": "demo12345"}'
+  -d '{"email": "demo_individual@sigmasight.com", "password": "demo12345"}'
 
 # Use the returned access_token to access protected endpoints
 curl -X GET http://localhost:8000/api/v1/auth/me \
@@ -242,7 +242,7 @@ Run this checklist to ensure identical setup:
 - [ ] API responds at http://localhost:8000
 - [ ] API documentation loads at http://localhost:8000/docs
 - [ ] Health check works at http://localhost:8000/health
-- [ ] Authentication works (login with demo_growth@sigmasight.com / demo12345)
+- [ ] Authentication works (login with demo_individual@sigmasight.com / demo12345)
 - [ ] All verification tests pass (`uv run python scripts/verify_setup.py`)
 
 ## 🔧 API Documentation

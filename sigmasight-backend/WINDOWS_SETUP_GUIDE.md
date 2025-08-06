@@ -196,9 +196,9 @@ We'll install these tools in order:
    uv run python scripts/seed_demo_users.py
    ```
    - This creates three demo accounts:
-     - demo_growth@sigmasight.com (password: demo12345)
-     - demo_value@sigmasight.com (password: demo12345)
-     - demo_balanced@sigmasight.com (password: demo12345)
+     - demo_individual@sigmasight.com (password: demo12345)
+     - demo_hnw@sigmasight.com (password: demo12345)
+     - demo_hedgefundstyle@sigmasight.com (password: demo12345)
 
 ---
 

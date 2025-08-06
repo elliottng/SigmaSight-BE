@@ -26,25 +26,25 @@ logger = get_logger("seed_demo_users")
 # Demo users as specified in DATABASE_DESIGN_ADDENDUM_V1.4.1.md
 DEMO_USERS = [
     {
-        "username": "demo_growth",
-        "email": "demo_growth@sigmasight.com",
-        "full_name": "Demo Growth Investor",
+        "username": "demo_individual",
+        "email": "demo_individual@sigmasight.com",
+        "full_name": "Demo Individual Investor",
         "password": "demo12345",
-        "strategy": "Tech-heavy, momentum plays, some options"
+        "strategy": "Balanced portfolio with mutual funds and growth stocks"
     },
     {
-        "username": "demo_value",
-        "email": "demo_value@sigmasight.com", 
-        "full_name": "Demo Value Investor",
+        "username": "demo_hnw",
+        "email": "demo_hnw@sigmasight.com", 
+        "full_name": "Demo High Net Worth Investor",
         "password": "demo12345",
-        "strategy": "Traditional value investing"
+        "strategy": "Sophisticated portfolio with private investments and alternatives"
     },
     {
-        "username": "demo_balanced",
-        "email": "demo_balanced@sigmasight.com",
-        "full_name": "Demo Balanced Investor", 
+        "username": "demo_hedgefundstyle",
+        "email": "demo_hedgefundstyle@sigmasight.com",
+        "full_name": "Demo Hedge Fund Style Investor", 
         "password": "demo12345",
-        "strategy": "Mixed strategies with pairs trades and hedges"
+        "strategy": "Long/short equity with options overlay and volatility trading"
     }
 ]
 

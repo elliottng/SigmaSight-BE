@@ -21,7 +21,7 @@ TEST_USER = {
 }
 
 DEMO_USER = {
-    "email": "demo_growth@sigmasight.com",
+    "email": "demo_individual@sigmasight.com",
     "password": "demo12345"
 }
 

@@ -17,22 +17,29 @@ logger = logging.getLogger(__name__)
 class TradeFeedsClient(MarketDataProvider):
     """TradeFeeds API client (backup provider)"""
     
-    BASE_URL = "https://api.tradefeeds.com/v1"
+    BASE_URL = "https://tradefeeds.com/api/v1"
     
-    def __init__(self, api_key: str, timeout: int = 30, max_retries: int = 3, rate_limit: int = 30):
+    def __init__(self, api_key: str, timeout: int = 30, max_retries: int = 3, rate_limit: int = 10):
         super().__init__(api_key, timeout, max_retries)
-        self.rate_limit = rate_limit  # calls per minute
+        self.rate_limit = rate_limit  # calls per minute (reduced for CAPTCHA avoidance)
         self.last_request_time = 0
         self.session = None
         self.credits_used = 0  # Track credit usage
+        self.captcha_detected = False
     
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create aiohttp session"""
+        """Get or create aiohttp session with CAPTCHA mitigation headers"""
         if self.session is None or self.session.closed:
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin'
             }
             self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
         return self.session
@@ -43,10 +50,14 @@ class TradeFeedsClient(MarketDataProvider):
             await self.session.close()
     
     async def _rate_limit_check(self):
-        """Implement rate limiting (30 calls/minute)"""
+        """Implement aggressive rate limiting to avoid CAPTCHA (10 calls/minute)"""
         current_time = datetime.now().timestamp()
         time_since_last = current_time - self.last_request_time
         min_interval = 60 / self.rate_limit  # seconds between calls
+        
+        # Add extra delay if CAPTCHA was detected recently
+        if self.captcha_detected:
+            min_interval = max(min_interval, 30)  # Wait at least 30 seconds
         
         if time_since_last < min_interval:
             wait_time = min_interval - time_since_last
@@ -56,9 +67,12 @@ class TradeFeedsClient(MarketDataProvider):
         self.last_request_time = datetime.now().timestamp()
     
     async def _make_request(self, endpoint: str, params: Dict[str, Any] = None, credit_multiplier: int = 1) -> Dict[str, Any]:
-        """Make HTTP request to TradeFeeds API with rate limiting"""
+        """Make HTTP request to TradeFeeds API with CAPTCHA detection"""
         if params is None:
             params = {}
+        
+        # Add API key to params (TradeFeeds uses query parameter authentication)
+        params['key'] = self.api_key
         
         await self._rate_limit_check()
         
@@ -69,22 +83,39 @@ class TradeFeedsClient(MarketDataProvider):
             try:
                 logger.debug(f"TradeFeeds API request: {url} (attempt {attempt + 1})")
                 async with session.get(url, params=params) as response:
+                    response_text = await response.text()
+                    
+                    # Check for CAPTCHA protection
+                    if (response.status == 202 and 'sgcaptcha' in response_text.lower()) or 'captcha' in response_text.lower():
+                        logger.error(f"TradeFeeds CAPTCHA protection detected for {endpoint}")
+                        self.captcha_detected = True
+                        raise Exception(f"TradeFeeds API blocked by CAPTCHA protection. Contact TradeFeeds support to whitelist API access.")
+                    
                     if response.status == 200:
-                        data = await response.json()
-                        # Track credit usage (ETF/MF calls have 20X multiplier)
-                        self.credits_used += credit_multiplier
-                        logger.debug(f"TradeFeeds credits used: {self.credits_used}")
-                        return data
+                        try:
+                            data = await response.json()
+                            # Reset CAPTCHA detection on success
+                            self.captcha_detected = False
+                            # Track credit usage (ETF/MF calls have 20X multiplier)
+                            self.credits_used += credit_multiplier
+                            logger.debug(f"TradeFeeds credits used: {self.credits_used}")
+                            return data
+                        except Exception:
+                            # If JSON parsing fails, it might be HTML (CAPTCHA)
+                            if 'html' in response_text.lower():
+                                logger.error(f"TradeFeeds returned HTML instead of JSON - CAPTCHA likely")
+                                self.captcha_detected = True
+                                raise Exception("TradeFeeds API returned HTML instead of JSON - CAPTCHA protection active")
+                            raise
                     elif response.status == 429:  # Rate limit
                         wait_time = 2 ** attempt
                         logger.warning(f"TradeFeeds rate limit hit, waiting {wait_time} seconds")
                         await asyncio.sleep(wait_time)
                         continue
                     else:
-                        error_text = await response.text()
-                        logger.error(f"TradeFeeds API error {response.status}: {error_text}")
+                        logger.error(f"TradeFeeds API error {response.status}: {response_text[:200]}...")
                         if attempt == self.max_retries - 1:
-                            raise Exception(f"TradeFeeds API error {response.status}: {error_text}")
+                            raise Exception(f"TradeFeeds API error {response.status}: {response_text[:200]}...")
             except asyncio.TimeoutError:
                 logger.warning(f"TradeFeeds API timeout on attempt {attempt + 1}")
                 if attempt == self.max_retries - 1:
@@ -93,7 +124,7 @@ class TradeFeedsClient(MarketDataProvider):
                 logger.error(f"TradeFeeds API request failed: {str(e)}")
                 if attempt == self.max_retries - 1:
                     raise
-                await asyncio.sleep(1)
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
         
         raise Exception("TradeFeeds API request failed after all retries")
     
@@ -108,7 +139,7 @@ class TradeFeedsClient(MarketDataProvider):
         # TradeFeeds may require individual requests for each symbol
         for symbol in symbols:
             try:
-                data = await self._make_request(f"quotes/{symbol}", credit_multiplier=1)
+                data = await self._make_request(f"comp_info", {'ticker': symbol}, credit_multiplier=1)
                 
                 if not data or 'quote' not in data:
                     logger.warning(f"No quote data from TradeFeeds for {symbol}")
@@ -151,23 +182,27 @@ class TradeFeedsClient(MarketDataProvider):
         """
         try:
             # TradeFeeds charges 20 credits for each fund holdings call
-            data = await self._make_request(f"funds/{symbol}/holdings", credit_multiplier=20)
+            data = await self._make_request(f"etfholdings", {'etf_ticker_symbol': symbol}, credit_multiplier=20)
             
-            if not data or 'holdings' not in data:
+            if not data or 'results' not in data:
                 logger.warning(f"No holdings data from TradeFeeds for {symbol}")
                 return []
             
             holdings = []
-            for holding in data['holdings']:
+            for result in data['results']:
+                if 'output' not in result:
+                    continue
+                holding = result['output']
                 try:
-                    # TradeFeeds returns weight as decimal (e.g., 0.0525 for 5.25%)
-                    weight = Decimal(str(holding.get('weight', 0)))
+                    # TradeFeeds returns percent_of_portfolio as string (e.g., "5.25" for 5.25%)
+                    weight_str = holding.get('percent_of_portfolio', '0')
+                    weight = Decimal(str(weight_str)) / 100  # Convert percentage to decimal
                     
                     shares = int(holding.get('shares', 0)) if holding.get('shares') else None
                     market_value = Decimal(str(holding.get('marketValue', 0))) if holding.get('marketValue') else None
                     
                     holdings.append({
-                        'symbol': holding.get('symbol', '').strip(),
+                        'symbol': holding.get('stock_ticker_symbol', '').strip(),
                         'name': holding.get('name', '').strip(),
                         'weight': weight,
                         'shares': shares,

@@ -485,9 +485,9 @@ settings = get_settings()
 ```sql
 -- Create 3 demo users with different portfolio strategies
 INSERT INTO users (username, email, password_hash, is_demo) VALUES
-('demo_growth', 'demo_growth@sigmasight.com', '<bcrypt hash of "demo123">', true),
-('demo_value', 'demo_value@sigmasight.com', '<bcrypt hash of "demo123">', true),
-('demo_balanced', 'demo_balanced@sigmasight.com', '<bcrypt hash of "demo123">', true);
+('demo_individual', 'demo_individual@sigmasight.com', '<bcrypt hash of "demo123">', true),
+('demo_hnw', 'demo_hnw@sigmasight.com', '<bcrypt hash of "demo123">', true),
+('demo_hedgefundstyle', 'demo_hedgefundstyle@sigmasight.com', '<bcrypt hash of "demo123">', true);
 ```
 
 ### 5.2 Demo Portfolio Characteristics

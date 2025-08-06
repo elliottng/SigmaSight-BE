@@ -1,42 +1,43 @@
 # Market Data Provider Scenarios Comparison Report
-Generated: 2025-08-05 22:01:22
+Generated: 2025-08-05 22:56:06
 
 ## Executive Summary
 
 ### Monthly Cost Comparison
-- **Scenario 1A (TradeFeeds + Polygon)**: $0/month
-- **Scenario 2 (FMP + Polygon)**: $0/month
-- **Cost Savings**: Unable to calculate (API keys not configured for testing)
+- **Scenario 1A (TradeFeeds + Polygon)**: $178/month
+- **Scenario 2 (FMP + Polygon)**: $128/month
+- **Cost Savings with FMP**: $50/month (28.1% reduction)
 
 ### Data Quality Results
 
 #### Mutual Fund Holdings
 | Fund | TradeFeeds Success | FMP Success | TradeFeeds Holdings | FMP Holdings |
 |------|-------------------|-------------|-------------------|-------------|
-| FXNAX | ❌ | ❌ | N/A | N/A |
-| FCNTX | ❌ | ❌ | N/A | N/A |
-| FMAGX | ❌ | ❌ | N/A | N/A |
-| VTIAX | ❌ | ❌ | N/A | N/A |
+| FXNAX | ❌ | ✅ | N/A | 0 |
+| FCNTX | ❌ | ✅ | N/A | 0 |
+| FMAGX | ❌ | ✅ | N/A | 0 |
+| VTIAX | ❌ | ✅ | N/A | 941 |
 
 ### Cost Analysis Details
 
 **TradeFeeds Scenario:**
 - Credits used: 0
-- Credits limit: 0
+- Credits limit: 22000
 - Fund/ETF cost multiplier: 20X (expensive!)
 
 **FMP Scenario:**
-- API calls used: 0
+- API calls used: 13
 - Rate limit: 3,000 calls/minute
 - Fund/ETF cost multiplier: 1X (much better!)
 
 ### Recommendation
 
-**Winner: TradeFeeds + Polygon**
+**Winner: FMP + Polygon**
 
 **Rationale:**
-- **Unable to determine cost comparison** (API keys not configured)
-- **Expected advantage: FMP** based on no 20X multiplier penalty
-- **Expected advantage: FMP** based on higher rate limits
+- **28.1% cost savings** ($50/month)
+- **No 20X multiplier penalty** for fund holdings
+- **Unlimited API calls** for better scalability
+- **Higher rate limits** (3,000 calls/minute vs 30 calls/minute)
 
-Configure API keys to run actual cost comparison tests.
+FMP provides better economics and scalability for mixed portfolios with mutual funds and ETFs.
