@@ -1648,23 +1648,58 @@ This section only requires orchestration and scheduling, NOT implementation of c
 
 **IMPORTANT NOTE**: All calculation engines are COMPLETE and TESTED. This is purely integration work, not new development.
 
-### 1.7 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
-**Week 1 Priority - Core Tables:**
-- Users & Authentication
-- Portfolios & Positions (with options parsing)
-- Market Data Cache (with sector/industry)
-- Tags
+#### 1.6.7 Technical Fixes (Critical for Production Readiness)
+*Address architectural issues identified in code review before API development*
 
-**Week 2 Priority - Analytics:**
-- Portfolio Snapshots
-- Position Greeks
-- Factor Definitions (8 fixed factors)
-- Risk Metrics
+- [ ] **Fix Blocking I/O in Async Context**
+  ```python
+  # Move sync API calls to thread pool to avoid blocking event loop
+  async def fetch_prices_async(symbols):
+      loop = asyncio.get_event_loop()
+      return await loop.run_in_executor(None, _fetch_prices_sync, symbols)
+  ```
+  - **Files**: `app/services/market_data_service.py`, `app/clients/*_client.py`
+  - **Issue**: yfinance, polygon sync calls block entire FastAPI for all users
+  - **Priority**: HIGH - affects all users even at 50-user scale
 
-**Week 3 Priority - Operations:**
-- Batch Jobs
-- Demo Data Generation (3 demo users)
-- Historical Snapshots (90 days)
+- [ ] **Ensure Single MarketDataService Instance**
+  ```python
+  # Instead of creating new instances everywhere:
+  # market_data_service = MarketDataService()  # Creates duplicate caches
+  
+  # Use singleton pattern or dependency injection
+  from app.services.market_data_service import market_data_service  # Single instance
+  ```
+  - **Files**: `app/services/correlation_service.py`, other services using market data
+  - **Issue**: Multiple instances defeat caching, waste API quotas
+  - **Priority**: MEDIUM
+
+- [ ] **Add Retry Decorators to All External API Calls**
+  ```python
+  # Extend existing ExponentialBackoff pattern to all providers
+  @retry_with_exponential_backoff(max_retries=3, base_delay=1.0)
+  async def fetch_from_provider(self, symbols):
+      # All FMP, TradeFeeds, YFinance calls
+  ```
+  - **Files**: All client files in `app/clients/`
+  - **Issue**: Transient API failures bubble up without retry
+  - **Priority**: MEDIUM
+
+- [ ] **Separate Transaction Management from Services**
+  ```python
+  # Current pattern (problematic):
+  async def service_method(db: AsyncSession):
+      # ... do work ...
+      await db.commit()  # Service controls transaction
+  
+  # Better pattern:
+  async def controller_endpoint(db: AsyncSession):
+      async with db.begin():  # Controller manages transaction
+          result = await service_method(db)  # Service returns data only
+  ```
+  - **Files**: All services that call `db.commit()`
+  - **Issue**: Cannot span multiple service calls in single transaction
+  - **Priority**: MEDIUM - Important for data integrity
 
 ---
 
