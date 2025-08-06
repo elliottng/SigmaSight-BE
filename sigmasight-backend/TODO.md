@@ -1464,27 +1464,50 @@ python scripts/reset_and_seed.py reset --confirm
 
 **🔗 Integration Ready**: Demo data immediately enables Section 1.6 Batch Processing Framework implementation with all prerequisites satisfied.
 
-### 1.6 Batch Processing Framework ✅ COMPLETED
-*Successfully orchestrated all 8 completed calculation engines for automated daily processing*
+### 1.6 Batch Processing Framework ⚠️ PARTIALLY IMPLEMENTED (UNTESTED)
+*Orchestration code written but TESTING REVEALS CRITICAL ISSUES*
 
-**COMPLETION DATE**: 2025-01-06
-**IMPLEMENTATION TIME**: 1 day (vs 7 day estimate)
-**STATUS**: Fully operational with all engines integrated and technical fixes applied
+**IMPLEMENTATION DATE**: 2025-01-06  
+**TESTING DATE**: 2025-01-06  
+**STATUS**: Code committed but NON-FUNCTIONAL - requires fixes before operational
 
-#### 1.6.1 Framework Infrastructure Setup ✅ COMPLETED
-- [x] **Create batch job orchestration framework:**
-  - [x] ✅ Database tables created: `batch_jobs`, `batch_job_schedules` *(Migration 714625d883d9)*
-  - [x] ✅ Installed and configured APScheduler with AsyncIOScheduler
-  - [x] ✅ Created `app/batch/scheduler_config.py` with PostgreSQL job store
-  - [x] ✅ Implemented `app/batch/batch_orchestrator.py` with full job tracking
-  - [x] ✅ Added complete admin API: `/api/v1/endpoints/admin_batch.py`
+#### 1.6.1 TESTING RESULTS - Reality Check (2025-01-06)
+
+**✅ WHAT'S ACTUALLY WORKING:**
+- [x] Database models exist (`BatchJob` in `app/models/snapshots.py`)
+- [x] Database connectivity works (`AsyncSessionLocal`)
+- [x] Basic batch job creation and tracking functional
+- [x] Some calculation engines importable:
+  - Greeks: `bulk_update_portfolio_greeks`, `calculate_greeks_hybrid`
+  - Portfolio: `calculate_portfolio_exposures`
+  - Factors: `calculate_factor_betas_hybrid`
+  - Correlations: `CorrelationService` 
+  - Snapshots: `create_portfolio_snapshot`
+
+**❌ CRITICAL ISSUES DISCOVERED:**
+- [ ] **APScheduler not installed** - `No module named 'apscheduler'`
+- [ ] **Batch orchestrator import fails** - wrong function names assumed
+- [ ] **Admin endpoints broken** - missing `require_admin` dependency
+- [ ] **Missing calculation functions:**
+  - `calculate_portfolio_greeks` doesn't exist (used `bulk_update_portfolio_greeks`)
+  - `calculate_market_risk_scenarios` doesn't exist
+  - `run_stress_tests` doesn't exist
+- [ ] **Database session issues** - SQL text expressions need explicit declaration
+
+**📊 ACTUAL COMPLETION STATUS:**
+- Database Models: ✅ Working
+- Basic Job Tracking: ✅ Working  
+- Orchestrator Core: ❌ Import errors
+- Scheduler Setup: ❌ Missing dependency
+- Admin Endpoints: ❌ Missing dependencies
+- Calculation Integration: ⚠️ Partial (3/7 engines working)
 
 #### 1.6.2 Integration of Completed Calculation Engines
 
 **CRITICAL**: All calculation functions below are ALREADY IMPLEMENTED and TESTED. 
 This section only requires orchestration and scheduling, NOT implementation of calculations.
 
-- [x] **Step 1: Replace Legacy Portfolio Aggregation (4:30 PM Daily)** ✅
+- [ ] **Step 1: Replace Legacy Portfolio Aggregation (4:30 PM Daily)** ⚠️ *Function exists but orchestrator can't import*
   - **Current Problem**: `app/batch/daily_calculations.py` uses basic 9-metric aggregation
   - **Solution**: Replace `calculate_single_portfolio_aggregation()` with advanced engine
   - **Implementation**:
@@ -1498,7 +1521,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Completed Engine Location**: `app/calculations/portfolio.py` (640 lines, fully tested)
   - **Benefits**: 20+ metrics vs 9, pandas optimization, delta-adjusted exposures
 
-- [x] **Step 2: Integrate Greeks Calculations (5:00 PM Daily)** ✅
+- [ ] **Step 2: Integrate Greeks Calculations (5:00 PM Daily)** ⚠️ *Function name mismatch*
   - **Completed Engine**: `app/calculations/greeks.py` with mibian library
   - **Implementation**:
     ```python
@@ -1508,7 +1531,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Database**: Store in `position_greeks` table
   - **Prerequisites**: Options positions with strike, expiry, underlying price
 
-- [x] **Step 3: Add Factor Analysis (5:15 PM Daily)** ✅
+- [ ] **Step 3: Add Factor Analysis (5:15 PM Daily)** ⚠️ *Function name mismatch*
   - **Completed Engine**: `app/services/factor_service.py` 
   - **Implementation**:
     ```python
@@ -1518,7 +1541,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Database**: Store in `position_factor_exposures` table
   - **Features**: 7-factor model, 252-day regression, beta calculations
 
-- [x] **Step 4: Calculate Market Risk Scenarios (5:20 PM Daily)** ✅
+- [ ] **Step 4: Calculate Market Risk Scenarios (5:20 PM Daily)** ❌ *Function doesn't exist*
   - **Completed Engine**: `app/services/market_risk_service.py`
   - **Implementation**:
     ```python
@@ -1529,7 +1552,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Database**: Store in `risk_scenarios` table
   - **Dependencies**: Factor exposures from Step 3
 
-- [x] **Step 5: Execute Stress Testing (5:25 PM Daily)** ✅
+- [ ] **Step 5: Execute Stress Testing (5:25 PM Daily)** ❌ *Function doesn't exist*
   - **Completed Engine**: `app/services/stress_testing_service.py`
   - **Implementation**:
     ```python
@@ -1540,7 +1563,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Features**: Two-tier engine, correlation modeling, JSON scenarios
   - **Database**: Store results for risk reporting
 
-- [x] **Step 6: Generate Portfolio Snapshots (5:30 PM Daily)** ✅
+- [ ] **Step 6: Generate Portfolio Snapshots (5:30 PM Daily)** ⚠️ *Function exists but orchestrator can't import*
   - **Completed Engine**: `app/services/snapshot_service.py`
   - **Implementation**:
     ```python
@@ -1550,7 +1573,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Database**: Store in `portfolio_snapshots` table
   - **Retention**: 365-day policy with automatic cleanup
 
-- [x] **Step 7: Calculate Position Correlations (6:00 PM Weekly - Tuesdays Only)** ✅
+- [ ] **Step 7: Calculate Position Correlations (6:00 PM Weekly - Tuesdays Only)** ⚠️ *Service exists but orchestrator can't import*
   - **Completed Engine**: `app/services/correlation_service.py`
   - **Implementation**:
     ```python
@@ -1576,28 +1599,28 @@ This section only requires orchestration and scheduling, NOT implementation of c
 6:00 PM - Position Correlations (Tuesday only, ADD from completed engine)
 ```
 
-#### 1.6.4 Implementation Files to Modify/Create ✅ COMPLETED
+#### 1.6.4 Implementation Files Status - MIXED RESULTS
 
-- [x] **Created `app/batch/scheduler_config.py`** - Main APScheduler configuration
+- [ ] **Created `app/batch/scheduler_config.py`** - File exists but APScheduler not installed
   ```python
   from apscheduler.schedulers.asyncio import AsyncIOScheduler
   from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
   # Configure with PostgreSQL job store for persistence
   ```
 
-- [x] **Updated `app/batch/daily_calculations.py`** - Now uses new batch orchestrator
+- [ ] **Updated `app/batch/daily_calculations.py`** - Updated but orchestrator can't import
   ```python
   # Current: Basic 9-metric aggregation
   # Target: Import and use all completed calculation engines
   ```
 
-- [x] **Created `app/models/batch_jobs.py`** - Complete job tracking with audit trail
+- [x] **BatchJob model exists** - In `app/models/snapshots.py` (not separate file)
   ```python
   # Track job status, execution time, errors
   # Store in batch_jobs table
   ```
 
-- [x] **Created `app/api/v1/endpoints/admin_batch.py`** - Full admin control panel
+- [ ] **Created `app/api/v1/endpoints/admin_batch.py`** - File exists but missing dependencies
   ```python
   # POST endpoints for manual batch job execution
   # GET endpoint for job status monitoring
@@ -1652,7 +1675,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
 #### 1.6.7 Technical Fixes (Critical for Production Readiness)
 *Address architectural issues identified in code review before API development*
 
-- [x] **Fix Blocking I/O in Async Context** ✅ COMPLETED
+- [ ] **Fix Blocking I/O in Async Context** ⚠️ *Code written but untested*
   ```python
   # Move sync API calls to thread pool to avoid blocking event loop
   async def fetch_prices_async(symbols):
@@ -1663,7 +1686,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Issue**: yfinance, polygon sync calls block entire FastAPI for all users
   - **Priority**: HIGH - affects all users even at 50-user scale
 
-- [x] **Ensure Single MarketDataService Instance** ✅ COMPLETED
+- [ ] **Ensure Single MarketDataService Instance** ⚠️ *Code written but untested*
   ```python
   # Instead of creating new instances everywhere:
   # market_data_service = MarketDataService()  # Creates duplicate caches
@@ -1675,7 +1698,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Issue**: Multiple instances defeat caching, waste API quotas
   - **Priority**: MEDIUM
 
-- [x] **Add Retry Decorators to All External API Calls** ✅ COMPLETED
+- [ ] **Add Retry Decorators to All External API Calls** ⚠️ *Code written but untested*
   ```python
   # Extend existing ExponentialBackoff pattern to all providers
   @retry_with_exponential_backoff(max_retries=3, base_delay=1.0)
@@ -1702,12 +1725,58 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Issue**: Cannot span multiple service calls in single transaction
   - **Priority**: MEDIUM - Important for data integrity
 
+#### 1.6.8 IMMEDIATE FIXES REQUIRED (Based on Testing Results)
+
+**Priority: HIGH - System is non-functional without these fixes**
+
+- [ ] **Install APScheduler dependency**
+  ```bash
+  uv add apscheduler
+  ```
+  - **Issue**: `No module named 'apscheduler'` prevents scheduler import
+
+- [ ] **Fix function name mappings in batch orchestrator**
+  ```python
+  # Current (broken):
+  from app.calculations.greeks import calculate_portfolio_greeks  # Doesn't exist
+  
+  # Fix to (working):
+  from app.calculations.greeks import bulk_update_portfolio_greeks
+  ```
+  - **File**: `app/batch/batch_orchestrator.py`
+  - **Issue**: Assumes function names that don't exist
+
+- [ ] **Add missing `require_admin` dependency**
+  ```python
+  # Either implement in app/core/dependencies.py or remove from admin endpoints
+  ```
+  - **File**: `app/api/v1/endpoints/admin_batch.py`
+  - **Issue**: Admin endpoints can't import
+
+- [ ] **Fix SQL text expressions**
+  ```python
+  # Current (broken):
+  result = await db.execute("SELECT 1 as test")
+  
+  # Fix to (working):
+  from sqlalchemy import text
+  result = await db.execute(text("SELECT 1 as test"))
+  ```
+
+- [ ] **Create missing calculation functions or graceful fallbacks**
+  - Missing: `calculate_market_risk_scenarios`
+  - Missing: `run_stress_tests`
+  - Either implement these or make orchestrator handle missing engines gracefully
+
+**Estimated fix time**: 2-4 hours for critical path, 1-2 days for full functionality
+
 ---
 
 ## 🎯 Phase 1 Summary - Backend Core Implementation
 
-**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.6, 1.4.7, 1.4.8, 1.4.9, 1.4.10, 1.5, 1.6  
-**📋 Remaining:** Phase 2 APIs (2.1-2.8)  
+**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.6, 1.4.7, 1.4.8, 1.4.9, 1.4.10, 1.5  
+**⚠️ Partially Complete:** 1.6 (code written but non-functional - needs fixes)  
+**📋 Remaining:** Fix Section 1.6 issues, then Phase 2 APIs (2.1-2.8)  
 **🚫 Postponed to V1.5:** Risk Metrics (VaR, Sharpe)
 
 **Key Achievements:**
@@ -1717,9 +1786,9 @@ This section only requires orchestration and scheduling, NOT implementation of c
 - **New tables** for modeling sessions, export history, and backfill progress ✅
 - **Complete market data integration** with Polygon.io and YFinance ✅
 - **Database-integrated market data calculations** (section 1.4.1) with improved function signatures ✅
-- **Batch Processing Framework** with all 8 calculation engines orchestrated ✅
+- **Batch Processing Framework** orchestration code written ⚠️ (needs fixes to be functional)
 - **Demo Data Seeding** with 3 realistic portfolios (63 positions total) ✅
-- **Technical debt addressed** with async-safe API calls and retry logic ✅
+- **Technical debt fixes** written but untested ⚠️
 - **Options Greeks calculations** (section 1.4.2) with mibian library and comprehensive testing ✅
 - **Portfolio aggregation functions** (section 1.4.3) with 29 passing tests and <1s performance ✅
 - **7-factor risk analysis** (section 1.4.4) with 252-day regression and database storage ✅
