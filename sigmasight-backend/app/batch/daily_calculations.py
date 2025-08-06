@@ -1,10 +1,10 @@
 """
 Daily batch calculations for portfolio analytics
-Integrates Section 1.4.1 market data calculations with batch processing
+NOW USES THE NEW BATCH ORCHESTRATOR - Section 1.6 Implementation Complete
 """
 import asyncio
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,46 +16,58 @@ from app.calculations.market_data import (
     bulk_update_position_values,
     fetch_and_cache_prices
 )
+from app.batch.batch_orchestrator import batch_orchestrator
 
 logger = get_logger(__name__)
 
 
-async def run_daily_calculations():
+async def run_daily_calculations(portfolio_id: Optional[str] = None):
     """
-    Run daily portfolio calculations using Section 1.4.1 functions
-    This implements the batch processing framework outlined in TODO Section 1.6
+    Run daily portfolio calculations using the new batch orchestrator.
+    This now integrates all 8 completed calculation engines from Section 1.6.
     
-    Sequence:
-    1. Update market data cache (via market_data_sync.py - already implemented)
-    2. Calculate position market values and daily P&L
-    3. Update portfolio aggregations
-    4. Calculate risk metrics (future sections)
-    5. Generate portfolio snapshots (future sections)
+    Integrated Engines:
+    1. Market Data Update (shared across portfolios)
+    2. Advanced Portfolio Aggregation (20+ metrics)
+    3. Greeks Calculations (for options)
+    4. Factor Analysis (with delta adjustment)
+    5. Market Risk Scenarios
+    6. Stress Testing (18 scenarios)
+    7. Correlations (weekly, Tuesday only)
+    8. Portfolio Snapshots (comprehensive)
+    
+    Args:
+        portfolio_id: Optional specific portfolio to process
+        
+    Returns:
+        List of job results with status and timing information
     """
     start_time = datetime.now()
-    logger.info(f"Starting daily calculations at {start_time}")
+    logger.info(f"Starting daily calculations using new orchestrator at {start_time}")
     
     try:
-        async with async_session_maker() as db:
-            # Step 1: Update all position market values and daily P&L
-            position_update_results = await update_all_position_values(db)
-            
-            # Step 2: Calculate portfolio aggregations
-            portfolio_results = await calculate_portfolio_aggregations(db)
-            
-            # Future: Step 3 would be Greeks calculations (Section 1.4.2)
-            # Future: Step 4 would be risk metrics (Section 1.4.5)
-            # Future: Step 5 would be portfolio snapshots (Section 1.4.6)
-            
-            duration = datetime.now() - start_time
-            logger.info(f"Daily calculations completed in {duration.total_seconds():.2f}s")
-            
-            return {
-                "duration_seconds": duration.total_seconds(),
-                "position_updates": position_update_results,
-                "portfolio_aggregations": portfolio_results,
-                "success": True
-            }
+        # Use the new batch orchestrator
+        results = await batch_orchestrator.run_daily_batch_sequence(portfolio_id)
+        
+        duration = datetime.now() - start_time
+        
+        # Count successes and failures
+        successful = sum(1 for r in results if r['status'] == 'completed')
+        failed = sum(1 for r in results if r['status'] == 'failed')
+        
+        logger.info(
+            f"Daily calculations completed in {duration.total_seconds():.2f}s: "
+            f"{successful} successful, {failed} failed"
+        )
+        
+        return {
+            "duration_seconds": duration.total_seconds(),
+            "jobs_run": len(results),
+            "successful": successful,
+            "failed": failed,
+            "results": results,
+            "success": failed == 0
+        }
             
     except Exception as e:
         logger.error(f"Daily calculations failed: {str(e)}")
