@@ -1317,124 +1317,42 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 **Ready for Production:** API keys configuration and provider trial setup are the only remaining steps for deployment.
 
-### 1.4.10 Database Migration Chain Fix & Multi-Developer Team Setup - ✅ COMPLETED (2025-08-05)
+### 1.4.10 Database Migration Chain Fix & Multi-Developer Team Setup - ✅ COMPLETED (2025-08-06)
 *Fix broken Alembic migration chain and establish standardized development workflow for multiple developers*
 
-**Problem Identification:**
-During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Investigation revealed this was caused by working across two machines (MacBookAir and current machine) with migration files not being synchronized due to incorrect `.gitignore` configuration.
+## Problem Summary
+During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Root cause was `.gitignore` containing `alembic/versions/*.py` which prevented migration files from being tracked in Git, causing synchronization issues between MacBookAir and Elliott Mac Mini.
 
-**Root Cause (Discovered on Current Machine - 2025-08-06):**
-- `.gitignore` contained `alembic/versions/*.py` which prevented migration files from being tracked in Git
-- When switching between machines, migration files created on one machine were not available on the other
-- This caused Alembic to fail when the database's `alembic_version` table referenced a migration file that didn't exist locally
+## Sequential Resolution Efforts
 
-**MacBookAir Fix (Completed 2025-08-05):**
-On the MacBookAir, implemented a surgical fix before discovering the root cause:
+**✅ PHASE 1: MacBookAir Surgical Fix (2025-08-05)**
+- [x] Created baseline migration `2a4b9bc52cd9_initial_baseline_with_all_current_models.py`
+- [x] Implemented temporary workaround to restore Alembic functionality
+- [x] Established professional database setup scripts and documentation
 
-**✅ PHASE 1: MIGRATION CHAIN ANALYSIS & REPAIR COMPLETED (MacBookAir)**
-- [x] **Root Cause Analysis**
-  - [x] Identified missing migration file `40680fc5a516` causing chain break
-  - [x] Discovered orphaned `historical_backfill_progress` table causing FK constraints
-  - [x] Analyzed broken migration chain preventing professional database version control
-  - [x] Determined surgical fix approach to restore proper Alembic workflow
+**✅ PHASE 2: Elliott Mac Mini Root Cause Discovery & Permanent Fix (2025-08-06)**
+- [x] Discovered `.gitignore` was preventing migration file synchronization
+- [x] Fixed `.gitignore` to track all Alembic migration files
+- [x] Added all 7 migration files to Git and pushed to remote
+- [x] Verified complete migration chain integrity
 
-**✅ PHASE 2: TRUE ROOT CAUSE DISCOVERY & PERMANENT FIX (Current Machine - 2025-08-06)**
-- [x] **Migration Chain Investigation**
-  - [x] Reconstructed complete migration chain: `001` → `81d5d976093e` → `5874f3dd4e4d` → `b033266c0376` → `5c561b79e1f3` → `b5cd2cea0507` → `40680fc5a516`
-  - [x] Discovered all migration files actually exist on current machine - chain is intact
-  - [x] Found `.gitignore` was ignoring `alembic/versions/*.py`, preventing Git synchronization
-  - [x] Removed problematic `.gitignore` rule to ensure migration files are tracked
+**✅ PHASE 3: Cross-Machine Synchronization & Verification (2025-08-06)**
+- [x] Pulled MacBookAir's surgical fix migrations to Elliott Mac Mini
+- [x] Successfully merged both approaches via merge migration `2fc0b47dcbc9`
+- [x] Upgraded database to final head: `2fc0b47dcbc9 (head) (mergepoint)`
+- [x] Verified clean migration chain across both development machines
 
-- [x] **Permanent Solution**
-  - [x] Fixed `.gitignore` to track all Alembic migration files
-  - [x] Verified migration chain is linear and complete
-  - [x] Ensured future migrations will be properly synchronized across all machines
-  - [x] Committed and pushed all 7 migration files to Git repository
+## Current State
+- **Migration Chain**: Fully synchronized and working across both machines
+- **Database State**: `2fc0b47dcbc9 (head) (mergepoint)` ✅
+- **Git Tracking**: All migration files properly tracked and synchronized
+- **Team Workflow**: Professional Alembic workflow established
 
-**⚠️ REQUIRED ACTIONS ON MACBOOKAIR:**
-1. Pull latest changes: `git pull`
-2. Verify all migration files are present: `ls -la alembic/versions/*.py`
-3. Check database state: `alembic current`
-4. If database is behind, run: `alembic upgrade head`
-5. Verify the surgical fix baseline migration can coexist with the original chain
-
-- [x] **Migration Chain Repair**
-  - [x] Removed broken migration `a4bf86e9a003_remove_historical_backfill_progress_.py`
-  - [x] Created proper baseline migration `2a4b9bc52cd9_initial_baseline_with_all_current_models.py`
-  - [x] Used `alembic stamp head` to mark baseline as applied without running
-  - [x] Verified chain integrity for future production migrations
-
-**✅ PHASE 2: PROFESSIONAL ALEMBIC WORKFLOW RESTORATION COMPLETED**
-
-#### Professional Database Setup ✅ COMPLETED
-- [x] **Created Professional Alembic-Based Setup Script**
-  - [x] Implemented `scripts/setup_dev_database_alembic.py` with proper migration workflow
-  - [x] Added database connectivity testing and migration status checking
-  - [x] Included reset capability with `--reset` flag for development environments
-  - [x] Added comprehensive error handling and schema verification
-  - [x] Ensured compatibility with professional database version control
-  - [x] File: `scripts/setup_dev_database_alembic.py`
-
-- [x] **Team Workflow Documentation**
-  - [x] Created comprehensive `TEAM_SETUP.md` guide for multi-developer environments
-  - [x] Documented consistent onboarding process for new team members
-  - [x] Established clear workflow for handling schema changes
-  - [x] Added troubleshooting section for common development issues
-  - [x] File: `TEAM_SETUP.md`
-
-#### Setup Guide Updates ✅ COMPLETED
-- [x] **Windows Setup Guide Updates**
-  - [x] Updated `WINDOWS_SETUP_GUIDE.md` database setup section
-  - [x] Updated to use professional Alembic workflow with `setup_dev_database_alembic.py`
-  - [x] Added development vs production command distinction
-  - [x] Updated quick reference commands section
-  - [x] File: `WINDOWS_SETUP_GUIDE.md`
-
-- [x] **Mac Setup Guide Updates**
-  - [x] Updated `MAC_INSTALL_GUIDE.md` database initialization section
-  - [x] Updated to use professional Alembic-based setup script
-  - [x] Updated troubleshooting section with new approach
-  - [x] Modified daily usage commands
-  - [x] File: `MAC_INSTALL_GUIDE.md`
-
-- [x] **Quick Start Guide Updates**
-  - [x] Updated `QUICK_START_WINDOWS.md` with new database setup command
-  - [x] Ensured consistency across all setup documentation
-  - [x] File: `QUICK_START_WINDOWS.md`
-
-- [x] **Main README Updates**
-  - [x] Updated main `README.md` setup instructions
-  - [x] Added development vs production command paths
-  - [x] Maintained backward compatibility notes
-  - [x] File: `README.md`
-
-**✅ PHASE 3: PRODUCTION READINESS COMPLETED**
-
-#### Professional Development/Production Approach ✅ COMPLETED
-- [x] **Development Environment**
-  - [x] Professional Alembic migration workflow for consistent team environments
-  - [x] Fast setup with `setup_dev_database_alembic.py` script
-  - [x] Proper database version control with rollback capability
-  - [x] Easy reset capability for corrupted development databases
-
-- [x] **Production Environment**
-  - [x] Clean Alembic baseline ready for production migrations
-  - [x] Proper migration generation capability preserved
-  - [x] Database schema versioning maintained for production deployments
-  - [x] Rollback capability available through Alembic for production
-
-#### Testing & Validation ✅ COMPLETED
-- [x] **Setup Script Testing**
-  - [x] Tested `setup_dev_database_alembic.py` with proper migration workflow
-  - [x] Verified 26 tables created correctly including new `fund_holdings` table
-  - [x] Confirmed integration with Section 1.4.9 hybrid market data implementation
-  - [x] Validated safety checks prevent production usage
-
-- [x] **Integration Verification**
-  - [x] Ran Section 1.4.9 integration tests with new database setup
-  - [x] Confirmed 100% test success rate (5/5 tests passing)
-  - [x] Verified FundHoldings model properly integrated
-  - [x] Tested client factory and service layer compatibility
+## Key Deliverables
+- **Setup Scripts**: `scripts/setup_dev_database_alembic.py` - Professional Alembic-based database setup
+- **Documentation**: `TEAM_SETUP.md` - Comprehensive team development workflow guide
+- **Updated Guides**: All platform setup guides updated for consistent workflow
+- **Migration Files**: Complete chain with surgical fix integration
 
 **📋 SUCCESS METRICS ACHIEVED:**
 - ✅ **Broken migration chain repaired** with clean baseline for production
