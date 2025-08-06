@@ -253,10 +253,10 @@ async def calculate_position_interest_rate_betas(
         start_date = end_date - timedelta(days=REGRESSION_WINDOW_DAYS + 30)
         
         fred_series = TREASURY_SERIES.get(treasury_series, 'DGS10')
-        treasury_data = fred.get_data(
+        treasury_data = fred.get_series(
             fred_series, 
-            start=start_date, 
-            end=end_date
+            observation_start=start_date, 
+            observation_end=end_date
         )
         
         # Calculate Treasury yield changes (daily changes in basis points)

@@ -31,6 +31,17 @@ from app.calculations.snapshots import create_portfolio_snapshot
 from app.services.correlation_service import CorrelationService
 from app.batch.market_data_sync import sync_market_data
 
+# Import market risk and stress testing engines for Phase 2
+from app.calculations.market_risk import (
+    calculate_portfolio_market_beta,
+    calculate_market_scenarios,
+    calculate_interest_rate_scenarios
+)
+from app.calculations.stress_testing import (
+    run_comprehensive_stress_test,
+    calculate_factor_correlation_matrix
+)
+
 logger = get_logger(__name__)
 
 
@@ -384,15 +395,18 @@ class BatchOrchestrator:
         try:
             # Use a fresh database session to avoid UUID serialization issues
             async with AsyncSessionLocal() as fresh_db:
-                # Convert string portfolio_id to UUID and use actual function name with required parameters
-                portfolio_uuid = UUID(portfolio_id)
+                # Handle both string and UUID types
+                if isinstance(portfolio_id, str):
+                    portfolio_uuid = UUID(portfolio_id)
+                else:
+                    portfolio_uuid = portfolio_id
                 factors = await calculate_factor_betas_hybrid(fresh_db, portfolio_uuid, date.today())
                 
                 # factors is a dict, not a list - extract meaningful data
                 factor_betas = factors.get('factor_betas', {}) if isinstance(factors, dict) else {}
                 
                 return {
-                    'portfolio_id': portfolio_id,
+                    'portfolio_id': str(portfolio_uuid),
                     'factors_calculated': len(factor_betas),
                     'primary_factor': list(factor_betas.keys())[0] if factor_betas else None,
                     'primary_exposure': list(factor_betas.values())[0] if factor_betas else 0,
@@ -413,17 +427,74 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 4: Calculate market risk scenarios."""
-        # Placeholder implementation - to be replaced with actual risk calculations
-        logger.warning(f"Market risk calculation not implemented yet for portfolio {portfolio_id}")
-        scenarios = []
+        from datetime import date
+        from uuid import UUID
         
-        return {
-            'portfolio_id': portfolio_id,
-            'scenarios_calculated': len(scenarios),
-            'worst_case': min(s['impact'] for s in scenarios) if scenarios else 0,
-            'best_case': max(s['impact'] for s in scenarios) if scenarios else 0,
-            'scenarios': scenarios
-        }
+        try:
+            # Use a fresh database session to avoid UUID serialization issues
+            async with AsyncSessionLocal() as fresh_db:
+                # Handle both string and UUID types
+                if isinstance(portfolio_id, str):
+                    portfolio_uuid = UUID(portfolio_id)
+                else:
+                    portfolio_uuid = portfolio_id
+                
+                # Step 1: Calculate portfolio market beta
+                market_beta_result = await calculate_portfolio_market_beta(
+                    fresh_db, 
+                    portfolio_uuid,
+                    date.today()
+                )
+                
+                # Step 2: Calculate market scenarios (stock market movements)
+                market_scenarios = await calculate_market_scenarios(
+                    fresh_db,
+                    portfolio_uuid,
+                    date.today()
+                )
+                
+                # Step 3: Calculate interest rate scenarios
+                interest_rate_scenarios = await calculate_interest_rate_scenarios(
+                    fresh_db,
+                    portfolio_uuid,
+                    date.today()
+                )
+                
+                # Extract P&L impacts from scenarios
+                market_pnls = []
+                for scenario_name, scenario_data in market_scenarios.get('scenarios', {}).items():
+                    if isinstance(scenario_data, dict) and 'predicted_pnl' in scenario_data:
+                        market_pnls.append(float(scenario_data['predicted_pnl']))
+                
+                ir_pnls = []
+                for scenario_name, scenario_data in interest_rate_scenarios.get('scenarios', {}).items():
+                    if isinstance(scenario_data, dict) and 'predicted_pnl' in scenario_data:
+                        ir_pnls.append(float(scenario_data['predicted_pnl']))
+                
+                # Combine all P&L impacts
+                all_pnls = market_pnls + ir_pnls
+                worst_case = min(all_pnls) if all_pnls else 0
+                best_case = max(all_pnls) if all_pnls else 0
+                
+                return {
+                    'portfolio_id': str(portfolio_uuid),
+                    'market_beta': market_beta_result.get('portfolio_market_beta', 0),
+                    'scenarios_calculated': len(all_pnls),
+                    'worst_case': float(worst_case),
+                    'best_case': float(best_case),
+                    'market_scenarios': len(market_pnls),
+                    'ir_scenarios': len(ir_pnls),
+                    'status': 'Market risk analysis completed successfully',
+                    'calculation_date': date.today().isoformat()
+                    # Don't include full scenario details to avoid UUID serialization issues
+                }
+                
+        except Exception as e:
+            logger.error(f"Market risk calculation error: {str(e)}")
+            import traceback
+            logger.error(f"Market risk stack trace: {traceback.format_exc()}")
+            # Re-raise to let the orchestrator handle it
+            raise
     
     async def _run_stress_tests(
         self, 
@@ -431,16 +502,73 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 5: Run comprehensive stress tests."""
-        # Placeholder implementation - to be replaced with actual stress tests
-        logger.warning(f"Stress testing not implemented yet for portfolio {portfolio_id}")
-        results = []
+        from datetime import date
+        from uuid import UUID
         
-        return {
-            'portfolio_id': portfolio_id,
-            'tests_run': len(results),
-            'max_drawdown': min(r['portfolio_impact'] for r in results) if results else 0,
-            'stress_tests': results
-        }
+        try:
+            # Use a fresh database session to avoid UUID serialization issues
+            async with AsyncSessionLocal() as fresh_db:
+                # Handle both string and UUID types
+                if isinstance(portfolio_id, str):
+                    portfolio_uuid = UUID(portfolio_id)
+                else:
+                    portfolio_uuid = portfolio_id
+                
+                # Step 1: Calculate factor correlation matrix (needed for correlated impacts)
+                correlation_matrix = await calculate_factor_correlation_matrix(
+                    fresh_db,
+                    lookback_days=252,
+                    decay_factor=0.94
+                )
+                
+                # Step 2: Run comprehensive stress test with all predefined scenarios
+                stress_test_results = await run_comprehensive_stress_test(
+                    fresh_db,
+                    portfolio_uuid,
+                    date.today()
+                    # No include_correlations parameter - correlations are always calculated
+                )
+                
+                # Extract scenario results
+                scenario_results = stress_test_results.get('scenario_results', [])
+                
+                # Calculate summary statistics
+                if scenario_results:
+                    impacts = [r['total_impact'] for r in scenario_results]
+                    max_drawdown = min(impacts)
+                    max_gain = max(impacts)
+                    avg_impact = sum(impacts) / len(impacts)
+                else:
+                    max_drawdown = 0
+                    max_gain = 0
+                    avg_impact = 0
+                
+                # Count scenarios by category
+                categories = {}
+                for result in scenario_results:
+                    category = result.get('category', 'unknown')
+                    categories[category] = categories.get(category, 0) + 1
+                
+                return {
+                    'portfolio_id': str(portfolio_uuid),
+                    'tests_run': len(scenario_results),
+                    'max_drawdown': float(max_drawdown),
+                    'max_gain': float(max_gain),
+                    'avg_impact': float(avg_impact),
+                    'categories_tested': categories,
+                    'correlation_included': True,
+                    'avg_correlation': correlation_matrix.get('avg_correlation', 0),
+                    'status': 'Stress testing completed successfully',
+                    'calculation_date': date.today().isoformat()
+                    # Don't include full results to avoid UUID serialization issues
+                }
+                
+        except Exception as e:
+            logger.error(f"Stress testing error: {str(e)}")
+            import traceback
+            logger.error(f"Stress testing stack trace: {traceback.format_exc()}")
+            # Re-raise to let the orchestrator handle it
+            raise
     
     async def _calculate_correlations(
         self, 
@@ -473,15 +601,18 @@ class BatchOrchestrator:
         try:
             # Use a fresh database session to avoid UUID serialization issues
             async with AsyncSessionLocal() as fresh_db:
-                # Convert string portfolio_id to UUID and use actual function signature with required parameters
-                portfolio_uuid = UUID(portfolio_id)
+                # Handle both string and UUID types
+                if isinstance(portfolio_id, str):
+                    portfolio_uuid = UUID(portfolio_id)
+                else:
+                    portfolio_uuid = portfolio_id
                 snapshot = await create_portfolio_snapshot(fresh_db, portfolio_uuid, date.today())
                 
                 # snapshot has different structure - extract meaningful data
                 snapshot_data = snapshot.get('snapshot', {}) if isinstance(snapshot, dict) else snapshot
                 
                 return {
-                    'portfolio_id': portfolio_id,
+                    'portfolio_id': str(portfolio_uuid),
                     'snapshot_id': str(snapshot_data.get('id')) if snapshot_data and snapshot_data.get('id') else None,
                     'total_value': float(snapshot_data.get('total_market_value', 0)) if snapshot_data else 0,
                     'metrics_captured': len(snapshot_data.get('metrics', {})) if snapshot_data else 0,
