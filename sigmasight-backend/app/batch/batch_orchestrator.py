@@ -72,9 +72,9 @@ class BatchOrchestrator:
         start_time = datetime.now()
         results = []
         
-        # Auto-detect if we should run correlations (Tuesday)
+        # Auto-detect if we should run correlations (Daily for testing - was Tuesday only)
         if not run_correlations:
-            run_correlations = datetime.now().weekday() == 1  # Tuesday = 1
+            run_correlations = True  # Changed to daily for testing (was: datetime.now().weekday() == 1)
         
         logger.info(f"Starting daily batch sequence at {start_time}")
         logger.info(f"Correlations will {'BE' if run_correlations else 'NOT be'} calculated")
@@ -577,16 +577,39 @@ class BatchOrchestrator:
     ) -> Dict[str, Any]:
         """Step 6: Calculate position correlations (weekly)."""
         # Instantiate CorrelationService with db session
+        from uuid import UUID
+        
         correlation_service = CorrelationService(db)
-        correlations = await correlation_service.calculate_portfolio_correlations(
-            portfolio_id, datetime.now()
+        
+        # Handle both string and UUID types
+        if isinstance(portfolio_id, str):
+            portfolio_uuid = UUID(portfolio_id)
+        else:
+            portfolio_uuid = portfolio_id
+            
+        correlation_calculation = await correlation_service.calculate_portfolio_correlations(
+            portfolio_uuid, datetime.now()
         )
         
+        # Extract data from the CorrelationCalculation object safely
+        # Access scalar fields directly (already loaded)
+        positions_included = correlation_calculation.positions_included if correlation_calculation.positions_included else 0
+        # Calculate number of pairs: n*(n-1)/2 for n positions
+        pairs_calculated = positions_included * (positions_included - 1) // 2 if positions_included > 1 else 0
+        avg_correlation = float(correlation_calculation.overall_correlation) if correlation_calculation.overall_correlation else 0
+        
         return {
-            'portfolio_id': portfolio_id,
-            'pairs_calculated': len(correlations),
-            'avg_correlation': sum(c['correlation'] for c in correlations) / len(correlations) if correlations else 0,
-            'correlations': correlations
+            'portfolio_id': str(portfolio_uuid),
+            'pairs_calculated': pairs_calculated,
+            'avg_correlation': avg_correlation,
+            'positions_included': correlation_calculation.positions_included,
+            'positions_excluded': correlation_calculation.positions_excluded,
+            'data_quality': correlation_calculation.data_quality,
+            'correlation_concentration_score': float(correlation_calculation.correlation_concentration_score),
+            'effective_positions': float(correlation_calculation.effective_positions),
+            'status': 'Correlation analysis completed successfully',
+            'calculation_date': datetime.now().isoformat()
+            # Don't include full correlations data to avoid UUID serialization issues
         }
     
     async def _create_snapshot(

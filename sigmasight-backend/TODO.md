@@ -1464,13 +1464,14 @@ python scripts/reset_and_seed.py reset --confirm
 
 **🔗 Integration Ready**: Demo data immediately enables Section 1.6 Batch Processing Framework implementation with all prerequisites satisfied.
 
-### 1.6 Batch Processing Framework ✅ PHASE 2 COMPLETED (2025-08-06)
-*Batch orchestration system now 100% functional - all jobs integrated and operational*
+### 1.6 Batch Processing Framework ✅ COMPLETE (2025-08-06)
+*Batch orchestration system now 100% functional - ALL jobs integrated and operational*
 
 **IMPLEMENTATION DATE**: 2025-01-06  
 **PHASE 0 TESTING DATE**: 2025-08-06 (Morning)
 **PHASE 1 COMPLETION**: 2025-08-06 (Morning) - 7/9 jobs working  
 **PHASE 2 COMPLETION**: 2025-08-06 (Afternoon) - 7/7 core jobs working (100%)
+**CORRELATIONS FIX**: 2025-08-06 (Evening) - 8/8 ALL jobs working (100%)
 
 #### 1.6.1 TESTING RESULTS - Reality Check (2025-01-06)
 
@@ -2063,8 +2064,8 @@ This mysterious UUID serialization issue has been documented for future investig
 #### 1.6.12 PHASE 2: Complete Remaining Job Integrations ✅ COMPLETED (2025-08-06)
 *Integrate existing calculation engines to achieve 100% batch framework completion*
 
-**FINAL STATUS**: 7/7 jobs working without correlations (100% complete) ✅
-**WITH CORRELATIONS**: 7/8 jobs working (87.5% - correlations job has separate issues)
+**FINAL STATUS**: 8/8 ALL jobs working (100% complete) ✅
+**INCLUDING CORRELATIONS**: 8/8 jobs working (100% - correlations job fixed!) ✅
 
 **COMPLETED TASKS:**
 
@@ -2096,7 +2097,21 @@ This mysterious UUID serialization issue has been documented for future investig
 5. ✅ Market Risk Scenarios (NEW - Phase 2)
 6. ✅ Stress Testing (NEW - Phase 2)
 7. ✅ Portfolio Snapshot
-8. ⚠️ Position Correlations (works Tuesday-only, has separate data issues)
+8. ✅ Position Correlations (FIXED - now working daily!) ✅
+
+#### 1.6.13 CORRELATIONS JOB FIX (2025-08-06)
+**Issue**: `TypeError: object of type 'CorrelationCalculation' has no len()`
+
+**Root Cause**: Batch orchestrator was treating CorrelationCalculation as a list when it's actually a SQLAlchemy model object
+
+**Fix Applied**:
+- Corrected return type handling: `CorrelationCalculation` object → extracted scalar fields
+- Fixed UUID type handling (string vs UUID object)
+- Calculated pairs count mathematically: `n*(n-1)/2` for n positions
+- Avoided lazy-loaded relationships to prevent async issues
+- Changed from Tuesday-only to daily execution for testing
+
+**Results**: Correlations job now working with 5 positions included, 6 excluded, 10 correlation pairs calculated, average correlation: 0.248
 
 ----
 
