@@ -1,12 +1,12 @@
 # SigmaSight Backend Development - Phase 2+ Planning
 
-> **Navigation**: [← Phase 1 (todo1.md)](todo1.md) | **Phase 2+ (Current File)**
+> **Navigation**: [← Phase 1 (TODO1.md)](TODO1.md) | **Phase 2+ (Current File)**
 
 ## Overview
 
 This document contains Phase 2 and beyond development planning for the SigmaSight backend system.
 
-**Phase 1 Status**: ✅ **COMPLETED** - See [todo1.md](todo1.md) for full Phase 1 details
+**Phase 1 Status**: ✅ **COMPLETED** - See [TODO1.md](TODO1.md) for full Phase 1 details
 - All backend core implementation complete (Sections 1.0 - 1.7)
 - 8/8 batch jobs working (100% operational)
 - Complete calculation engines integrated and tested

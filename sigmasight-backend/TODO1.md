@@ -1,6 +1,6 @@
 # SigmaSight Backend Implementation - Phase 1 (COMPLETED)
 
-> **Navigation**: **Phase 1 (Current File)** | [→ Phase 2+ (todo2.md)](todo2.md)
+> **Navigation**: **Phase 1 (Current File)** | [→ Phase 2+ (TODO2.md)](TODO2.md)
 
 ## Project Overview
 Build a FastAPI backend for SigmaSight portfolio risk management platform with Railway deployment, PostgreSQL database, Polygon.io/YFinance market data integration, and **V1.4 hybrid real/mock calculation engine**.
