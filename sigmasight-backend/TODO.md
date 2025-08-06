@@ -1380,6 +1380,33 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 ## Phase 2: Advanced Features & Frontend Integration (Weeks 5-6)
 
+### 2.0 Code Quality & Technical Debt
+*Refactoring, deprecations, and technical improvements*
+
+#### 2.0.1 Greeks Calculation Simplification
+- [ ] **Remove py_vollib dependency and fallback logic**
+  - Remove `py-vollib>=1.0.1` from `pyproject.toml`
+  - Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
+  - Remove `get_mock_greeks()` function - no more mock calculations
+  - Simplify Greeks calculation to use **mibian only**
+  - Return `None`/`NULL` values with logged errors if mibian fails
+  - Update unit tests to remove mock Greeks test cases
+  - **Rationale**: Eliminate warning messages and simplify codebase by relying solely on the proven mibian library
+
+#### 2.0.2 Technical Debt & Cleanup (Future)
+- [ ] Standardize error handling patterns across all services
+- [ ] Remove deprecated code comments and TODOs
+- [ ] Consolidate similar utility functions
+- [ ] Update Pydantic v1 validators to v2 field_validator syntax
+- [ ] Review and optimize database query patterns
+- [ ] Standardize logging levels and messages
+
+#### 2.0.3 Performance Improvements (Future)
+- [ ] Remove redundant database queries in position calculations
+- [ ] Optimize factor exposure calculation batch operations
+- [ ] Review and improve caching strategies
+- [ ] Consolidate overlapping market data fetches
+
 ### 2.1 ProForma Modeling APIs
 - [ ] **POST /api/v1/modeling/sessions** - Create modeling session
 - [ ] **GET /api/v1/modeling/sessions/{id}** - Get session state
