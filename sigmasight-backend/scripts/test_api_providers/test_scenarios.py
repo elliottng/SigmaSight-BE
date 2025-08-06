@@ -372,13 +372,13 @@ class ScenarioTester:
         
         return {
             'provider_costs': {
-                'FMP': 99,  # $99/month
+                'FMP': 139,  # $139/month
                 'Polygon_Options': 29  # $29/month
             },
             'total_api_calls': total_api_calls,
             'fmp_rate_limit': '3000 calls/minute',
             'unlimited_calls': True,
-            'total_monthly_cost': 99 + 29,  # $128
+            'total_monthly_cost': 139 + 29,  # $168
             'cost_per_fund_call': 1,  # 1X multiplier - much better!
             'scalability_advantage': 'Unlimited calls support easy scaling'
         }

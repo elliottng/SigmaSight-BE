@@ -5,8 +5,8 @@ Generated: 2025-08-05 22:56:06
 
 ### Monthly Cost Comparison
 - **Scenario 1A (TradeFeeds + Polygon)**: $178/month
-- **Scenario 2 (FMP + Polygon)**: $128/month
-- **Cost Savings with FMP**: $50/month (28.1% reduction)
+- **Scenario 2 (FMP + Polygon)**: $168/month
+- **Cost Savings with FMP**: $10/month (5.6% reduction)
 
 ### Data Quality Results
 
@@ -35,7 +35,7 @@ Generated: 2025-08-05 22:56:06
 **Winner: FMP + Polygon**
 
 **Rationale:**
-- **28.1% cost savings** ($50/month)
+- **5.6% cost savings** ($10/month)
 - **No 20X multiplier penalty** for fund holdings
 - **Unlimited API calls** for better scalability
 - **Higher rate limits** (3,000 calls/minute vs 30 calls/minute)

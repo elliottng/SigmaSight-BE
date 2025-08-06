@@ -4,9 +4,9 @@
 This guide covers the deployment of the hybrid market data provider system implemented in Section 1.4.9, which adds support for mutual fund holdings data through FMP (Financial Modeling Prep) and TradeFeeds providers.
 
 ## Architecture Summary
-- **Primary Provider**: Financial Modeling Prep (FMP) - $99/month, unlimited API calls
+- **Primary Provider**: Financial Modeling Prep (FMP) - $139/month, unlimited API calls
 - **Backup Provider**: TradeFeeds - $149/month, 22,000 credits (with 20X multiplier for fund/ETF calls)
-- **Options Provider**: Polygon.io - Unchanged, existing integration maintained
+- **Options Provider**: Polygon.io - $29/month, existing integration maintained
 - **Database**: New `FundHoldings` model for mutual fund and ETF holdings data
 
 ## Pre-Deployment Checklist
@@ -14,7 +14,7 @@ This guide covers the deployment of the hybrid market data provider system imple
 ### 1. API Provider Setup
 1. **Sign up for Financial Modeling Prep Ultimate Plan**
    - Visit: https://financialmodelingprep.com/developer/docs
-   - Plan: Ultimate ($99/month) - provides unlimited API calls
+   - Plan: Ultimate ($139/month) - provides unlimited API calls
    - Required endpoints: `stock/real-time-price`, `v3/mutual-fund-holdings/{symbol}`
    - Test API key with sample requests
 

@@ -92,12 +92,12 @@ Based on cost analysis and feature requirements, we'll test these two scenarios:
 **Option B**: Use TradeFeeds for ETF/Mutual Fund holdings only + Polygon Stocks Starter ($29/month) = $207/month total
 
 #### Scenario 2: Financial Modeling Prep + Polygon  
-- **FMP Ultimate Plan**: $99/month
+- **FMP Ultimate Plan**: $139/month
   - 3,000 API calls/minute
   - Includes Stocks, ETF/Mutual Fund holdings
 - **Polygon Options Starter**: $29/month
   - Unlimited options API calls  
-- **Total Cost**: $128/month
+- **Total Cost**: $168/month
 
 ### Cost Analysis for 20 Users
 
@@ -121,9 +121,9 @@ Based on cost analysis and feature requirements, we'll test these two scenarios:
 #### Scenario 2 Cost Breakdown:
 - FMP: 11,600 calls for stocks + ETF/MF holdings (within rate limits ✓)
 - Polygon: 3,520 options calls (unlimited ✓)  
-- **Monthly cost**: $128
+- **Monthly cost**: $168
 
-**Recommendation**: Scenario 2 (FMP + Polygon) offers best value at $128/month with room to scale.
+**Recommendation**: Scenario 2 (FMP + Polygon) offers best value at $168/month with room to scale.
 
 ### Testing Timeline
 
