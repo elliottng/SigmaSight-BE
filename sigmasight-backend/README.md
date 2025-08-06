@@ -122,15 +122,15 @@ docker-compose ps
 DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
 ```
 
-4. **Set up database (Development):**
+4. **Set up database (Professional Alembic Approach):**
 ```bash
-# For development environments - creates clean database
-uv run python scripts/setup_dev_database.py
+# Professional database migrations (recommended)
+uv run python scripts/setup_dev_database_alembic.py
 ```
 
-**Alternative for Production:**
+**Alternative Direct Alembic:**
 ```bash
-# For production deployments only
+# Direct Alembic usage (for experienced developers)
 uv run alembic upgrade head
 ```
 
@@ -146,7 +146,7 @@ This creates three demo users:
 
 **Option B: Use Existing PostgreSQL**
 1. Update DATABASE_URL in .env file with your PostgreSQL connection
-2. Set up database: `uv run python scripts/setup_dev_database.py`
+2. Set up database: `uv run python scripts/setup_dev_database_alembic.py`
 3. Optionally seed demo users: `uv run python scripts/seed_demo_users.py`
 
 **Note:** The database is required for authentication, portfolio management, and all core features.

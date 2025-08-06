@@ -247,8 +247,8 @@ if __name__ == "__main__":
     asyncio.run(main())
 EOF
 
-# Run development database setup (standardized for team)
-uv run python scripts/setup_dev_database.py
+# Run professional Alembic database setup
+uv run python scripts/setup_dev_database_alembic.py
 
 # Create demo users for testing (optional but recommended)
 if [ -f scripts/seed_demo_users.py ]; then
@@ -566,7 +566,7 @@ docker logs $(docker ps -qf "name=postgres")
 # Reset database if needed:
 docker-compose down -v  # Warning: This deletes all data
 docker-compose up -d postgres
-uv run python scripts/setup_dev_database.py
+uv run python scripts/setup_dev_database_alembic.py
 ```
 
 #### 4. UV Command Not Found
@@ -595,7 +595,7 @@ uv run alembic current
 
 # If corrupted, reset (WARNING: loses data):
 docker exec $(docker ps -qf "name=postgres") psql -U sigmasight -d sigmasight_db -c "DROP TABLE IF EXISTS alembic_version;"
-uv run python scripts/setup_dev_database.py
+uv run python scripts/setup_dev_database_alembic.py
 ```
 
 ## 📝 Daily Usage
@@ -640,7 +640,7 @@ git pull origin main
 uv sync
 
 # Run any new database migrations
-uv run python scripts/setup_dev_database.py
+uv run python scripts/setup_dev_database_alembic.py
 ```
 
 ## 📋 Quick Commands Reference
@@ -667,7 +667,7 @@ docker exec -it $(docker ps -qf "name=postgres") psql -U sigmasight -d sigmasigh
 # Update from GitHub
 git pull
 uv sync
-uv run python scripts/setup_dev_database.py
+uv run python scripts/setup_dev_database_alembic.py
 
 # Seed demo users
 uv run python scripts/seed_demo_users.py

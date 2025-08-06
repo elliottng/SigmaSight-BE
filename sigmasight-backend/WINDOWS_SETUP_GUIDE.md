@@ -183,18 +183,13 @@ We'll install these tools in order:
    ```
    - You should see a container named `sigmasight-backend_postgres_1` or similar
 
-3. **Set up database tables (Development):**
+3. **Set up database tables (Professional Approach):**
    ```bash
-   uv run python scripts/setup_dev_database.py
+   uv run python scripts/setup_dev_database_alembic.py
    ```
-   - This creates all the necessary tables for development
+   - This uses proper Alembic migrations for professional development
    - When prompted, type `y` and press Enter to continue
-   
-   **For Production Only:**
-   ```bash
-   uv run alembic upgrade head
-   ```
-   - Use this command only for production deployments
+   - Provides proper database versioning and rollback capabilities
 
 4. **Create demo users (optional):**
    ```bash
@@ -307,8 +302,8 @@ git pull
 # Install/update dependencies
 uv sync
 
-# Set up development database
-uv run python scripts/setup_dev_database.py
+# Set up database with Alembic migrations
+uv run python scripts/setup_dev_database_alembic.py
 
 # Seed demo users
 uv run python scripts/seed_demo_users.py

@@ -1,8 +1,8 @@
-# Team Development Setup Guide
+# Professional Team Development Setup Guide
 
 ## For Multiple Developers Working on SigmaSight
 
-This guide ensures all team members have consistent development environments.
+This guide ensures all team members use professional database migration workflows.
 
 ## Quick Setup for New Team Members
 
@@ -18,13 +18,13 @@ cp .env.example .env
 uv sync
 ```
 
-### 2. Database Setup
+### 2. Professional Database Setup
 ```bash
 # Start PostgreSQL (with Docker)
 docker-compose up -d
 
-# Set up development database (consistent across all team members)
-uv run python scripts/setup_dev_database.py
+# Set up database using proper Alembic migrations
+uv run python scripts/setup_dev_database_alembic.py
 
 # Add demo users for testing
 uv run python scripts/seed_demo_users.py
@@ -41,37 +41,47 @@ uv run python run.py
 
 ## Development Workflow
 
-### Daily Development
-- Use `scripts/setup_dev_database.py` to reset your local database
-- This ensures everyone starts with the same clean schema
-- Safe to run multiple times during development
+### Daily Development with Alembic
+- Professional database versioning with proper migrations
+- Rollback capability if changes need to be undone
+- Full change history and team coordination
 
-### When Someone Adds New Models
-1. **Model Author**: Add the new model to imports in `scripts/setup_dev_database.py`
-2. **Team Members**: Run `uv run python scripts/setup_dev_database.py` to get the new tables
-3. **Everyone**: Continues development with consistent schema
+### When Someone Adds New Models (Professional Workflow)
+1. **Model Author**: 
+   - Add new model to appropriate files in `app/models/`
+   - Generate migration: `alembic revision --autogenerate -m "add new model"`
+   - Test migration: `alembic upgrade head`
+   - Commit both model files and migration file
 
-### Database Changes Process
-1. **Add new models** to appropriate files in `app/models/`
-2. **Update** `scripts/setup_dev_database.py` imports if needed
-3. **Test locally** with `uv run python scripts/setup_dev_database.py`
-4. **Commit** both model and setup script changes
-5. **Team notification**: "New models added, run setup_dev_database.py"
+2. **Team Members**: 
+   - Pull latest changes: `git pull`
+   - Apply new migrations: `alembic upgrade head`
+   - Continue development with updated schema
+
+### Database Changes Process (Professional)
+1. **Modify models** in `app/models/`
+2. **Generate migration**: `alembic revision --autogenerate -m "descriptive message"`
+3. **Review migration** file for correctness
+4. **Test migration** locally: `alembic upgrade head`
+5. **Test rollback** if needed: `alembic downgrade -1` then `alembic upgrade head`
+6. **Commit** both model changes and migration file
+7. **Team coordination**: Include migration info in PR/commit message
 
 ## Why This Approach?
 
-### ✅ Benefits for Team Development:
-- **Consistent environments**: Everyone has identical database schema
-- **No migration conflicts**: No risk of conflicting Alembic migrations during development
-- **Fast iteration**: Add model → run script → start coding
-- **Easy onboarding**: New team members get working environment quickly
-- **Reset capability**: Can always start fresh if something gets corrupted
-- **Model-driven**: Schema is always in sync with code
+### ✅ Benefits for Professional Development:
+- **Database versioning**: Full history of all schema changes
+- **Rollback capability**: Can undo problematic migrations safely
+- **Team coordination**: Clear migration files show what changed and when
+- **Production safety**: Same tools used in development and production
+- **Change tracking**: Alembic tracks exactly what was applied when
+- **Industry standard**: Professional teams expect Alembic workflows
 
-### ⚠️ Important Notes:
-- **Development only**: This approach is for local development environments
-- **Data loss expected**: Running the setup script drops all existing data
-- **Production ready**: We have proper Alembic migrations for production deployment
+### ✅ Migration Advantages:
+- **Incremental updates**: Only apply changes since last migration
+- **Data preservation**: Migrations can transform data during schema changes
+- **Conflict resolution**: Team members can coordinate schema changes through git
+- **Audit trail**: Complete history of database evolution
 
 ## Troubleshooting
 
@@ -87,13 +97,13 @@ docker-compose up -d
 
 ### Schema Issues
 ```bash
-# Reset everything
-uv run python scripts/setup_dev_database.py
+# Reset everything with proper Alembic (WARNING: loses data)
+uv run python scripts/setup_dev_database_alembic.py --reset
 
 # This will:
 # 1. Drop all tables
-# 2. Recreate from current models
-# 3. Verify setup
+# 2. Apply proper Alembic baseline migration
+# 3. Verify setup with professional workflow
 ```
 
 ### Import Errors
@@ -121,7 +131,7 @@ alembic upgrade head
 
 ```
 scripts/
-├── setup_dev_database.py     # Team development setup
+├── setup_dev_database_alembic.py  # Professional Alembic-based setup
 ├── init_database.py          # Legacy script (kept for compatibility)
 ├── seed_demo_users.py        # Demo data creation
 └── test_api_providers/       # Section 1.4.9 testing scripts
@@ -142,7 +152,7 @@ alembic/                       # For production deployments
 
 ### When Making Schema Changes:
 1. **Announce in team chat**: "Adding new model: XYZ"
-2. **Include in PR description**: "Requires running setup_dev_database.py"
+2. **Include in PR description**: "Requires running: alembic upgrade head"
 3. **After merge**: "New schema changes merged, please run setup script"
 
 ### Before Major Features:
