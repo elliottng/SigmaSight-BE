@@ -2059,6 +2059,50 @@ This mysterious UUID serialization issue has been documented for future investig
 
 **Git Commit**: UUID serialization issue resolved with pragmatic workaround - 7/7 jobs functional
 
+#### 1.6.12 PHASE 2: Complete Remaining Job Integrations (2/9 jobs)
+*Integrate existing calculation engines to achieve 100% batch framework completion*
+
+**CURRENT STATUS**: 7/9 jobs working (77.8% complete)
+
+**REMAINING TASKS:**
+
+- [ ] **Integrate Market Risk Scenarios (5:20 PM Daily)**
+  - **Current Status**: Placeholder implementation returning empty scenarios
+  - **Available Engine**: `app.services.market_risk_service.py` (Section 1.4.5)
+  - **Integration Needed**: Replace `_calculate_market_risk()` method in batch orchestrator
+  - **Implementation**:
+    ```python
+    from app.services.market_risk_service import MarketRiskService
+    # Replace placeholder with actual market risk calculations
+    # Run market shock scenarios (+/-5%, 10%, 20%)
+    # Run interest rate scenarios (+/-100bp, 200bp)
+    ```
+  - **Estimated Time**: 1-2 hours
+  - **Dependencies**: Factor exposures from Step 3 (already working)
+
+- [ ] **Integrate Stress Testing (5:25 PM Daily)**
+  - **Current Status**: Placeholder implementation returning empty results
+  - **Available Engine**: `app.services.stress_testing_service.py` (Section 1.4.7)
+  - **Integration Needed**: Replace `_run_stress_tests()` method in batch orchestrator
+  - **Implementation**:
+    ```python
+    from app.services.stress_testing_service import StressTestingService
+    # Replace placeholder with actual stress test calculations
+    # Run 18 predefined stress scenarios
+    # Calculate factor correlations and cross-impacts
+    ```
+  - **Estimated Time**: 1-2 hours
+  - **Dependencies**: Factor exposures and market risk scenarios (working/to be working)
+
+**SUCCESS CRITERIA:**
+- All 9 batch jobs fully functional (100% completion)
+- No placeholder implementations remaining
+- Complete daily batch sequence operational
+
+**TOTAL ESTIMATED TIME**: 2-4 hours (pure integration work, engines already exist)
+
+----
+
 ### 1.7 Database Import Consistency Cleanup ✅ COMPLETED (2025-08-06)
 *Standardized database access patterns across entire codebase*
 
