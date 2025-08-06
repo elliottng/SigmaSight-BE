@@ -1321,14 +1321,42 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 *Fix broken Alembic migration chain and establish standardized development workflow for multiple developers*
 
 **Problem Identification:**
-During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Rather than continue with workaround approaches, implemented a surgical fix to restore professional Alembic-based database version control.
+During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Investigation revealed this was caused by working across two machines (MacBookAir and current machine) with migration files not being synchronized due to incorrect `.gitignore` configuration.
 
-**✅ PHASE 1: MIGRATION CHAIN ANALYSIS & REPAIR COMPLETED**
+**Root Cause (Discovered on Current Machine - 2025-08-06):**
+- `.gitignore` contained `alembic/versions/*.py` which prevented migration files from being tracked in Git
+- When switching between machines, migration files created on one machine were not available on the other
+- This caused Alembic to fail when the database's `alembic_version` table referenced a migration file that didn't exist locally
+
+**MacBookAir Fix (Completed 2025-08-05):**
+On the MacBookAir, implemented a surgical fix before discovering the root cause:
+
+**✅ PHASE 1: MIGRATION CHAIN ANALYSIS & REPAIR COMPLETED (MacBookAir)**
 - [x] **Root Cause Analysis**
   - [x] Identified missing migration file `40680fc5a516` causing chain break
   - [x] Discovered orphaned `historical_backfill_progress` table causing FK constraints
   - [x] Analyzed broken migration chain preventing professional database version control
   - [x] Determined surgical fix approach to restore proper Alembic workflow
+
+**✅ PHASE 2: TRUE ROOT CAUSE DISCOVERY & PERMANENT FIX (Current Machine - 2025-08-06)**
+- [x] **Migration Chain Investigation**
+  - [x] Reconstructed complete migration chain: `001` → `81d5d976093e` → `5874f3dd4e4d` → `b033266c0376` → `5c561b79e1f3` → `b5cd2cea0507` → `40680fc5a516`
+  - [x] Discovered all migration files actually exist on current machine - chain is intact
+  - [x] Found `.gitignore` was ignoring `alembic/versions/*.py`, preventing Git synchronization
+  - [x] Removed problematic `.gitignore` rule to ensure migration files are tracked
+
+- [x] **Permanent Solution**
+  - [x] Fixed `.gitignore` to track all Alembic migration files
+  - [x] Verified migration chain is linear and complete
+  - [x] Ensured future migrations will be properly synchronized across all machines
+  - [x] Committed and pushed all 7 migration files to Git repository
+
+**⚠️ REQUIRED ACTIONS ON MACBOOKAIR:**
+1. Pull latest changes: `git pull`
+2. Verify all migration files are present: `ls -la alembic/versions/*.py`
+3. Check database state: `alembic current`
+4. If database is behind, run: `alembic upgrade head`
+5. Verify the surgical fix baseline migration can coexist with the original chain
 
 - [x] **Migration Chain Repair**
   - [x] Removed broken migration `a4bf86e9a003_remove_historical_backfill_progress_.py`
