@@ -9,7 +9,7 @@ from uuid import UUID
 from typing import Optional
 
 from app.core.auth import verify_token
-from app.core.database import get_db
+from app.database import get_db
 from app.models.users import User
 from app.schemas.auth import CurrentUser
 from app.core.logging import auth_logger
@@ -114,3 +114,15 @@ async def get_current_user_optional(
         return None
     except Exception:
         return None
+
+
+async def require_admin(
+    current_user: CurrentUser = Depends(get_current_user)
+) -> CurrentUser:
+    """
+    Dependency that requires admin privileges.
+    For now, just requires authenticated user - can be enhanced later.
+    """
+    # TODO: Add proper admin role check
+    # For demo stage, any authenticated user can access admin endpoints
+    return current_user

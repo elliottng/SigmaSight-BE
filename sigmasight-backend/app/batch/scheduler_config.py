@@ -7,9 +7,10 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from datetime import datetime
+from typing import Any
 import pytz
 
-from app.core.config import settings
+from app.config import settings
 from app.core.logging import get_logger
 from app.batch.batch_orchestrator import batch_orchestrator
 
@@ -26,7 +27,7 @@ class BatchScheduler:
         # Configure job stores - persist jobs in database
         jobstores = {
             'default': SQLAlchemyJobStore(
-                url=settings.database_url.replace('+asyncpg', ''),  # Use sync SQLAlchemy
+                url=settings.DATABASE_URL.replace('+asyncpg', ''),  # Use sync SQLAlchemy
                 tablename='apscheduler_jobs'
             )
         }

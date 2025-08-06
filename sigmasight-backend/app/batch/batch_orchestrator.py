@@ -8,21 +8,26 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.database import async_session_maker
+from app.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.models.users import Portfolio
 from app.models.positions import Position
-from app.models.batch_jobs import BatchJob, JobStatus
+from app.models.snapshots import BatchJob
 
-# Import all completed calculation engines
+# Import all completed calculation engines (using ACTUAL function names)
 from app.calculations.portfolio import (
-    calculate_portfolio_exposures,  # Advanced 20+ metric aggregation
+    calculate_portfolio_exposures,  # This one exists
     calculate_delta_adjusted_exposure
 )
-from app.calculations.greeks import calculate_portfolio_greeks
-from app.calculations.factors import calculate_factor_exposures
-from app.calculations.market_risk import calculate_market_risk_scenarios
-from app.calculations.stress_testing import run_stress_tests
+from app.calculations.greeks import (
+    bulk_update_portfolio_greeks,  # Actual function name
+    calculate_greeks_hybrid
+)
+from app.calculations.factors import (
+    calculate_factor_betas_hybrid,  # Actual function name
+    aggregate_portfolio_factor_exposures
+)
+# NOTE: market_risk and stress_testing functions don't exist yet - handle gracefully
 from app.calculations.snapshots import create_portfolio_snapshot
 from app.services.correlation_service import CorrelationService
 from app.batch.market_data_sync import sync_market_data
@@ -37,7 +42,7 @@ class BatchOrchestrator:
     """
     
     def __init__(self):
-        self.correlation_service = CorrelationService()
+        # CorrelationService needs db session, instantiate per-call
         self.job_registry: Dict[str, BatchJob] = {}
     
     async def run_daily_batch_sequence(
@@ -66,7 +71,7 @@ class BatchOrchestrator:
         logger.info(f"Correlations will {'BE' if run_correlations else 'NOT be'} calculated")
         
         try:
-            async with async_session_maker() as db:
+            async with AsyncSessionLocal() as db:
                 # Get portfolios to process
                 portfolios = await self._get_portfolios_to_process(db, portfolio_id)
                 
@@ -205,7 +210,7 @@ class BatchOrchestrator:
             
             # Update job status
             duration = (datetime.now() - start_time).total_seconds()
-            await self._update_batch_job(job, JobStatus.COMPLETED, result, duration)
+            await self._update_batch_job(job, 'success', result, duration)
             
             logger.info(f"Job {job_name} completed in {duration:.2f}s")
             
@@ -225,7 +230,7 @@ class BatchOrchestrator:
             
             # Update job status if we have a job record
             if 'job' in locals():
-                await self._update_batch_job(job, JobStatus.FAILED, {'error': error_msg}, duration)
+                await self._update_batch_job(job, 'failed', {'error': error_msg}, duration)
             
             return {
                 'job_name': job_name,
@@ -302,7 +307,8 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 2: Calculate Greeks for all options positions."""
-        greeks = await calculate_portfolio_greeks(db, portfolio_id)
+        # Use actual function name
+        greeks = await bulk_update_portfolio_greeks(db, portfolio_id)
         
         return {
             'portfolio_id': portfolio_id,
@@ -319,7 +325,8 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 3: Calculate factor exposures with delta adjustment."""
-        factors = await calculate_factor_exposures(db, portfolio_id)
+        # Use actual function name
+        factors = await calculate_factor_betas_hybrid(db, portfolio_id)
         
         return {
             'portfolio_id': portfolio_id,
@@ -335,7 +342,9 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 4: Calculate market risk scenarios."""
-        scenarios = await calculate_market_risk_scenarios(db, portfolio_id)
+        # TODO: Function doesn't exist yet - return placeholder
+        logger.warning(f"Market risk calculation not implemented yet for portfolio {portfolio_id}")
+        scenarios = []  # Placeholder
         
         return {
             'portfolio_id': portfolio_id,
@@ -351,7 +360,9 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 5: Run comprehensive stress tests."""
-        results = await run_stress_tests(db, portfolio_id)
+        # TODO: Function doesn't exist yet - return placeholder
+        logger.warning(f"Stress testing not implemented yet for portfolio {portfolio_id}")
+        results = []  # Placeholder
         
         return {
             'portfolio_id': portfolio_id,
@@ -366,8 +377,10 @@ class BatchOrchestrator:
         portfolio_id: str
     ) -> Dict[str, Any]:
         """Step 6: Calculate position correlations (weekly)."""
-        correlations = await self.correlation_service.calculate_portfolio_correlations(
-            db, portfolio_id
+        # Instantiate CorrelationService with db session
+        correlation_service = CorrelationService(db)
+        correlations = await correlation_service.calculate_portfolio_correlations(
+            portfolio_id, datetime.now()
         )
         
         return {
@@ -397,12 +410,13 @@ class BatchOrchestrator:
     
     async def _create_batch_job(self, job_name: str) -> BatchJob:
         """Create a batch job record for tracking."""
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             job = BatchJob(
                 job_name=job_name,
-                status=JobStatus.RUNNING,
+                job_type='batch_orchestration',
+                status='running',
                 started_at=datetime.now(),
-                parameters={}
+                job_metadata={}
             )
             db.add(job)
             await db.commit()
@@ -414,12 +428,12 @@ class BatchOrchestrator:
     async def _update_batch_job(
         self, 
         job: BatchJob, 
-        status: JobStatus, 
+        status: str, 
         result: Dict[str, Any],
         duration: float
     ):
         """Update batch job record with results."""
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             # Re-fetch the job to avoid detached instance issues
             stmt = select(BatchJob).where(BatchJob.id == job.id)
             result_obj = await db.execute(stmt)
@@ -427,8 +441,8 @@ class BatchOrchestrator:
             
             job.status = status
             job.completed_at = datetime.now()
-            job.result = result
-            job.execution_time = duration
+            job.job_metadata = result
+            job.duration_seconds = int(duration)
             
             await db.commit()
 

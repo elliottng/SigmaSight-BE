@@ -129,11 +129,11 @@ async def test_database_integration():
     print("\n🔍 Testing database integration...")
     
     try:
-        from app.core.database import async_session_maker
+        from app.database import AsyncSessionLocal
         from app.models.market_data import MarketDataCache
         from sqlalchemy import select
         
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             # Test database connection
             stmt = select(MarketDataCache).limit(1)
             result = await db.execute(stmt)

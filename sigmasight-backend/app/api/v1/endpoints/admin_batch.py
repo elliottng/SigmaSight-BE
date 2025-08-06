@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.core.dependencies import get_db, require_admin
-from app.models.batch_jobs import BatchJob, JobStatus
+from app.models.snapshots import BatchJob
 from app.batch.batch_orchestrator import batch_orchestrator
 from app.batch.scheduler_config import batch_scheduler
 from app.core.logging import get_logger
@@ -79,13 +79,13 @@ async def trigger_greeks_calculation(
     """
     Manually trigger Greeks calculation for a specific portfolio.
     """
-    from app.calculations.greeks import calculate_portfolio_greeks
+    from app.calculations.greeks import bulk_update_portfolio_greeks
     
     logger.info(f"Admin {admin_user.email} triggered Greeks calculation for portfolio {portfolio_id}")
     
     async def run_greeks():
         async with get_db() as db_session:
-            return await calculate_portfolio_greeks(db_session, portfolio_id)
+            return await bulk_update_portfolio_greeks(db_session, portfolio_id)
     
     background_tasks.add_task(run_greeks)
     
@@ -210,7 +210,7 @@ async def trigger_portfolio_snapshot(
 @router.get("/jobs/status")
 async def get_batch_job_status(
     job_name: Optional[str] = Query(None, description="Filter by job name"),
-    status: Optional[JobStatus] = Query(None, description="Filter by status"),
+    status: Optional[str] = Query(None, description="Filter by status"),
     portfolio_id: Optional[str] = Query(None, description="Filter by portfolio"),
     days_back: int = Query(1, description="Number of days to look back"),
     db: AsyncSession = Depends(get_db),
@@ -271,13 +271,13 @@ async def get_batch_job_summary(
     
     # Calculate statistics
     total_jobs = len(jobs)
-    completed = sum(1 for j in jobs if j.status == JobStatus.COMPLETED)
-    failed = sum(1 for j in jobs if j.status == JobStatus.FAILED)
-    warnings = sum(1 for j in jobs if j.status == JobStatus.COMPLETED_WITH_WARNINGS)
-    running = sum(1 for j in jobs if j.status == JobStatus.RUNNING)
+    completed = sum(1 for j in jobs if j.status == 'success')
+    failed = sum(1 for j in jobs if j.status == 'failed')
+    warnings = sum(1 for j in jobs if j.status == 'completed_with_warnings')
+    running = sum(1 for j in jobs if j.status == 'running')
     
     # Average execution time for completed jobs
-    completed_jobs = [j for j in jobs if j.status in [JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_WARNINGS] and j.execution_time]
+    completed_jobs = [j for j in jobs if j.status in ['success', 'completed_with_warnings'] and j.execution_time]
     avg_execution_time = sum(j.execution_time for j in completed_jobs) / len(completed_jobs) if completed_jobs else 0
     
     # Group by job type
@@ -287,9 +287,9 @@ async def get_batch_job_summary(
         if job_type not in job_types:
             job_types[job_type] = {"total": 0, "completed": 0, "failed": 0}
         job_types[job_type]["total"] += 1
-        if job.status == JobStatus.COMPLETED:
+        if job.status == 'success':
             job_types[job_type]["completed"] += 1
-        elif job.status == JobStatus.FAILED:
+        elif job.status == 'failed':
             job_types[job_type]["failed"] += 1
     
     return {
@@ -395,14 +395,14 @@ async def cancel_batch_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    if job.status != JobStatus.RUNNING:
+    if job.status != 'running':
         raise HTTPException(
             status_code=400, 
             detail=f"Job is not running (status: {job.status})"
         )
     
     # Update job status
-    job.status = JobStatus.CANCELLED
+    job.status = 'cancelled'
     job.completed_at = datetime.now()
     job.error_message = f"Cancelled by admin {admin_user.email}"
     

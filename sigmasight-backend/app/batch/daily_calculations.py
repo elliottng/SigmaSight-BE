@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session_maker
+from app.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.models.positions import Position
 from app.models.users import Portfolio

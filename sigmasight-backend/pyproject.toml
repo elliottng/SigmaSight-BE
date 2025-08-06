@@ -51,6 +51,7 @@ dependencies = [
     "python-dateutil>=2.8.2",
     "psycopg2-binary>=2.9.10",
     "brotli>=1.1.0",
+    "apscheduler>=3.11.0",
 ]
 
 [project.optional-dependencies]

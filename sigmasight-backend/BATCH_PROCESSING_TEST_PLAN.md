@@ -1,7 +1,12 @@
 # Batch Processing Framework - Comprehensive Testing Plan
+**⚠️ STATUS: DEFERRED FOR FUTURE PRODUCTION SCALING**
+
+> **IMPORTANT**: This comprehensive test plan is DEFERRED until we need to scale beyond 50 users.
+> For current demo-stage testing (20 users max), see **BATCH_TESTING_PRAGMATIC.md** instead.
+> The pragmatic test suite is implemented in `tests/batch/test_batch_pragmatic.py`.
 
 ## Overview
-This document outlines the testing strategy for Section 1.6 Batch Processing Framework, which integrates 8 completed calculation engines into an automated daily processing pipeline.
+This document outlines the FUTURE testing strategy for Section 1.6 Batch Processing Framework when scaling to production (1000+ users, enterprise requirements).
 
 ## Test Levels
 

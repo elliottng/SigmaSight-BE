@@ -7,7 +7,7 @@ from typing import List, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, distinct
 
-from app.core.database import async_session_maker
+from app.database import AsyncSessionLocal
 from app.services.market_data_service import market_data_service
 from app.models.positions import Position
 from app.models.market_data import MarketDataCache
@@ -27,7 +27,7 @@ async def sync_market_data():
     logger.info(f"Starting market data sync at {start_time}")
     
     try:
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             # Get all unique symbols from active positions
             symbols = await get_active_portfolio_symbols(db)
             
@@ -88,7 +88,7 @@ async def fetch_missing_historical_data(days_back: int = 90):
     logger.info(f"Starting historical data backfill for {days_back} days")
     
     try:
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             symbols = await get_active_portfolio_symbols(db)
             
             if not symbols:
@@ -132,7 +132,7 @@ async def verify_market_data_quality():
     logger.info("Starting market data quality verification")
     
     try:
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             # Check for recent data
             recent_date = date.today() - timedelta(days=7)
             
