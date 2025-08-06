@@ -256,24 +256,27 @@ def calculate_real_greeks(
 
 def get_mock_greeks(position_type: PositionType, quantity: Decimal) -> Dict[str, float]:
     """
-    Get mock Greeks values scaled by quantity
+    Get mock Greeks values per contract/share (NOT scaled by quantity)
+    
+    The database stores per-contract/per-share Greeks values. 
+    Position-level impact should be calculated separately when needed.
     
     Args:
         position_type: Position type enum
-        quantity: Position quantity
+        quantity: Position quantity (not used for scaling)
         
     Returns:
-        Dictionary with mock Greeks scaled by quantity
+        Dictionary with mock Greeks per contract/share
     """
     base_greeks = MOCK_GREEKS.get(position_type, MOCK_GREEKS[PositionType.LONG])
-    quantity_float = float(quantity)
     
+    # Return per-contract/per-share Greeks (do NOT multiply by quantity)
     return {
-        "delta": base_greeks["delta"] * quantity_float,
-        "gamma": base_greeks["gamma"] * quantity_float,
-        "theta": base_greeks["theta"] * quantity_float,
-        "vega": base_greeks["vega"] * quantity_float,
-        "rho": base_greeks["rho"] * quantity_float
+        "delta": base_greeks["delta"],
+        "gamma": base_greeks["gamma"], 
+        "theta": base_greeks["theta"],
+        "vega": base_greeks["vega"],
+        "rho": base_greeks["rho"]
     }
 
 
