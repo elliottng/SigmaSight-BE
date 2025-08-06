@@ -1464,191 +1464,191 @@ python scripts/reset_and_seed.py reset --confirm
 
 **🔗 Integration Ready**: Demo data immediately enables Section 1.6 Batch Processing Framework implementation with all prerequisites satisfied.
 
-### 1.6 Batch Processing Framework
-*Orchestrates calculation functions for automated daily processing*
+### 1.6 Batch Processing Framework - COMPREHENSIVE IMPLEMENTATION PLAN
+*Orchestrates all completed calculation engines for automated daily processing*
 
-- [ ] Create batch job framework:
-  - [x] Implement `batch_jobs` table for job tracking *(Table created in initial migration)*
-  - [x] Create `batch_job_schedules` table for cron management *(Table created in initial migration)*
-  - [ ] Build job runner service using APScheduler (runs within FastAPI app)
-  - [ ] Configure APScheduler with PostgreSQL job store for persistence
+**CURRENT STATE**: Only basic market data updates and simple 9-metric aggregation implemented
+**TARGET STATE**: Full integration of 8 completed calculation engines with proper scheduling
 
-- [ ] **Integrate Advanced Portfolio Aggregation Engine into Batch Processing**
-  - **Problem**: Current `app/batch/daily_calculations.py` uses legacy aggregation logic in `calculate_single_portfolio_aggregation()` 
-  - **Solution**: Replace with advanced `app/calculations/portfolio.py` engine (640 lines of optimized code)
-  - **Impact**: Performance, completeness, and consistency across batch jobs and API endpoints
-  
-  **Specific Integration Tasks:**
-  - [ ] **Replace legacy aggregation function**: Update `calculate_single_portfolio_aggregation()` in `app/batch/daily_calculations.py`
-    - Current: 9 basic metrics (total_market_value, exposures, counts) calculated individually
-    - Target: Use `calculate_portfolio_exposures()` from `app/calculations/portfolio.py`
-    - Benefits: 20+ comprehensive metrics, pandas optimization, proper error handling
-  
-  - [ ] **Add delta-adjusted exposure calculation**: Integrate `calculate_delta_adjusted_exposure()` for options portfolios
-    - Required for portfolios with options positions (LC, LP, SC, SP types)
-    - Provides delta-neutral exposure metrics critical for risk management
-    - Uses Greeks data when available, falls back to position_type heuristics
-  
-  - [ ] **Implement performance optimizations**: 
-    - Convert position lists to pandas DataFrames for vectorized operations
-    - Enable `timed_lru_cache` for 60-second TTL on repeated calculations
-    - Process large portfolios (1000+ positions) efficiently using chunking
-  
-  - [ ] **Update batch job return structure**: Expand response to include all advanced metrics
-    - Current: 9 basic fields in aggregation results
-    - Target: Full metric set from advanced engine (exposures, Greeks aggregations, notionals, etc.)
-    - Ensure backward compatibility for existing monitoring/logging
-  
-  - [ ] **Add comprehensive error handling**: Implement robust position validation
-    - Handle missing market_value, exposure, or Greeks data gracefully
-    - Log detailed warnings for positions with incomplete data
-    - Continue processing other positions when individual position fails
-  
-  - [ ] **Create integration tests**: Validate batch jobs use advanced engine correctly
-    - Test legacy vs advanced engine output for same portfolio data
-    - Verify performance improvements with large portfolio datasets
-    - Ensure cached results are properly invalidated between batch runs
-  
-  **Files to Modify:**
-  - `app/batch/daily_calculations.py` - Replace `calculate_single_portfolio_aggregation()`
-  - `tests/batch/` - Add integration tests for advanced engine usage
-  
-  **Dependencies:**
-  - Advanced portfolio engine already exists in `app/calculations/portfolio.py`
-  - Position market values must be updated first (handled by existing Batch Job 1)
-  - Greeks data should be available for options (handled by existing Batch Job 2)
+#### 1.6.1 Framework Infrastructure Setup
+- [ ] **Create batch job orchestration framework:**
+  - [x] ✅ Database tables created: `batch_jobs`, `batch_job_schedules` *(Initial migration)*
+  - [ ] Install and configure APScheduler: `uv add apscheduler`
+  - [ ] Create `app/batch/scheduler.py` with PostgreSQL job store configuration
+  - [ ] Implement job tracking service with status updates and error logging
+  - [ ] Add job monitoring dashboard endpoint: GET /api/v1/admin/batch/status
 
-- [ ] **Batch Job 1: `update_market_data()` (4:00 PM weekdays)**
-  - [ ] Call `fetch_and_cache_prices()` for all portfolio symbols + factor ETFs
-  - [ ] Call `calculate_position_market_value()` for all positions
-  - [ ] Call `calculate_daily_pnl()` for all positions
-  - [ ] Update market_data_cache and positions tables
-  - [ ] Maintain 12+ month rolling window for factor calculations
-  - [ ] 5-minute timeout
+#### 1.6.2 Integration of Completed Calculation Engines
 
-- [ ] **Batch Job 2: `calculate_portfolio_greeks()` (5:00 PM weekdays)**
-  - [ ] **CRITICAL INTEGRATION**: Replace stub `update_options_greeks()` in `app/batch/daily_calculations.py`
-  - [ ] Call `bulk_update_portfolio_greeks()` from `app/calculations/greeks.py` for each portfolio
-    - Function already exists and is fully implemented with hybrid real/mock calculations
-    - Handles both py_vollib and mibian libraries with fallback logic
-    - Includes proper error handling and database upserts to position_greeks table
-  - [ ] Update batch job to pass market_data from Batch Job 1 to Greeks calculations
-  - [ ] Ensure Greeks calculation runs after market data updates (dependency on Batch Job 1)
-  - [ ] Add error handling for portfolios with no options positions
-  - [ ] Store results in position_greeks table (already implemented in bulk function)
-  - [ ] 10-minute timeout
+**CRITICAL**: All calculation functions below are ALREADY IMPLEMENTED and TESTED. 
+This section only requires orchestration and scheduling, NOT implementation of calculations.
 
-- [ ] **Batch Job 3: `calculate_factor_exposures()` (5:15 PM weekdays)**
-  - [ ] Call `calculate_factor_betas_hybrid()` for each portfolio
-  - [ ] Call `store_position_factor_exposures()` to store position-level data
-  - [ ] Call `aggregate_portfolio_factor_exposures()` to store portfolio-level data
-  - [ ] Store results in both `position_factor_exposures` and `factor_exposures` tables
-  - [ ] 15-minute timeout
-  - [ ] Process large portfolios in 1000-position chunks
+- [ ] **Step 1: Replace Legacy Portfolio Aggregation (4:30 PM Daily)**
+  - **Current Problem**: `app/batch/daily_calculations.py` uses basic 9-metric aggregation
+  - **Solution**: Replace `calculate_single_portfolio_aggregation()` with advanced engine
+  - **Implementation**:
+    ```python
+    # Replace this legacy code in daily_calculations.py
+    from app.calculations.portfolio import (
+        calculate_portfolio_exposures,  # 20+ metrics, pandas optimized
+        calculate_delta_adjusted_exposure  # For options portfolios
+    )
+    ```
+  - **Completed Engine Location**: `app/calculations/portfolio.py` (640 lines, fully tested)
+  - **Benefits**: 20+ metrics vs 9, pandas optimization, delta-adjusted exposures
 
-- [ ] **Batch Job 4: `create_portfolio_snapshots()` (5:30 PM weekdays)**
-  - [ ] Call `create_portfolio_snapshot()` for each portfolio
-  - [ ] Aggregate all calculated metrics (no VaR/risk metrics in V1.4)
-  - [ ] Store in portfolio_snapshots table
-  - [ ] Implement 365-day retention policy
+- [ ] **Step 2: Integrate Greeks Calculations (5:00 PM Daily)**
+  - **Completed Engine**: `app/calculations/greeks.py` with mibian library
+  - **Implementation**:
+    ```python
+    from app.calculations.greeks import calculate_portfolio_greeks
+    # Add to batch sequence after market data updates
+    ```
+  - **Database**: Store in `position_greeks` table
+  - **Prerequisites**: Options positions with strike, expiry, underlying price
 
-- [ ] **Batch Job 5: `calculate_portfolio_correlations()` (6:00 PM Tuesdays) - From Section 1.4.8**
-  - [ ] Create correlation_calculation_job.py with weekly execution schedule (Tuesday 6 PM)
-  - [ ] Implement single 90-day calculation logic with position filtering
-  - [ ] Add incremental calculation strategy with significant position change detection
-  - [ ] Integrate correlation job into existing batch job sequence after risk calculations
-  - [ ] Add job monitoring and error notification for correlation failures
-  - [ ] Implement performance optimization using position filtering and vectorized operations
-  - [ ] Add batch job testing for correlation calculation pipeline
+- [ ] **Step 3: Add Factor Analysis (5:15 PM Daily)**
+  - **Completed Engine**: `app/services/factor_service.py` 
+  - **Implementation**:
+    ```python
+    from app.services.factor_service import FactorService
+    # Calculate position and portfolio factor exposures
+    ```
+  - **Database**: Store in `position_factor_exposures` table
+  - **Features**: 7-factor model, 252-day regression, beta calculations
 
-- [ ] Add manual trigger endpoints:
-  - [ ] POST /api/v1/admin/batch/market-data
-  - [ ] POST /api/v1/admin/batch/risk-metrics
-  - [ ] POST /api/v1/admin/batch/snapshots
-  - [ ] POST /api/v1/admin/batch/correlations
+- [ ] **Step 4: Calculate Market Risk Scenarios (5:20 PM Daily)**
+  - **Completed Engine**: `app/services/market_risk_service.py`
+  - **Implementation**:
+    ```python
+    from app.services.market_risk_service import MarketRiskService
+    # Run market shock scenarios (+/-5%, 10%, 20%)
+    # Run interest rate scenarios (+/-100bp, 200bp)
+    ```
+  - **Database**: Store in `risk_scenarios` table
+  - **Dependencies**: Factor exposures from Step 3
 
-- [ ] Add job monitoring and error handling
+- [ ] **Step 5: Execute Stress Testing (5:25 PM Daily)**
+  - **Completed Engine**: `app/services/stress_testing_service.py`
+  - **Implementation**:
+    ```python
+    from app.services.stress_testing_service import StressTestingService
+    # Run 18 predefined stress scenarios
+    # Calculate factor correlations and cross-impacts
+    ```
+  - **Features**: Two-tier engine, correlation modeling, JSON scenarios
+  - **Database**: Store results for risk reporting
 
-### 1.7 Portfolio Management APIs
-- [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
-- [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
-- [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
-- [ ] **POST /api/v1/portfolio/upload** - CSV upload endpoint
-- [ ] Implement CSV parsing based on SAMPLE_CSV_FORMAT.md
-- [ ] Add position type detection logic
-- [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
+- [ ] **Step 6: Generate Portfolio Snapshots (5:30 PM Daily)**
+  - **Completed Engine**: `app/services/snapshot_service.py`
+  - **Implementation**:
+    ```python
+    from app.services.snapshot_service import SnapshotService
+    # Capture all metrics from Steps 1-5
+    ```
+  - **Database**: Store in `portfolio_snapshots` table
+  - **Retention**: 365-day policy with automatic cleanup
 
-### 1.8 Position Management APIs
-- [ ] **GET /api/v1/positions** - List positions with filtering
-- [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
-- [ ] **GET /api/v1/positions/{id}** - Individual position details
-- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
-- [ ] **GET /api/v1/tags** - Tag management
-- [ ] **POST /api/v1/tags** - Create new tags
-- [ ] **GET /api/v1/strategies** - Strategy groupings
-- [ ] Implement position grouping logic
+- [ ] **Step 7: Calculate Position Correlations (6:00 PM Weekly - Tuesdays Only)**
+  - **Completed Engine**: `app/services/correlation_service.py`
+  - **Implementation**:
+    ```python
+    from app.services.correlation_service import CorrelationService
+    # Weekly calculation due to computational intensity
+    # 99.8% optimization through position filtering
+    ```
+  - **Features**: Correlation clustering, 90-day returns, position filtering
+  - **Database**: Store in `position_correlations` table
 
-### 1.9 Risk Analytics APIs
-- [ ] Implement py_vollib Greeks calculator (hybrid real/mock approach)
-- [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
-- [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
-- [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
-- [ ] **GET /api/v1/risk/factors/positions** - Position-level factor exposures
-- [ ] **GET /api/v1/risk/metrics** - Risk metrics (POSTPONED TO V1.5)
-- [ ] Create Greeks aggregation logic (completed in Section 1.4.3)
-- [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
-- [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
+#### 1.6.3 Daily Batch Processing Schedule
 
-### 1.9.5 Correlation & Stress Testing APIs
-*API endpoints for Section 1.4.7 stress testing and future position correlation features*
+**COMPLETE DAILY SEQUENCE (Monday-Friday)**:
+```
+4:00 PM - Market Data Update (existing, basic implementation)
+4:15 PM - Position Values & P&L (existing, basic implementation)  
+4:30 PM - Portfolio Aggregations (UPGRADE to advanced engine)
+5:00 PM - Greeks Calculations (ADD from completed engine)
+5:15 PM - Factor Analysis (ADD from completed engine)
+5:20 PM - Market Risk Scenarios (ADD from completed engine)
+5:25 PM - Stress Testing (ADD from completed engine)
+5:30 PM - Portfolio Snapshots (ADD from completed engine)
+6:00 PM - Position Correlations (Tuesday only, ADD from completed engine)
+```
 
-#### Factor Correlation APIs (Section 1.4.7 - Calculation Functions Completed)
-- [ ] **GET /api/v1/risk/correlations/factors/matrix** - Factor correlation matrix with metadata
-- [ ] **POST /api/v1/risk/correlations/factors/calculate** - Calculate factor correlations on-demand
+#### 1.6.4 Implementation Files to Modify/Create
 
-#### Stress Testing APIs (Section 1.4.7 - Calculation Functions Completed)  
-- [ ] **GET /api/v1/risk/stress-testing/scenarios** - List available stress test scenarios
-- [ ] **POST /api/v1/risk/stress-testing/direct-impact** - Calculate direct stress impact
-- [ ] **POST /api/v1/risk/stress-testing/correlated-impact** - Calculate correlated stress impact
-- [ ] **POST /api/v1/risk/stress-testing/comprehensive** - Run comprehensive stress test
-- [ ] **GET /api/v1/risk/stress-testing/results/{portfolio_id}** - Get latest stress test results
+- [ ] **Create `app/batch/scheduler.py`** - Main APScheduler configuration
+  ```python
+  from apscheduler.schedulers.asyncio import AsyncIOScheduler
+  from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+  # Configure with PostgreSQL job store for persistence
+  ```
 
-#### Position Correlation APIs (Pending Implementation Decision)
-- [ ] **GET /api/v1/risk/correlations/positions/metrics** - Portfolio-level correlation metrics
-- [ ] **GET /api/v1/risk/correlations/positions/matrix** - Full pairwise correlation matrix  
-- [ ] **POST /api/v1/risk/correlations/positions/calculate** - Trigger position correlation calculation
+- [ ] **Update `app/batch/daily_calculations.py`** - Replace legacy with advanced engines
+  ```python
+  # Current: Basic 9-metric aggregation
+  # Target: Import and use all completed calculation engines
+  ```
 
-**Implementation Notes:**
-- Factor correlation and stress testing calculation functions completed in Section 1.4.7
-- Position correlation approach pending decision (standalone vs factor-based)
-- All endpoints follow consistent `/api/v1/risk/correlations/` and `/api/v1/risk/stress-testing/` patterns
-- Pydantic schemas completed in `app/schemas/stress_testing.py`
+- [ ] **Create `app/batch/job_tracker.py`** - Job monitoring and error handling
+  ```python
+  # Track job status, execution time, errors
+  # Store in batch_jobs table
+  ```
 
-### 1.10 Factor Analysis APIs
-- [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
-- [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
-- [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
-- [ ] **POST /api/v1/factors/calculate** - Calculate factor exposures (252-day regression)
-- [ ] Implement 252-day regression factor calculations (7-factor model)
-- [ ] Create factor regression analysis using statsmodels OLS
-- [ ] Add factor performance attribution
-- [ ] Store both position-level and portfolio-level factor exposures
+- [ ] **Create `app/api/endpoints/admin/batch.py`** - Manual trigger endpoints
+  ```python
+  # POST endpoints for manual batch job execution
+  # GET endpoint for job status monitoring
+  ```
 
-### 1.11 Tag Management APIs
-- [ ] **GET /api/v1/tags** - List all tags
-- [ ] **POST /api/v1/tags** - Create new tag
-- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
-- [ ] **DELETE /api/v1/tags/{id}** - Delete tag
-- [ ] Implement tag validation and limits
+#### 1.6.5 Testing & Validation Requirements
 
-### 1.12 API Infrastructure  
-- [ ] Add user activity logging
-- [ ] Create data validation middleware
-- [x] Add rate limiting (100 requests/minute per user) - COMPLETED
-- [x] Polygon.io API rate limiting with token bucket algorithm - COMPLETED
-- [ ] Set up request/response logging
+- [ ] **Performance Benchmarks**:
+  - Test with 3 demo portfolios (21 positions each)
+  - Measure execution time for complete daily sequence
+  - Target: < 5 minutes for all calculations per portfolio
+  - Memory usage: < 1GB for 1000-position portfolio
 
-### 1.13 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
+- [ ] **Data Validation**:
+  - Verify all 20+ metrics from advanced aggregation engine
+  - Confirm Greeks calculations for all options positions
+  - Validate factor exposures sum to expected values
+  - Check stress test results are within reasonable bounds
+
+- [ ] **Error Handling**:
+  - Test behavior with missing market data
+  - Handle calculation failures gracefully
+  - Implement retry logic with exponential backoff
+  - Send alerts for critical failures
+
+#### 1.6.6 Implementation Priority & Time Estimate
+
+**Phase 1 (Day 1-2)**: Framework Setup
+- Install APScheduler, create scheduler.py
+- Set up job tracking and monitoring
+- Create manual trigger endpoints
+
+**Phase 2 (Day 3-4)**: Engine Integration  
+- Replace legacy aggregation with advanced engine
+- Add Greeks calculations to sequence
+- Integrate factor analysis
+
+**Phase 3 (Day 5-6)**: Risk Calculations
+- Add market risk scenarios
+- Integrate stress testing
+- Set up correlation calculations
+
+**Phase 4 (Day 7)**: Testing & Optimization
+- Run complete sequence with demo data
+- Performance optimization
+- Error handling and alerting
+
+**Total Estimated Time**: 7 days
+
+**IMPORTANT NOTE**: All calculation engines are COMPLETE and TESTED. This is purely integration work, not new development.
+
+### 1.7 Implementation Priority (from DATABASE_DESIGN_ADDENDUM_V1.4.1)
 **Week 1 Priority - Core Tables:**
 - Users & Authentication
 - Portfolios & Positions (with options parsing)
@@ -1668,10 +1668,10 @@ python scripts/reset_and_seed.py reset --confirm
 
 ---
 
-## 🎯 Phase 1 Summary
+## 🎯 Phase 1 Summary - Backend Core Implementation
 
 **✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.6, 1.4.7, 1.4.8, 1.4.9, 1.4.10  
-**📋 Remaining:** 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13  
+**📋 Remaining:** 1.5 (Demo Data), 1.6 (Batch Processing Framework)  
 **🚫 Postponed to V1.5:** Risk Metrics (VaR, Sharpe)
 
 **Key Achievements:**
@@ -1701,19 +1701,118 @@ python scripts/reset_and_seed.py reset --confirm
 - **Production ready**: 18 active scenarios across 5 categories, all tests passing with real portfolio data
 
 **Next Priority:**
-- Section 1.4.6: Snapshot Generation (without risk metrics)
 - Section 1.5: Demo Data Seeding (sample portfolios)
 - Section 1.6: Batch Processing Framework with APScheduler
-- API Integration: Expose factor analysis through REST endpoints
+- Phase 2: API Development (all endpoints)
 
 ---
 
-## Phase 2: Advanced Features & Frontend Integration (Weeks 5-6)
+## Phase 2: API Development
+*All REST API endpoints for exposing backend functionality*
 
-### 2.0 Code Quality & Technical Debt
+### 2.1 Batch Processing Admin APIs (from Section 1.6.8)
+*Manual trigger endpoints for batch job execution and monitoring*
+
+- [ ] **POST /api/v1/admin/batch/run-all** - Execute complete daily sequence
+- [ ] **POST /api/v1/admin/batch/market-data** - Update market data only
+- [ ] **POST /api/v1/admin/batch/aggregations** - Run portfolio aggregations
+- [ ] **POST /api/v1/admin/batch/greeks** - Calculate Greeks only
+- [ ] **POST /api/v1/admin/batch/factors** - Run factor analysis
+- [ ] **POST /api/v1/admin/batch/risk-scenarios** - Execute risk scenarios
+- [ ] **POST /api/v1/admin/batch/stress-tests** - Run stress testing
+- [ ] **POST /api/v1/admin/batch/snapshots** - Generate snapshots
+- [ ] **POST /api/v1/admin/batch/correlations** - Calculate correlations
+- [ ] **GET /api/v1/admin/batch/status** - View job execution status
+- [ ] **GET /api/v1/admin/batch/history** - View recent job execution history
+- [ ] **GET /api/v1/admin/batch/schedule** - View upcoming scheduled jobs
+
+### 2.2 Portfolio Management APIs (from Section 1.7)
+- [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
+- [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
+- [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
+- [ ] **POST /api/v1/portfolio/upload** - CSV upload endpoint
+- [ ] Implement CSV parsing based on SAMPLE_CSV_FORMAT.md
+- [ ] Add position type detection logic
+- [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
+
+### 2.3 Position Management APIs (from Section 1.8)
+- [ ] **GET /api/v1/positions** - List positions with filtering
+- [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
+- [ ] **GET /api/v1/positions/{id}** - Individual position details
+- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
+- [ ] **GET /api/v1/tags** - Tag management
+- [ ] **POST /api/v1/tags** - Create new tags
+- [ ] **GET /api/v1/strategies** - Strategy groupings
+- [ ] Implement position grouping logic
+
+### 2.4 Risk Analytics APIs (from Section 1.9)
+- [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
+- [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
+- [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
+- [ ] **GET /api/v1/risk/factors/positions** - Position-level factor exposures
+- [ ] **GET /api/v1/risk/metrics** - Risk metrics (POSTPONED TO V1.5)
+- [ ] Create Greeks aggregation logic (completed in Section 1.4.3)
+- [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
+- [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
+
+### 2.5 Correlation & Stress Testing APIs (from Section 1.9.5)
+*API endpoints for Section 1.4.7 stress testing and Section 1.4.8 correlation features*
+
+#### Factor Correlation APIs
+- [ ] **GET /api/v1/risk/correlations/factors/matrix** - Factor correlation matrix with metadata
+- [ ] **POST /api/v1/risk/correlations/factors/calculate** - Calculate factor correlations on-demand
+
+#### Stress Testing APIs
+- [ ] **GET /api/v1/risk/stress-testing/scenarios** - List available stress test scenarios
+- [ ] **POST /api/v1/risk/stress-testing/direct-impact** - Calculate direct stress impact
+- [ ] **POST /api/v1/risk/stress-testing/correlated-impact** - Calculate correlated stress impact
+- [ ] **POST /api/v1/risk/stress-testing/comprehensive** - Run comprehensive stress test
+- [ ] **GET /api/v1/risk/stress-testing/results/{portfolio_id}** - Get latest stress test results
+
+#### Position Correlation APIs
+- [ ] **GET /api/v1/risk/correlations/positions/metrics** - Portfolio-level correlation metrics
+- [ ] **GET /api/v1/risk/correlations/positions/matrix** - Full pairwise correlation matrix  
+- [ ] **POST /api/v1/risk/correlations/positions/calculate** - Trigger position correlation calculation
+
+### 2.6 Factor Analysis APIs (from Section 1.10)
+- [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
+- [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
+- [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
+- [ ] **POST /api/v1/factors/calculate** - Calculate factor exposures (252-day regression)
+- [ ] Implement 252-day regression factor calculations (7-factor model)
+- [ ] Create factor regression analysis using statsmodels OLS
+- [ ] Add factor performance attribution
+- [ ] Store both position-level and portfolio-level factor exposures
+
+### 2.7 Tag Management APIs (from Section 1.11)
+- [ ] **GET /api/v1/tags** - List all tags
+- [ ] **POST /api/v1/tags** - Create new tag
+- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
+- [ ] **DELETE /api/v1/tags/{id}** - Delete tag
+- [ ] Implement tag validation and limits
+
+### 2.8 API Infrastructure (from Section 1.12)
+- [ ] Add user activity logging
+- [ ] Create data validation middleware
+- [x] Add rate limiting (100 requests/minute per user) - COMPLETED
+- [x] Polygon.io API rate limiting with token bucket algorithm - COMPLETED
+- [ ] Set up request/response logging
+
+**Phase 2 Implementation Notes:**
+- All calculation engines are ALREADY COMPLETE (Phase 1)
+- APIs simply expose existing functionality
+- Focus on clean REST design and proper error handling
+- Implement pagination for list endpoints
+- Add filtering and sorting capabilities
+
+---
+
+## Phase 3: Advanced Features & Frontend Integration (Future)
+
+### 3.0 Code Quality & Technical Debt
 *Refactoring, deprecations, and technical improvements*
 
-#### 2.0.1 Greeks Calculation Simplification
+#### 3.0.1 Greeks Calculation Simplification
 - [ ] **Remove py_vollib dependency and fallback logic**
   - Remove `py-vollib>=1.0.1` from `pyproject.toml`
   - Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
@@ -1723,7 +1822,7 @@ python scripts/reset_and_seed.py reset --confirm
   - Update unit tests to remove mock Greeks test cases
   - **Rationale**: Eliminate warning messages and simplify codebase by relying solely on the proven mibian library
 
-#### 2.0.2 Technical Debt & Cleanup (Future)
+#### 3.0.2 Technical Debt & Cleanup (Future)
 - [ ] Standardize error handling patterns across all services
 - [ ] Remove deprecated code comments and TODOs
 - [ ] Consolidate similar utility functions
@@ -1731,13 +1830,13 @@ python scripts/reset_and_seed.py reset --confirm
 - [ ] Review and optimize database query patterns
 - [ ] Standardize logging levels and messages
 
-#### 2.0.3 Performance Improvements (Future)
+#### 3.0.3 Performance Improvements (Future)
 - [ ] Remove redundant database queries in position calculations
 - [ ] Optimize factor exposure calculation batch operations
 - [ ] Review and improve caching strategies
 - [ ] Consolidate overlapping market data fetches
 
-### 2.1 ProForma Modeling APIs
+### 3.1 ProForma Modeling APIs
 - [ ] **POST /api/v1/modeling/sessions** - Create modeling session
 - [ ] **GET /api/v1/modeling/sessions/{id}** - Get session state
 - [ ] **POST /api/v1/modeling/sessions/{id}/trades** - Add ProForma trades
@@ -1747,7 +1846,7 @@ python scripts/reset_and_seed.py reset --confirm
 - [ ] Implement session state management
 - [ ] Add trade generation suggestions
 
-### 2.2 Customer Portfolio CSV Upload & Onboarding Workflow
+### 3.2 Customer Portfolio CSV Upload & Onboarding Workflow
 *Complete workflow from CSV upload to batch-processing readiness*
 
 - [ ] **CSV Upload & Validation**
