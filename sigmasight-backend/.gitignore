@@ -77,5 +77,4 @@ logs/
 .uv/
 
 # Alembic
-alembic/versions/*.py
 !alembic/versions/README
