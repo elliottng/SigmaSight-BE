@@ -206,7 +206,7 @@ docker exec $(docker ps -qf "name=postgres") psql -U sigmasight -d sigmasight_db
 
 ### Step 6: Initialize Database Schema
 
-**Important**: This project uses SQLAlchemy's `Base.metadata.create_all()` method for table creation, not Alembic migrations. The following approach was discovered during actual installation.
+**Important**: This project uses professional Alembic migrations for database version control. The setup script provides a convenient wrapper around Alembic commands.
 
 ```bash
 # Create comprehensive database initialization script
@@ -845,11 +845,11 @@ Based on this installation and likely environment variations:
 **Guide Status**: ✅ Already fixed in updated guide
 
 ### 5. Database Initialization Method
-**Problem**: Guide assumed Alembic migrations exist, but they don't
-**Root Cause**: Project uses SQLAlchemy `Base.metadata.create_all()` method, not Alembic
-**Discovery**: Found `init_db()` function in `app.core.database` vs `app.database` conflict
-**Solution**: Created `scripts/init_database.py` using correct imports from `app.database`
-**Guide Status**: ✅ Updated to use direct SQLAlchemy table creation
+**Problem**: Broken Alembic migration chain prevented proper database version control
+**Root Cause**: Missing migration files causing `KeyError: '40680fc5a516'` when creating new migrations
+**Discovery**: Migration chain needed surgical repair to restore professional workflow
+**Solution**: Created proper Alembic baseline migration and professional setup script
+**Guide Status**: ✅ Updated to use professional Alembic migrations
 
 ### 6. Missing Schema Files
 **Problem**: Server startup failed due to missing `app.schemas.auth` module

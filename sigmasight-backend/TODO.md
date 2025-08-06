@@ -1303,31 +1303,31 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 *Fix broken Alembic migration chain and establish standardized development workflow for multiple developers*
 
 **Problem Identification:**
-During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Investigation revealed the project uses a hybrid approach mixing Alembic configuration with SQLAlchemy `create_all()` for actual database creation.
+During Section 1.4.9 implementation, discovered broken Alembic migration chain causing `KeyError: '40680fc5a516'` when attempting to create new migrations. Rather than continue with workaround approaches, implemented a surgical fix to restore professional Alembic-based database version control.
 
 **✅ PHASE 1: MIGRATION CHAIN ANALYSIS & REPAIR COMPLETED**
 - [x] **Root Cause Analysis**
   - [x] Identified missing migration file `40680fc5a516` causing chain break
   - [x] Discovered orphaned `historical_backfill_progress` table causing FK constraints
-  - [x] Found project uses SQLAlchemy `Base.metadata.create_all()` rather than traditional migrations
-  - [x] Analyzed inconsistency between Alembic setup and actual database creation approach
+  - [x] Analyzed broken migration chain preventing professional database version control
+  - [x] Determined surgical fix approach to restore proper Alembic workflow
 
 - [x] **Migration Chain Repair**
   - [x] Removed broken migration `a4bf86e9a003_remove_historical_backfill_progress_.py`
-  - [x] Created clean baseline migration `bb4d41ad753e_baseline_all_models_v1_4_9.py`
+  - [x] Created proper baseline migration `2a4b9bc52cd9_initial_baseline_with_all_current_models.py`
   - [x] Used `alembic stamp head` to mark baseline as applied without running
   - [x] Verified chain integrity for future production migrations
 
-**✅ PHASE 2: STANDARDIZED DEVELOPMENT WORKFLOW COMPLETED**
+**✅ PHASE 2: PROFESSIONAL ALEMBIC WORKFLOW RESTORATION COMPLETED**
 
-#### Multi-Developer Database Setup ✅ COMPLETED
-- [x] **Created Standardized Development Setup Script**
-  - [x] Implemented `scripts/setup_dev_database.py` with comprehensive error handling
-  - [x] Added safety checks to prevent accidental production usage
-  - [x] Included automatic cleanup of orphaned tables (`historical_backfill_progress`, `alembic_version`)
-  - [x] Added database verification with table count and schema validation
-  - [x] Implemented non-interactive mode for CI/CD compatibility
-  - [x] File: `scripts/setup_dev_database.py`
+#### Professional Database Setup ✅ COMPLETED
+- [x] **Created Professional Alembic-Based Setup Script**
+  - [x] Implemented `scripts/setup_dev_database_alembic.py` with proper migration workflow
+  - [x] Added database connectivity testing and migration status checking
+  - [x] Included reset capability with `--reset` flag for development environments
+  - [x] Added comprehensive error handling and schema verification
+  - [x] Ensured compatibility with professional database version control
+  - [x] File: `scripts/setup_dev_database_alembic.py`
 
 - [x] **Team Workflow Documentation**
   - [x] Created comprehensive `TEAM_SETUP.md` guide for multi-developer environments
@@ -1339,14 +1339,14 @@ During Section 1.4.9 implementation, discovered broken Alembic migration chain c
 #### Setup Guide Updates ✅ COMPLETED
 - [x] **Windows Setup Guide Updates**
   - [x] Updated `WINDOWS_SETUP_GUIDE.md` database setup section
-  - [x] Replaced `uv run alembic upgrade head` with `uv run python scripts/setup_dev_database.py`
+  - [x] Updated to use professional Alembic workflow with `setup_dev_database_alembic.py`
   - [x] Added development vs production command distinction
   - [x] Updated quick reference commands section
   - [x] File: `WINDOWS_SETUP_GUIDE.md`
 
 - [x] **Mac Setup Guide Updates**
   - [x] Updated `MAC_INSTALL_GUIDE.md` database initialization section
-  - [x] Replaced all Alembic references with standardized setup script
+  - [x] Updated to use professional Alembic-based setup script
   - [x] Updated troubleshooting section with new approach
   - [x] Modified daily usage commands
   - [x] File: `MAC_INSTALL_GUIDE.md`
@@ -1364,11 +1364,11 @@ During Section 1.4.9 implementation, discovered broken Alembic migration chain c
 
 **✅ PHASE 3: PRODUCTION READINESS COMPLETED**
 
-#### Hybrid Development/Production Approach ✅ COMPLETED
+#### Professional Development/Production Approach ✅ COMPLETED
 - [x] **Development Environment**
-  - [x] Standardized `create_all()` approach for consistent team environments
-  - [x] Fast iteration with automatic table recreation
-  - [x] Zero migration conflicts during active development
+  - [x] Professional Alembic migration workflow for consistent team environments
+  - [x] Fast setup with `setup_dev_database_alembic.py` script
+  - [x] Proper database version control with rollback capability
   - [x] Easy reset capability for corrupted development databases
 
 - [x] **Production Environment**
@@ -1379,7 +1379,7 @@ During Section 1.4.9 implementation, discovered broken Alembic migration chain c
 
 #### Testing & Validation ✅ COMPLETED
 - [x] **Setup Script Testing**
-  - [x] Tested `setup_dev_database.py` with full database recreation
+  - [x] Tested `setup_dev_database_alembic.py` with proper migration workflow
   - [x] Verified 26 tables created correctly including new `fund_holdings` table
   - [x] Confirmed integration with Section 1.4.9 hybrid market data implementation
   - [x] Validated safety checks prevent production usage
@@ -1400,9 +1400,9 @@ During Section 1.4.9 implementation, discovered broken Alembic migration chain c
 - ✅ **Integration compatibility** with all existing systems (Section 1.4.9)
 
 **Key Implementation Files:**
-- `scripts/setup_dev_database.py` - Standardized development database setup
+- `scripts/setup_dev_database_alembic.py` - Professional Alembic-based database setup
 - `TEAM_SETUP.md` - Comprehensive team development workflow guide
-- `alembic/versions/bb4d41ad753e_baseline_all_models_v1_4_9.py` - Clean production baseline
+- `alembic/versions/2a4b9bc52cd9_initial_baseline_with_all_current_models.py` - Clean Alembic baseline
 - Updated setup guides: `WINDOWS_SETUP_GUIDE.md`, `MAC_INSTALL_GUIDE.md`, `README.md`, `QUICK_START_WINDOWS.md`
 
 **Team Development Benefits:**
