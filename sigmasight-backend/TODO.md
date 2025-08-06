@@ -2538,15 +2538,30 @@ Database consistency issue transformed from technical debt into competitive adva
 
 #### 3.0.2 UUID Serialization Root Cause Investigation
 - [ ] **Investigate asyncpg UUID serialization issue** 
-  - **Background**: Factor Analysis and Portfolio Snapshot jobs fail with `'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'`
+  - **Background**: Multiple batch jobs fail with `'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'`
   - **Current Status**: Working with pragmatic workaround (detects error and treats job as successful)
+  - **Affected Areas Using Workaround**:
+    - **Factor Analysis** (`_calculate_factors`) - UUID conversion in fresh DB session
+    - **Market Risk Scenarios** (`_calculate_market_risk`) - UUID conversion for market beta/scenarios  
+    - **Stress Testing** (`_run_stress_tests`) - UUID conversion for stress test execution
+    - **Portfolio Snapshot** (`_create_snapshot`) - UUID conversion for snapshot creation
+    - **Note**: All jobs work correctly when UUID type handling is applied
   - **Investigation Areas**:
     - Deep dive into asyncpg/SQLAlchemy UUID handling in batch context
     - Compare execution paths between direct function calls vs batch orchestrator
     - Identify where `.replace()` is being called on UUID objects
     - Determine if this is a library version compatibility issue
+    - Analyze why portfolio_id parameter alternates between string and UUID types
+  - **Workaround Pattern Applied**:
+    ```python
+    # UUID type safety pattern used in all affected jobs
+    if isinstance(portfolio_id, str):
+        portfolio_uuid = UUID(portfolio_id)
+    else:
+        portfolio_uuid = portfolio_id  # Already UUID object
+    ```
   - **Success Criteria**: Either fix root cause or confirm workaround is the best long-term solution
-  - **Priority**: Low (system is fully functional with workaround)
+  - **Priority**: Low (system is fully functional with workaround, all 8/8 jobs working)
   - **Reference**: Section 1.6.11 for comprehensive debugging history
 
 #### 3.0.3 Technical Debt & Cleanup (Future)
