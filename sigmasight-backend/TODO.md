@@ -1419,8 +1419,8 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 ## 🎯 Phase 1 Summary
 
-**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.7, 1.4.8, 1.4.9  
-**🔄 Partially Completed:** 1.4.6 (infrastructure ready, core functions missing)  
+**✅ Completed:** 1.0, 1.1, 1.2, 1.3, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.5.1, 1.4.6, 1.4.7, 1.4.8, 1.4.9  
+**🔄 In Progress:** None  
 **📋 Remaining:** 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13  
 **🚫 Postponed to V1.5:** Risk Metrics (VaR, Sharpe)
 
