@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = Field(..., env="DATABASE_URL")
     
-    # Redis settings
-    REDIS_URL: str = Field(default="redis://localhost:6379", env="REDIS_URL")
-    
     # Market data API keys
     POLYGON_API_KEY: str = Field(..., env="POLYGON_API_KEY")
     POLYGON_PLAN: str = Field(default="free", env="POLYGON_PLAN")  # free, starter, developer, advanced

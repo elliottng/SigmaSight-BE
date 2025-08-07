@@ -136,9 +136,6 @@ cat > .env << 'EOF'
 # Database Configuration (matches docker-compose.yml)
 DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
 
-# Redis Configuration (optional for development)
-REDIS_URL=redis://localhost:6379
-
 # Market Data API Keys (optional for basic testing)
 POLYGON_API_KEY=your_polygon_api_key_here
 

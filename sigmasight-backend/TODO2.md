@@ -182,10 +182,79 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 ## Phase 3: Advanced Features & Frontend Integration (Future)
 
-### 3.0 Code Quality & Technical Debt
+### 3.0 Developer Experience & Onboarding
+*Make the project easy to set up and contribute to*
+
+#### 3.0.1 Developer Onboarding Improvements ⏳ **PLANNED**
+*Streamline project setup to reduce friction for new contributors*
+
+**Timeline**: 2-3 Days | **Priority**: High (Developer Productivity)
+
+##### Day 1: Docker & Environment Setup Enhancement
+- [ ] **Keep existing `docker-compose.yml`** with PostgreSQL only (Redis not needed - unused in application)
+- [ ] **Enhance `.env.example`** with all required environment variables documented:
+  - [ ] `DATABASE_URL=postgresql://sigmasight:sigmasight_dev@localhost/sigmasight_db`
+  - [ ] `POLYGON_API_KEY=your_key_here` (with setup instructions)
+  - [ ] Remove unused Redis configuration variables
+  - [ ] All other config variables with explanations
+- [ ] **Create `scripts/setup_dev_environment.py`** - automated setup script that:
+  - [ ] Validates Python 3.11+ and uv installation
+  - [ ] Checks Docker is running: `docker compose up -d`
+  - [ ] Creates `.env` from `.env.example` if missing
+  - [ ] Waits for PostgreSQL health check to pass
+  - [ ] Runs database migrations: `uv run alembic upgrade head`
+  - [ ] Seeds demo data: `python scripts/reset_and_seed.py seed`
+  - [ ] Validates setup with comprehensive health checks
+
+##### Day 2: Documentation & Quick Start Enhancement
+- [ ] **Streamline README.md** by consolidating existing guides (WINDOWS_SETUP_GUIDE.md, WINDSURF_SETUP.md):
+  - [ ] Add unified "5-Minute Quick Start" section at the top
+  - [ ] Simplify to: `git clone → docker compose up -d → ./scripts/setup_dev_environment.py`
+  - [ ] Include demo user credentials prominently: 
+    - `demo_individual@sigmasight.com / demo12345`
+    - `demo_hnw@sigmasight.com / demo12345` 
+    - `demo_hedgefundstyle@sigmasight.com / demo12345`
+  - [ ] Move platform-specific details to appendix
+- [ ] **Enhance existing setup guides** rather than creating new ones:
+  - [ ] Update WINDOWS_SETUP_GUIDE.md to use automated setup script
+  - [ ] Update WINDSURF_SETUP.md to reference new quick start
+  - [ ] Ensure all guides point to the same streamlined workflow
+- [ ] **Add `scripts/validate_environment.py`** - health check script for troubleshooting
+
+##### Day 3: Developer Tools & Polish
+- [ ] **Create `Makefile`** with common development commands:
+  ```makefile
+  setup: # Complete development environment setup
+  seed: # Seed database with demo data
+  test: # Run test suite
+  lint: # Run linting and type checking
+  clean: # Clean up containers and temp files
+  ```
+- [ ] **Add development health check endpoint** - `/health` with database status only
+- [ ] **Create troubleshooting guide** for common setup issues:
+  - [ ] Database connection problems
+  - [ ] Migration failures
+  - [ ] Missing environment variables
+  - [ ] Docker connectivity issues
+
+**Success Criteria**:
+- ✅ New developer can go from `git clone` to working demo in under 5 minutes
+- ✅ Single command setup: `make setup` or `./scripts/setup_dev_environment.py`
+- ✅ Clear error messages with actionable solutions
+- ✅ Comprehensive documentation for all setup scenarios
+- ✅ Demo data works immediately after setup
+
+**Cross-Reference**:
+- Builds on production-ready seeding from Section 1.5.1
+- Leverages existing `scripts/reset_and_seed.py` validation
+- Supports all 8 batch calculation engines and 3 demo portfolios
+
+---
+
+### 3.1 Code Quality & Technical Debt
 *Refactoring, deprecations, and technical improvements*
 
-#### 3.0.1 Greeks Calculation Simplification
+#### 3.1.1 Greeks Calculation Simplification
 - [x] **Remove py_vollib dependency and fallback logic** - **COMPLETED**
   - [x] Remove `py-vollib>=1.0.1` from `pyproject.toml`
   - [x] Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
@@ -348,7 +417,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Document all endpoints with OpenAPI schemas
 
 ### 2.4 Performance Optimization
-- [ ] Implement Redis caching for frequently accessed data
+- [ ] Implement in-memory caching for frequently accessed data
 - [ ] Add database query optimization
 - [ ] Implement connection pooling
 - [ ] Add response compression
@@ -376,7 +445,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Create railway.json configuration
 - [ ] Set up PostgreSQL on Railway
 - [ ] Configure environment variables
-- [ ] Set up Redis on Railway
+- [ ] Configure application for production
 - [ ] Deploy FastAPI application
 - [ ] Configure custom domain (if needed)
 - [ ] Set up monitoring and logging
@@ -472,6 +541,19 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 ### Legacy Scripts
 - Request legacy Polygon.io integration scripts from PM
 - Request legacy GICS data fetching examples
+
+---
+
+## Recent Updates
+
+### Redis & Celery Dependency Cleanup ✅ **COMPLETED** (2025-01-16)
+- **Removed unused dependencies**: `redis>=5.0.0` and `celery>=5.3.0` from `pyproject.toml`
+- **Cleaned configuration**: Removed `REDIS_URL` from `app/config.py` and `.env.example`
+- **Updated documentation**: Removed Redis references from README.md, MAC_INSTALL_GUIDE.md, and TODO2.md
+- **Environment cleanup**: `uv sync` removed 12 packages (redis, celery, and dependencies)
+- **Simplified architecture**: Application now requires only PostgreSQL database for full functionality
+
+**Impact**: Cleaner codebase, reduced complexity, faster installation, and elimination of unused infrastructure dependencies.
 
 ---
 

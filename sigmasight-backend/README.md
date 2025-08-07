@@ -21,7 +21,7 @@ FastAPI backend for SigmaSight portfolio risk management platform.
 - **Market Data**: Integration with Polygon.io and YFinance APIs
 - **Authentication**: JWT-based user authentication
 - **Batch Processing**: Automated market data updates and calculations
-- **Modern Stack**: FastAPI, PostgreSQL, Redis, and UV package manager
+- **Modern Stack**: FastAPI, PostgreSQL, and UV package manager
 
 ## 🌊 Using Windsurf IDE? 
 
@@ -324,7 +324,6 @@ sigmasight-backend/
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `REDIS_URL` | Redis connection string | Yes |
 | `POLYGON_API_KEY` | Polygon.io API key | Yes |
 | `SECRET_KEY` | JWT secret key | Yes |
 | `DEBUG` | Enable debug mode | No |

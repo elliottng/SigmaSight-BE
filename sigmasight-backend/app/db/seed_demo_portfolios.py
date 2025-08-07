@@ -223,6 +223,62 @@ def determine_position_type(symbol: str, quantity: Decimal) -> PositionType:
     else:  # Stock symbol
         return PositionType.LONG if quantity > 0 else PositionType.SHORT
 
+async def _add_positions_to_portfolio(db: AsyncSession, portfolio: Portfolio, position_data_list: List[Dict[str, Any]], user: User, existing_symbols: set = None) -> int:
+    """Helper function to add positions to a portfolio, avoiding duplicates"""
+    if existing_symbols is None:
+        existing_symbols = set()
+    
+    position_count = 0
+    for pos_data in position_data_list:
+        symbol = pos_data["symbol"]
+        
+        # Skip if position already exists
+        if symbol in existing_symbols:
+            continue
+        
+        # Determine position type
+        position_type = determine_position_type(symbol, pos_data["quantity"])
+        
+        # Create position
+        position = Position(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            symbol=symbol,
+            position_type=position_type,
+            quantity=pos_data["quantity"],
+            entry_price=pos_data["entry_price"],
+            entry_date=pos_data["entry_date"],
+        )
+        
+        # Add options-specific fields if present
+        if "underlying" in pos_data:
+            position.underlying_symbol = pos_data["underlying"]
+            position.strike_price = pos_data["strike"]
+            position.expiration_date = pos_data["expiry"]
+        
+        db.add(position)
+        await db.flush()  # Get position ID
+        
+        # Create and associate tags (async-safe approach)
+        if pos_data.get("tags"):
+            await db.flush()  # Ensure position is saved first
+            for tag_name in pos_data.get("tags", []):
+                tag = await get_or_create_tag(db, user.id, tag_name)
+                await db.flush()  # Ensure tag is saved
+                
+                # Use async-safe relationship assignment
+                position.tags.append(tag)
+            
+            await db.flush()  # Commit the tag relationships
+        
+        position_count += 1
+        existing_symbols.add(symbol)  # Track newly added positions
+    
+    return position_count
+
+# Note: Tag backfill function removed due to SQLAlchemy async relationship access issues
+# The function _add_missing_tags_to_positions would be here if async relationships worked properly
+
 async def create_demo_portfolio(db: AsyncSession, portfolio_data: Dict[str, Any]) -> Portfolio:
     """Create a single demo portfolio with all positions"""
     logger.info(f"Creating portfolio: {portfolio_data['portfolio_name']}")
@@ -242,8 +298,23 @@ async def create_demo_portfolio(db: AsyncSession, portfolio_data: Dict[str, Any]
         position_result = await db.execute(
             select(Position).where(Position.portfolio_id == existing_portfolio.id)
         )
-        positions = position_result.scalars().all()
-        logger.info(f"Portfolio has {len(positions)} positions")
+        existing_positions = position_result.scalars().all()
+        existing_symbols = {pos.symbol for pos in existing_positions}
+        logger.info(f"Portfolio has {len(existing_positions)} existing positions")
+        
+        # Add missing positions to existing portfolio
+        expected_positions = len(portfolio_data["positions"])
+        missing_count = expected_positions - len(existing_positions)
+        
+        if missing_count > 0:
+            logger.info(f"Adding {missing_count} missing positions to existing portfolio")
+            await _add_positions_to_portfolio(db, existing_portfolio, portfolio_data["positions"], user, existing_symbols)
+            logger.info(f"✅ Updated portfolio {existing_portfolio.name} with {missing_count} new positions")
+        else:
+            logger.info(f"Portfolio already has all {expected_positions} positions - no update needed")
+            # Note: Tag backfill disabled due to SQLAlchemy async relationship access issues
+            # Tags work correctly for newly created positions
+            
         return existing_portfolio
     
     # Create portfolio
@@ -256,38 +327,8 @@ async def create_demo_portfolio(db: AsyncSession, portfolio_data: Dict[str, Any]
     db.add(portfolio)
     await db.flush()  # Get portfolio ID
     
-    # Create positions
-    position_count = 0
-    for pos_data in portfolio_data["positions"]:
-        # Determine position type
-        position_type = determine_position_type(pos_data["symbol"], pos_data["quantity"])
-        
-        # Create position
-        position = Position(
-            id=uuid4(),
-            portfolio_id=portfolio.id,
-            symbol=pos_data["symbol"],
-            position_type=position_type,
-            quantity=pos_data["quantity"],
-            entry_price=pos_data["entry_price"],
-            entry_date=pos_data["entry_date"],
-        )
-        
-        # Add options-specific fields if present
-        if "underlying" in pos_data:
-            position.underlying_symbol = pos_data["underlying"]
-            position.strike_price = pos_data["strike"]
-            position.expiration_date = pos_data["expiry"]
-        
-        db.add(position)
-        await db.flush()  # Get position ID
-        
-        # Create and associate tags
-        for tag_name in pos_data.get("tags", []):
-            tag = await get_or_create_tag(db, user.id, tag_name)
-            position.tags.append(tag)
-        
-        position_count += 1
+    # Create positions using helper function
+    position_count = await _add_positions_to_portfolio(db, portfolio, portfolio_data["positions"], user)
     
     logger.info(f"Created portfolio {portfolio_data['portfolio_name']} with {position_count} positions")
     return portfolio
