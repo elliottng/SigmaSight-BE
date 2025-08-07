@@ -118,14 +118,23 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 *Refactoring, deprecations, and technical improvements*
 
 #### 3.0.1 Greeks Calculation Simplification
-- [ ] **Remove py_vollib dependency and fallback logic**
-  - Remove `py-vollib>=1.0.1` from `pyproject.toml`
-  - Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
-  - Remove `get_mock_greeks()` function - no more mock calculations
-  - Simplify Greeks calculation to use **mibian only**
-  - Return `None`/`NULL` values with logged errors if mibian fails
-  - Update unit tests to remove mock Greeks test cases
+- [x] **Remove py_vollib dependency and fallback logic** - **COMPLETED**
+  - [x] Remove `py-vollib>=1.0.1` from `pyproject.toml`
+  - [x] Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
+  - [x] Remove `get_mock_greeks()` function - no more mock calculations
+  - [x] Simplify Greeks calculation to use **mibian only**
+  - [x] Return `None`/`NULL` values with logged errors if mibian fails
+  - [x] Update unit tests to remove mock Greeks test cases
+  - [x] Update function name: `calculate_greeks_hybrid()` → `calculate_position_greeks()`
+  - [x] Update imports in `__init__.py` and `batch_orchestrator.py`
+  - [x] Run `uv sync` to clean py_vollib from environment
+  - [x] Test end-to-end with demo data (mibian delta: 0.515 for ATM call)
   - **Rationale**: Eliminate warning messages and simplify codebase by relying solely on the proven mibian library
+  - **Result**: ✅ **Successfully eliminated** py_vollib warnings, reduced complexity, maintained calculation quality
+  - **Behavioral Changes**:
+    - Stock positions now return `None` (Greeks not applicable)
+    - Failed calculations return `None` with error logging
+    - Options calculations use mibian-only (same quality, no fallbacks)
 
 #### 3.0.2 UUID Serialization Root Cause Investigation
 - [ ] **Investigate asyncpg UUID serialization issue** 

@@ -24,60 +24,8 @@ except ImportError:
     logger.warning("mibian not available, falling back to mock calculations")
     MIBIAN_AVAILABLE = False
 
-try:
-    import py_vollib.black_scholes as bs
-    import py_vollib.black_scholes.greeks.analytical as greeks
-    PY_VOLLIB_AVAILABLE = True
-except ImportError:
-    logger.warning("py_vollib not available, falling back to mock calculations")
-    PY_VOLLIB_AVAILABLE = False
 
 
-# Mock Greeks fallback values from PRD
-MOCK_GREEKS = {
-    PositionType.LC: {  # Long Call
-        "delta": 0.6,
-        "gamma": 0.02,
-        "theta": -0.05,
-        "vega": 0.15,
-        "rho": 0.08
-    },
-    PositionType.SC: {  # Short Call
-        "delta": -0.4,
-        "gamma": -0.02,
-        "theta": 0.05,
-        "vega": -0.15,
-        "rho": -0.08
-    },
-    PositionType.LP: {  # Long Put
-        "delta": -0.4,
-        "gamma": 0.02,
-        "theta": -0.05,
-        "vega": 0.15,
-        "rho": -0.08
-    },
-    PositionType.SP: {  # Short Put
-        "delta": 0.3,
-        "gamma": -0.02,
-        "theta": 0.05,
-        "vega": -0.15,
-        "rho": 0.08
-    },
-    PositionType.LONG: {  # Long Stock
-        "delta": 1.0,
-        "gamma": 0.0,
-        "theta": 0.0,
-        "vega": 0.0,
-        "rho": 0.0
-    },
-    PositionType.SHORT: {  # Short Stock
-        "delta": -1.0,
-        "gamma": 0.0,
-        "theta": 0.0,
-        "vega": 0.0,
-        "rho": 0.0
-    }
-}
 
 
 def is_options_position(position: Position) -> bool:
@@ -254,45 +202,21 @@ def calculate_real_greeks(
         raise
 
 
-def get_mock_greeks(position_type: PositionType, quantity: Decimal) -> Dict[str, float]:
-    """
-    Get mock Greeks values per contract/share (NOT scaled by quantity)
-    
-    The database stores per-contract/per-share Greeks values. 
-    Position-level impact should be calculated separately when needed.
-    
-    Args:
-        position_type: Position type enum
-        quantity: Position quantity (not used for scaling)
-        
-    Returns:
-        Dictionary with mock Greeks per contract/share
-    """
-    base_greeks = MOCK_GREEKS.get(position_type, MOCK_GREEKS[PositionType.LONG])
-    
-    # Return per-contract/per-share Greeks (do NOT multiply by quantity)
-    return {
-        "delta": base_greeks["delta"],
-        "gamma": base_greeks["gamma"], 
-        "theta": base_greeks["theta"],
-        "vega": base_greeks["vega"],
-        "rho": base_greeks["rho"]
-    }
 
 
-async def calculate_greeks_hybrid(
+async def calculate_position_greeks(
     position: Position,
     market_data: Dict[str, Any]
-) -> Dict[str, float]:
+) -> Optional[Dict[str, float]]:
     """
-    Calculate Greeks using hybrid real/mock approach
+    Calculate Greeks using mibian Black-Scholes model
     
     Args:
         position: Position object (SQLAlchemy model or dict)
         market_data: Market data dictionary keyed by symbol
         
     Returns:
-        Dictionary with all 5 Greeks as floats, scaled by quantity
+        Dictionary with all 5 Greeks as floats (scaled by quantity), or None if calculation fails
     """
     logger.debug(f"Calculating Greeks for position {position.id} ({position.symbol})")
     
@@ -307,34 +231,34 @@ async def calculate_greeks_hybrid(
             "rho": 0.0
         }
     
-    # Handle stock positions with simple delta
+    # Handle stock positions - Greeks calculation not applicable
     if not is_options_position(position):
-        logger.debug(f"Stock position {position.symbol}, using simple delta")
-        return get_mock_greeks(position.position_type, position.quantity)
+        logger.debug(f"Stock position {position.symbol}, Greeks calculation not applicable")
+        return None
     
-    # Try real Greeks calculation for options
+    # Calculate Greeks for options positions only
     try:
         option_params = extract_option_parameters(position)
         if not option_params:
-            logger.warning(f"Invalid option parameters for {position.symbol}, using mock Greeks")
-            return get_mock_greeks(position.position_type, position.quantity)
+            logger.error(f"Invalid option parameters for {position.symbol}, cannot calculate Greeks")
+            return None
         
         # Get market data for underlying
         underlying_symbol = option_params["underlying_symbol"]
         if not market_data or underlying_symbol not in market_data:
-            logger.warning(f"No market data for {underlying_symbol}, using mock Greeks")
-            return get_mock_greeks(position.position_type, position.quantity)
+            logger.error(f"No market data for {underlying_symbol}, cannot calculate Greeks")
+            return None
         
         underlying_data = market_data[underlying_symbol]
         if not isinstance(underlying_data, dict) or "current_price" not in underlying_data:
-            logger.warning(f"Invalid market data for {underlying_symbol}, using mock Greeks")
-            return get_mock_greeks(position.position_type, position.quantity)
+            logger.error(f"Invalid market data for {underlying_symbol}, cannot calculate Greeks")
+            return None
         
         underlying_price = float(underlying_data["current_price"])
         volatility = get_implied_volatility(underlying_symbol, market_data)
         risk_free_rate = get_risk_free_rate(market_data)
         
-        # Calculate real Greeks
+        # Calculate real Greeks using mibian
         real_greeks = calculate_real_greeks(
             underlying_price=underlying_price,
             strike=option_params["strike"],
@@ -354,12 +278,12 @@ async def calculate_greeks_hybrid(
             "rho": real_greeks["rho"] * quantity_float
         }
         
-        logger.debug(f"Real Greeks calculated for {position.symbol}: {scaled_greeks}")
+        logger.debug(f"Greeks calculated for {position.symbol}: {scaled_greeks}")
         return scaled_greeks
         
     except Exception as e:
-        logger.warning(f"Real Greeks calculation failed for {position.symbol}: {str(e)}, using mock fallback")
-        return get_mock_greeks(position.position_type, position.quantity)
+        logger.error(f"Greeks calculation failed for {position.symbol}: {str(e)}")
+        return None
 
 
 async def update_position_greeks(
@@ -373,8 +297,12 @@ async def update_position_greeks(
     Args:
         db: Database session
         position_id: Position ID
-        greeks: Dictionary with Greeks values
+        greeks: Dictionary with Greeks values (must not be None)
     """
+    if greeks is None:
+        logger.warning(f"Cannot update Greeks for position {position_id}: Greeks is None")
+        return
+        
     try:
         # Calculate dollar Greeks (delta * 100 for options, gamma * 100 for options)
         multiplier = 100  # Options multiplier
@@ -462,11 +390,15 @@ async def bulk_update_portfolio_greeks(
             for position in chunk:
                 try:
                     # Calculate Greeks
-                    greeks = await calculate_greeks_hybrid(position, market_data)
+                    greeks = await calculate_position_greeks(position, market_data)
                     
-                    # Update database
-                    await update_position_greeks(db, position.id, greeks)
-                    updated_count += 1
+                    # Update database only if Greeks were calculated
+                    if greeks is not None:
+                        await update_position_greeks(db, position.id, greeks)
+                        updated_count += 1
+                    else:
+                        # Greeks not applicable (stock position) or calculation failed
+                        logger.debug(f"Skipping Greeks update for {position.symbol} (no Greeks calculated)")
                     
                 except Exception as e:
                     failed_count += 1
@@ -494,12 +426,12 @@ async def bulk_update_portfolio_greeks(
 
 
 # Convenience functions for portfolio-level aggregations
-async def aggregate_portfolio_greeks(positions_greeks: List[Dict[str, float]]) -> Dict[str, float]:
+async def aggregate_portfolio_greeks(positions_greeks: List[Optional[Dict[str, float]]]) -> Dict[str, float]:
     """
     Aggregate position-level Greeks to portfolio level
     
     Args:
-        positions_greeks: List of position Greeks dictionaries
+        positions_greeks: List of position Greeks dictionaries (may contain None for non-option positions)
         
     Returns:
         Portfolio-level Greeks summary
@@ -513,12 +445,15 @@ async def aggregate_portfolio_greeks(positions_greeks: List[Dict[str, float]]) -
             "total_rho": 0.0
         }
     
+    # Filter out None values (stock positions and failed calculations)
+    valid_greeks = [pos for pos in positions_greeks if pos is not None]
+    
     portfolio_greeks = {
-        "total_delta": sum(pos.get("delta", 0.0) for pos in positions_greeks),
-        "total_gamma": sum(pos.get("gamma", 0.0) for pos in positions_greeks),
-        "total_theta": sum(pos.get("theta", 0.0) for pos in positions_greeks),
-        "total_vega": sum(pos.get("vega", 0.0) for pos in positions_greeks),
-        "total_rho": sum(pos.get("rho", 0.0) for pos in positions_greeks)
+        "total_delta": sum(pos.get("delta", 0.0) for pos in valid_greeks),
+        "total_gamma": sum(pos.get("gamma", 0.0) for pos in valid_greeks),
+        "total_theta": sum(pos.get("theta", 0.0) for pos in valid_greeks),
+        "total_vega": sum(pos.get("vega", 0.0) for pos in valid_greeks),
+        "total_rho": sum(pos.get("rho", 0.0) for pos in valid_greeks)
     }
     
     logger.debug(f"Portfolio Greeks aggregation: {portfolio_greeks}")

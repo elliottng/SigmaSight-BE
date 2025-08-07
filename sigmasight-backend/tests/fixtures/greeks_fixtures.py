@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 from app.models.positions import PositionType
-from app.calculations.greeks import MOCK_GREEKS
 
 # Market data includes dividend yield
 TEST_MARKET_DATA = {
@@ -147,58 +146,6 @@ EXPECTED_REAL_GREEKS = {
     }
 }
 
-# Mock fallback results
-EXPECTED_MOCK_GREEKS = {
-    'LC': {
-        'delta': MOCK_GREEKS[PositionType.LC]['delta'] * 5,
-        'gamma': MOCK_GREEKS[PositionType.LC]['gamma'] * 5,
-        'theta': MOCK_GREEKS[PositionType.LC]['theta'] * 5,
-        'vega': MOCK_GREEKS[PositionType.LC]['vega'] * 5,
-        'rho': MOCK_GREEKS[PositionType.LC]['rho'] * 5
-    },
-    'SC': {
-        'delta': MOCK_GREEKS[PositionType.SC]['delta'] * -3,
-        'gamma': MOCK_GREEKS[PositionType.SC]['gamma'] * -3,
-        'theta': MOCK_GREEKS[PositionType.SC]['theta'] * -3,
-        'vega': MOCK_GREEKS[PositionType.SC]['vega'] * -3,
-        'rho': MOCK_GREEKS[PositionType.SC]['rho'] * -3
-    },
-    'LP': {
-        'delta': MOCK_GREEKS[PositionType.LP]['delta'] * 2,
-        'gamma': MOCK_GREEKS[PositionType.LP]['gamma'] * 2,
-        'theta': MOCK_GREEKS[PositionType.LP]['theta'] * 2,
-        'vega': MOCK_GREEKS[PositionType.LP]['vega'] * 2,
-        'rho': MOCK_GREEKS[PositionType.LP]['rho'] * 2
-    },
-    'SP': {
-        'delta': MOCK_GREEKS[PositionType.SP]['delta'] * -4,
-        'gamma': MOCK_GREEKS[PositionType.SP]['gamma'] * -4,
-        'theta': MOCK_GREEKS[PositionType.SP]['theta'] * -4,
-        'vega': MOCK_GREEKS[PositionType.SP]['vega'] * -4,
-        'rho': MOCK_GREEKS[PositionType.SP]['rho'] * -4
-    },
-    'LONG': {
-        'delta': MOCK_GREEKS[PositionType.LONG]['delta'] * 100,
-        'gamma': MOCK_GREEKS[PositionType.LONG]['gamma'] * 100,
-        'theta': MOCK_GREEKS[PositionType.LONG]['theta'] * 100,
-        'vega': MOCK_GREEKS[PositionType.LONG]['vega'] * 100,
-        'rho': MOCK_GREEKS[PositionType.LONG]['rho'] * 100
-    },
-    'SHORT': {
-        'delta': MOCK_GREEKS[PositionType.SHORT]['delta'] * -50,
-        'gamma': MOCK_GREEKS[PositionType.SHORT]['gamma'] * -50,
-        'theta': MOCK_GREEKS[PositionType.SHORT]['theta'] * -50,
-        'vega': MOCK_GREEKS[PositionType.SHORT]['vega'] * -50,
-        'rho': MOCK_GREEKS[PositionType.SHORT]['rho'] * -50
-    },
-    'EXPIRED': {
-        'delta': 0.0,
-        'gamma': 0.0,
-        'theta': 0.0,
-        'vega': 0.0,
-        'rho': 0.0
-    }
-}
 
 # Test cases for edge cases
 EDGE_CASE_POSITIONS = {

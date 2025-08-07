@@ -36,10 +36,9 @@ dependencies = [
     "fredapi>=0.5.1",
     "pandas>=2.1.0",
     "numpy>=1.25.0",
-    # Options Calculations (V1.4 Hybrid Engine)
+    # Options Calculations (V1.4 Simplified Engine)
     "scipy>=1.11.0",
-    "mibian>=0.1.3", # Primary: Black-Scholes Greeks calculations
-    "py-vollib>=1.0.1", # Fallback: Has _testcapi compatibility issues on Python 3.11+
+    "mibian>=0.1.3", # Black-Scholes Greeks calculations
     "statsmodels>=0.14.0", # Factor regression analysis
     "empyrical>=0.5.5", # Risk metrics (Sharpe, VaR, etc.)
     "pandas_market_calendars>=4.0.0", # Trading calendar for market days

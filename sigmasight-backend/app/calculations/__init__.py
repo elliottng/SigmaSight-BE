@@ -11,7 +11,7 @@ from .market_data import (
 
 from .greeks import (
     calculate_real_greeks,
-    get_mock_greeks
+    calculate_position_greeks
 )
 
 from .portfolio import (
@@ -35,7 +35,7 @@ __all__ = [
     
     # Greeks calculations
     "calculate_real_greeks",
-    "get_mock_greeks",
+    "calculate_position_greeks",
     
     # Portfolio aggregations
     "calculate_portfolio_exposures",

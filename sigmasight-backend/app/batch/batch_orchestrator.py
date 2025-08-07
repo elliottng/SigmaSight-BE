@@ -21,7 +21,7 @@ from app.calculations.portfolio import (
 )
 from app.calculations.greeks import (
     bulk_update_portfolio_greeks,
-    calculate_greeks_hybrid
+    calculate_position_greeks
 )
 from app.calculations.factors import (
     calculate_factor_betas_hybrid,

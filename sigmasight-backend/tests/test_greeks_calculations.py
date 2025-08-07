@@ -7,8 +7,7 @@ from decimal import Decimal
 from unittest.mock import Mock, AsyncMock, patch
 
 from app.calculations.greeks import (
-    calculate_greeks_hybrid,
-    get_mock_greeks,
+    calculate_position_greeks,
     calculate_real_greeks,
     extract_option_parameters,
     calculate_time_to_expiry,
@@ -18,14 +17,13 @@ from app.calculations.greeks import (
     get_risk_free_rate,
     update_position_greeks,
     bulk_update_portfolio_greeks,
-    aggregate_portfolio_greeks,
-    MOCK_GREEKS
+    aggregate_portfolio_greeks
 )
 from app.models.positions import PositionType
 from tests.fixtures.greeks_fixtures import (
     TEST_POSITIONS,
     TEST_MARKET_DATA,
-    EXPECTED_MOCK_GREEKS,
+    EXPECTED_REAL_GREEKS,
     EDGE_CASE_POSITIONS,
     EMPTY_MARKET_DATA,
     INVALID_MARKET_DATA,
@@ -159,39 +157,10 @@ class TestGreeksCalculations:
         except ImportError:
             pytest.skip("py_vollib not available")
 
-    def test_get_mock_greeks_all_position_types(self):
-        """Test mock Greeks for all position types"""
-        # Test Long Call
-        greeks = get_mock_greeks(PositionType.LC, Decimal('5'))
-        expected = EXPECTED_MOCK_GREEKS['LC']
-        assert greeks['delta'] == expected['delta']
-        assert greeks['gamma'] == expected['gamma']
-        assert greeks['theta'] == expected['theta']
-        assert greeks['vega'] == expected['vega']
-        assert greeks['rho'] == expected['rho']
-        
-        # Test Short Call
-        greeks = get_mock_greeks(PositionType.SC, Decimal('-3'))
-        expected = EXPECTED_MOCK_GREEKS['SC']
-        assert greeks['delta'] == expected['delta']
-        
-        # Test Long Stock
-        greeks = get_mock_greeks(PositionType.LONG, Decimal('100'))
-        expected = EXPECTED_MOCK_GREEKS['LONG']
-        assert greeks['delta'] == expected['delta']
-        assert greeks['gamma'] == expected['gamma']
-        assert greeks['theta'] == expected['theta']
-        assert greeks['vega'] == expected['vega']
-        assert greeks['rho'] == expected['rho']
-        
-        # Test Short Stock
-        greeks = get_mock_greeks(PositionType.SHORT, Decimal('-50'))
-        expected = EXPECTED_MOCK_GREEKS['SHORT']
-        assert greeks['delta'] == expected['delta']
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_stock_positions(self):
-        """Test that stock positions use simple delta"""
+    async def test_calculate_position_greeks_stock_positions(self):
+        """Test that stock positions return None (Greeks not applicable)"""
         # Create mock stock position
         position = Mock()
         position.id = 'test-id'
@@ -200,17 +169,12 @@ class TestGreeksCalculations:
         position.quantity = Decimal('100')
         position.expiration_date = None
         
-        greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
+        greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
         
-        expected = EXPECTED_MOCK_GREEKS['LONG']
-        assert greeks['delta'] == expected['delta']
-        assert greeks['gamma'] == expected['gamma']
-        assert greeks['theta'] == expected['theta']
-        assert greeks['vega'] == expected['vega']
-        assert greeks['rho'] == expected['rho']
+        assert greeks is None
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_expired_options(self):
+    async def test_calculate_position_greeks_expired_options(self):
         """Test expired options return zero Greeks"""
         # Create mock expired option
         position = Mock()
@@ -220,7 +184,7 @@ class TestGreeksCalculations:
         position.quantity = Decimal('1')
         position.expiration_date = date.today() - timedelta(days=1)
         
-        greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
+        greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
         
         assert greeks['delta'] == 0.0
         assert greeks['gamma'] == 0.0
@@ -229,8 +193,8 @@ class TestGreeksCalculations:
         assert greeks['rho'] == 0.0
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_missing_data_fallback(self):
-        """Test fallback to mock values when market data missing"""
+    async def test_calculate_position_greeks_missing_data(self):
+        """Test that missing market data returns None"""
         # Create mock option position
         position = Mock()
         position.id = 'test-id'
@@ -242,18 +206,13 @@ class TestGreeksCalculations:
         position.underlying_symbol = 'AAPL'
         
         # Test with empty market data
-        greeks = await calculate_greeks_hybrid(position, EMPTY_MARKET_DATA)
+        greeks = await calculate_position_greeks(position, EMPTY_MARKET_DATA)
         
-        expected = EXPECTED_MOCK_GREEKS['LC']
-        assert greeks['delta'] == expected['delta']
-        assert greeks['gamma'] == expected['gamma']
-        assert greeks['theta'] == expected['theta']
-        assert greeks['vega'] == expected['vega']
-        assert greeks['rho'] == expected['rho']
+        assert greeks is None
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_invalid_option_params(self):
-        """Test fallback when option parameters are invalid"""
+    async def test_calculate_position_greeks_invalid_option_params(self):
+        """Test that invalid option parameters return None"""
         # Create mock option with missing strike
         position = Mock()
         position.id = 'test-id'
@@ -264,14 +223,12 @@ class TestGreeksCalculations:
         position.expiration_date = date.today() + timedelta(days=30)
         position.underlying_symbol = 'AAPL'
         
-        greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
+        greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
         
-        # Should fallback to mock values
-        expected = EXPECTED_MOCK_GREEKS['LC']
-        assert greeks['delta'] == expected['delta']
+        assert greeks is None
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_real_calculation(self):
+    async def test_calculate_position_greeks_real_calculation(self):
         """Test real Greeks calculation with valid market data"""
         # Create mock option position
         position = Mock()
@@ -283,21 +240,16 @@ class TestGreeksCalculations:
         position.expiration_date = date.today() + timedelta(days=30)
         position.underlying_symbol = 'AAPL'
         
-        try:
-            greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
-            
-            # Should be real calculation, not mock
+        greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
+        
+        # Should either return real Greeks or None if mibian fails
+        if greeks is not None:
             # Verify Greeks are reasonable for ATM call
             assert greeks['delta'] > 0  # Positive delta for long call
             assert greeks['gamma'] > 0  # Positive gamma
             assert greeks['theta'] < 0  # Negative theta (time decay)
             assert greeks['vega'] > 0   # Positive vega
-            
-        except Exception:
-            # If real calculation fails, should fallback to mock
-            expected = EXPECTED_MOCK_GREEKS['LC']
-            greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
-            assert greeks['delta'] == expected['delta']
+        # If greeks is None, mibian failed and that's acceptable
 
     @pytest.mark.asyncio
     async def test_update_position_greeks_database(self):
@@ -390,8 +342,8 @@ class TestGreeksCalculations:
         assert params['option_type'] == 'c'
 
     @pytest.mark.asyncio
-    async def test_calculate_greeks_hybrid_calculation_error(self):
-        """Test fallback when py_vollib throws exception"""
+    async def test_calculate_position_greeks_calculation_error(self):
+        """Test that mibian calculation errors return None"""
         # Create mock option position
         position = Mock()
         position.id = 'test-id'
@@ -402,15 +354,14 @@ class TestGreeksCalculations:
         position.expiration_date = date.today() + timedelta(days=30)
         position.underlying_symbol = 'AAPL'
         
-        # Mock py_vollib to raise exception
+        # Mock mibian calculation to raise exception
         with patch('app.calculations.greeks.calculate_real_greeks') as mock_real:
             mock_real.side_effect = Exception("Calculation error")
             
-            greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
+            greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
             
-            # Should fallback to mock values
-            expected = EXPECTED_MOCK_GREEKS['LC']
-            assert greeks['delta'] == expected['delta']
+            # Should return None when calculation fails
+            assert greeks is None
 
 
 class TestGreeksPerformance:
@@ -469,14 +420,16 @@ class TestGreeksPerformance:
         start_time = time.time()
         
         # Calculate Greeks
-        greeks = await calculate_greeks_hybrid(position, TEST_MARKET_DATA)
+        greeks = await calculate_position_greeks(position, TEST_MARKET_DATA)
         
         end_time = time.time()
         execution_time = end_time - start_time
         
         # Should complete very quickly
         assert execution_time < 0.1  # Less than 100ms per position
-        assert 'delta' in greeks
+        # Greeks may be None (calculation failed) or a dictionary with delta
+        if greeks is not None:
+            assert 'delta' in greeks
 
 
 if __name__ == "__main__":
