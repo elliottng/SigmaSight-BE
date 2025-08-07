@@ -33,9 +33,9 @@ async def backfill_position_symbols():
         print(f"Found {len(symbols)} unique symbols to backfill:")
         print(f"Symbols: {', '.join(symbols)}")
         
-        # Use YFinance to backfill data for these symbols
+        # Use FMP hybrid approach to backfill data for these symbols
         try:
-            result = await market_data_service.bulk_fetch_factor_etfs(
+            result = await market_data_service.bulk_fetch_and_cache(
                 db=db,
                 symbols=symbols,
                 days_back=300  # Get plenty of historical data

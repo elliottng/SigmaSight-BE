@@ -70,8 +70,8 @@ class FactorETFBackfiller:
                     logger.info(f"Processing {symbol}...")
                     
                     try:
-                        # Use YFinance integration for factor ETFs
-                        result = await market_data_service.bulk_fetch_factor_etfs(
+                        # Use FMP hybrid approach for factor ETFs
+                        result = await market_data_service.bulk_fetch_and_cache(
                             db=db,
                             symbols=[symbol],
                             days_back=self.days_to_fetch

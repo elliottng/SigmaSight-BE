@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Union, Any
 from polygon import RESTClient
-import yfinance as yf
+# import yfinance as yf  # Removed - using FMP primary architecture
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update
@@ -34,6 +34,101 @@ class MarketDataService:
     
     # New hybrid provider methods (Section 1.4.9)
     
+    async def fetch_historical_data_hybrid(
+        self, 
+        symbols: List[str], 
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Fetch historical stock price data using hybrid provider approach
+        
+        Priority: FMP -> Polygon (fallback)
+        
+        Args:
+            symbols: List of stock symbols
+            start_date: Start date for historical data
+            end_date: End date for historical data
+            
+        Returns:
+            Dictionary with symbol as key and list of price data as value
+        """
+        logger.info(f"Fetching historical data (hybrid) for {len(symbols)} symbols")
+        
+        if not start_date:
+            start_date = date.today() - timedelta(days=90)
+        if not end_date:
+            end_date = date.today()
+        
+        days_back = (end_date - start_date).days
+        
+        # Try FMP first
+        provider = market_data_factory.get_provider_for_data_type(DataType.STOCKS)
+        results = {}
+        
+        if provider:
+            try:
+                for symbol in symbols:
+                    try:
+                        historical_data = await provider.get_historical_prices(symbol, days=days_back)
+                        
+                        if historical_data:
+                            # Convert FMP format to our standard format
+                            price_records = []
+                            for day_data in historical_data:
+                                # Handle date field - could be string or date object
+                                date_value = day_data['date']
+                                if isinstance(date_value, str):
+                                    date_obj = datetime.strptime(date_value, '%Y-%m-%d').date()
+                                elif isinstance(date_value, date):
+                                    date_obj = date_value
+                                else:
+                                    date_obj = datetime.fromisoformat(str(date_value)).date()
+                                
+                                price_records.append({
+                                    'symbol': symbol.upper(),
+                                    'date': date_obj,
+                                    'open': Decimal(str(day_data['open'])),
+                                    'high': Decimal(str(day_data['high'])),
+                                    'low': Decimal(str(day_data['low'])),
+                                    'close': Decimal(str(day_data['close'])),
+                                    'volume': day_data['volume'],
+                                    'data_source': 'fmp'
+                                })
+                            
+                            results[symbol] = price_records
+                            logger.debug(f"FMP: Retrieved {len(price_records)} records for {symbol}")
+                        else:
+                            results[symbol] = []
+                            
+                    except Exception as e:
+                        logger.warning(f"FMP error for {symbol}: {str(e)}")
+                        results[symbol] = []
+                
+                # Check success rate
+                successful_symbols = [s for s, data in results.items() if data]
+                success_rate = len(successful_symbols) / len(symbols) if symbols else 0
+                
+                if success_rate >= 0.8:  # 80% success rate threshold
+                    logger.info(f"FMP historical data: {len(successful_symbols)}/{len(symbols)} symbols ({success_rate:.1%})")
+                    return results
+                else:
+                    logger.warning(f"FMP success rate too low ({success_rate:.1%}), falling back to Polygon")
+                    
+            except Exception as e:
+                logger.error(f"FMP historical data provider error: {str(e)}")
+        
+        # Fallback to Polygon
+        logger.info("Using Polygon for historical data (fallback)")
+        polygon_results = await self.fetch_stock_prices(symbols, start_date, end_date)
+        
+        # Merge FMP successes with Polygon fallbacks
+        for symbol in symbols:
+            if symbol not in results or not results[symbol]:
+                results[symbol] = polygon_results.get(symbol, [])
+        
+        return results
+
     async def fetch_stock_prices_hybrid(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
         """
         Fetch current stock prices using hybrid provider approach
@@ -344,7 +439,10 @@ class MarketDataService:
     
     async def fetch_gics_data(self, symbols: List[str]) -> Dict[str, Dict[str, str]]:
         """
-        Fetch GICS sector/industry data from YFinance
+        Fetch GICS sector/industry data 
+        
+        NOTE: YFinance removed for FMP-primary architecture. 
+        GICS data temporarily disabled until FMP coverage improves.
         
         Args:
             symbols: List of symbols to fetch GICS data for
@@ -352,27 +450,13 @@ class MarketDataService:
         Returns:
             Dictionary with symbol as key and sector/industry info as value
         """
-        logger.info(f"Fetching GICS data for {len(symbols)} symbols")
-        gics_data = {}
+        logger.warning(f"GICS data temporarily disabled - YFinance removed for FMP migration")
+        logger.info(f"Returning empty GICS data for {len(symbols)} symbols")
         
+        # Return empty GICS data - system handles missing data gracefully
+        gics_data = {}
         for symbol in symbols:
-            try:
-                ticker = yf.Ticker(symbol.upper())
-                info = ticker.info
-                
-                gics_data[symbol] = {
-                    'sector': info.get('sector'),
-                    'industry': info.get('industry')
-                }
-                
-                logger.debug(f"GICS data for {symbol}: {gics_data[symbol]}")
-                
-                # Add delay to be respectful to YFinance
-                await asyncio.sleep(0.2)
-                
-            except Exception as e:
-                logger.error(f"Error fetching GICS data for {symbol}: {str(e)}")
-                gics_data[symbol] = {'sector': None, 'industry': None}
+            gics_data[symbol] = {'sector': None, 'industry': None}
         
         return gics_data
     
@@ -482,8 +566,8 @@ class MarketDataService:
         """
         logger.info(f"Updating market data cache for {len(symbols)} symbols")
         
-        # Fetch price data
-        price_data = await self.fetch_stock_prices(symbols, start_date, end_date)
+        # Fetch price data using hybrid approach (FMP primary, Polygon fallback)
+        price_data = await self.fetch_historical_data_hybrid(symbols, start_date, end_date)
         
         # Fetch GICS data if requested
         gics_data = {}
@@ -613,138 +697,6 @@ class MarketDataService:
             include_gics=True
         )
     
-    async def fetch_factor_etf_data_yfinance(
-        self,
-        db: AsyncSession,
-        symbols: List[str],
-        start_date: date,
-        end_date: date
-    ) -> Dict[str, Any]:
-        """
-        Fetch historical data for factor ETFs using YFinance (free API)
-        Specifically designed for factor ETFs that may not be available on free Polygon tier
-        
-        Args:
-            db: Database session
-            symbols: List of ETF symbols (SPY, VTV, etc.)
-            start_date: Start date for historical data
-            end_date: End date for historical data
-            
-        Returns:
-            Dictionary with processing statistics
-        """
-        logger.info(f"Fetching factor ETF data from YFinance for {len(symbols)} symbols")
-        logger.info(f"Date range: {start_date} to {end_date}")
-        
-        results = {
-            "symbols_processed": 0,
-            "symbols_updated": 0,
-            "total_records": 0,
-            "errors": []
-        }
-        
-        for symbol in symbols:
-            try:
-                logger.info(f"Fetching YFinance data for {symbol}")
-                
-                # Fetch data from YFinance
-                ticker = yf.Ticker(symbol)
-                hist_data = ticker.history(
-                    start=start_date,
-                    end=end_date,
-                    interval="1d",
-                    auto_adjust=True,  # Use adjusted prices
-                    prepost=False
-                )
-                
-                if hist_data.empty:
-                    logger.warning(f"No data returned from YFinance for {symbol}")
-                    results["errors"].append(f"No data for {symbol}")
-                    continue
-                
-                # Convert DataFrame to our format
-                records_to_insert = []
-                for date_idx, row in hist_data.iterrows():
-                    # Extract date from pandas Timestamp
-                    trade_date = date_idx.date()
-                    
-                    record = {
-                        "symbol": symbol.upper(),
-                        "date": trade_date,
-                        "open": Decimal(str(round(row['Open'], 4))),
-                        "high": Decimal(str(round(row['High'], 4))),
-                        "low": Decimal(str(round(row['Low'], 4))),
-                        "close": Decimal(str(round(row['Close'], 4))),
-                        "volume": int(row['Volume']) if pd.notna(row['Volume']) else None,
-                        "data_source": "yfinance"
-                    }
-                    records_to_insert.append(record)
-                
-                # Bulk insert using PostgreSQL upsert
-                if records_to_insert:
-                    stmt = pg_insert(MarketDataCache).values(records_to_insert)
-                    stmt = stmt.on_conflict_do_update(
-                        index_elements=['symbol', 'date'],
-                        set_={
-                            'open': stmt.excluded.open,
-                            'high': stmt.excluded.high,
-                            'low': stmt.excluded.low,
-                            'close': stmt.excluded.close,
-                            'volume': stmt.excluded.volume,
-                            'data_source': stmt.excluded.data_source,
-                            'updated_at': datetime.utcnow()
-                        }
-                    )
-                    
-                    await db.execute(stmt)
-                    await db.commit()
-                    
-                    results["symbols_processed"] += 1
-                    results["symbols_updated"] += 1
-                    results["total_records"] += len(records_to_insert)
-                    
-                    logger.info(f"✓ {symbol}: Inserted {len(records_to_insert)} records")
-                else:
-                    logger.warning(f"No valid records to insert for {symbol}")
-                
-                # Small delay to be respectful to YFinance
-                await asyncio.sleep(0.1)
-                
-            except Exception as e:
-                error_msg = f"Error fetching {symbol} from YFinance: {str(e)}"
-                logger.error(error_msg)
-                results["errors"].append(error_msg)
-        
-        logger.info(f"YFinance fetch complete: {results['symbols_processed']} symbols, {results['total_records']} records")
-        return results
-    
-    async def bulk_fetch_factor_etfs(
-        self,
-        db: AsyncSession,
-        symbols: List[str],
-        days_back: int = 365
-    ) -> Dict[str, Any]:
-        """
-        Bulk fetch factor ETF data using YFinance
-        Wrapper around fetch_factor_etf_data_yfinance for convenience
-        
-        Args:
-            db: Database session
-            symbols: List of factor ETF symbols
-            days_back: Number of days of historical data to fetch
-            
-        Returns:
-            Processing statistics
-        """
-        end_date = date.today()
-        start_date = end_date - timedelta(days=days_back)
-        
-        return await self.fetch_factor_etf_data_yfinance(
-            db=db,
-            symbols=symbols,
-            start_date=start_date,
-            end_date=end_date
-        )
     
     async def close(self):
         """Close all provider client sessions"""

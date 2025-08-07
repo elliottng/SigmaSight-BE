@@ -33,7 +33,7 @@ CURRENT_PRICES = {
     
     # Financial Services
     "JPM": Decimal("170.00"),
-    "BRK.B": Decimal("440.00"),
+    "BRK-B": Decimal("440.00"),
     "V": Decimal("268.00"),
     "C": Decimal("55.00"),
     

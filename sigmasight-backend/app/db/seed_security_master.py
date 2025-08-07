@@ -29,7 +29,7 @@ SECURITY_MASTER_DATA = {
     
     # Financial Services
     "JPM": {"sector": "Financial Services", "industry": "Banks - Diversified", "market_cap": 650000000000, "security_type": "stock", "exchange": "NYSE", "country": "US"},
-    "BRK.B": {"sector": "Financial Services", "industry": "Insurance - Diversified", "market_cap": 900000000000, "security_type": "stock", "exchange": "NYSE", "country": "US"},
+    "BRK-B": {"sector": "Financial Services", "industry": "Insurance - Diversified", "market_cap": 900000000000, "security_type": "stock", "exchange": "NYSE", "country": "US"},
     "V": {"sector": "Financial Services", "industry": "Credit Services", "market_cap": 550000000000, "security_type": "stock", "exchange": "NYSE", "country": "US"},
     "C": {"sector": "Financial Services", "industry": "Banks - Diversified", "market_cap": 110000000000, "security_type": "stock", "exchange": "NYSE", "country": "US"},
     

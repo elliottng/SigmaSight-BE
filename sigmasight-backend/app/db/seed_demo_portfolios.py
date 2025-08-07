@@ -88,7 +88,7 @@ DEMO_PORTFOLIOS = [
             {"symbol": "MSFT", "quantity": Decimal("200"), "entry_price": Decimal("420.00"), "entry_date": date(2024, 1, 10), "tags": ["Blue Chip"]},
             {"symbol": "AMZN", "quantity": Decimal("480"), "entry_price": Decimal("170.00"), "entry_date": date(2024, 1, 12), "tags": ["Blue Chip"]},
             {"symbol": "GOOGL", "quantity": Decimal("500"), "entry_price": Decimal("160.00"), "entry_date": date(2024, 1, 12), "tags": ["Blue Chip"]},
-            {"symbol": "BRK.B", "quantity": Decimal("180"), "entry_price": Decimal("440.00"), "entry_date": date(2024, 1, 15), "tags": ["Blue Chip"]},
+            {"symbol": "BRK-B", "quantity": Decimal("180"), "entry_price": Decimal("440.00"), "entry_date": date(2024, 1, 15), "tags": ["Blue Chip"]},
             {"symbol": "JPM", "quantity": Decimal("350"), "entry_price": Decimal("170.00"), "entry_date": date(2024, 1, 15), "tags": ["Blue Chip"]},
             {"symbol": "JNJ", "quantity": Decimal("310"), "entry_price": Decimal("160.00"), "entry_date": date(2024, 1, 18), "tags": ["Blue Chip"]},
             {"symbol": "NVDA", "quantity": Decimal("70"), "entry_price": Decimal("700.00"), "entry_date": date(2024, 1, 20), "tags": ["Blue Chip"]},
@@ -120,7 +120,7 @@ DEMO_PORTFOLIOS = [
             {"symbol": "AMD", "quantity": Decimal("1200"), "entry_price": Decimal("162.00"), "entry_date": date(2024, 1, 12), "tags": ["Long Momentum"]},
             
             # Long Positions - Quality/Value 
-            {"symbol": "BRK.B", "quantity": Decimal("600"), "entry_price": Decimal("440.00"), "entry_date": date(2024, 1, 15), "tags": ["Long Momentum"]},
+            {"symbol": "BRK-B", "quantity": Decimal("600"), "entry_price": Decimal("440.00"), "entry_date": date(2024, 1, 15), "tags": ["Long Momentum"]},
             {"symbol": "JPM", "quantity": Decimal("1000"), "entry_price": Decimal("170.00"), "entry_date": date(2024, 1, 15), "tags": ["Long Momentum"]},
             {"symbol": "JNJ", "quantity": Decimal("800"), "entry_price": Decimal("160.00"), "entry_date": date(2024, 1, 18), "tags": ["Long Momentum"]},
             {"symbol": "UNH", "quantity": Decimal("200"), "entry_price": Decimal("545.00"), "entry_date": date(2024, 1, 18), "tags": ["Long Momentum"]},
