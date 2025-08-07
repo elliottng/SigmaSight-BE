@@ -11,9 +11,8 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from app.core.database import get_async_session, engine
+from app.database import get_async_session, engine, Base
 from app.core.logging import setup_logging, get_logger
-from app.database import Base
 
 # Import seeding functions
 from scripts.seed_database import seed_database

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import uuid4
 
-from app.core.database import get_db
+from app.database import get_db
 from app.core.auth import verify_password, get_password_hash, create_token_response
 from app.core.dependencies import get_current_user
 from app.models.users import User, Portfolio

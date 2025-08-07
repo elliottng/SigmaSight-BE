@@ -350,7 +350,7 @@ async def seed_demo_portfolios(db: AsyncSession) -> None:
 
 async def main():
     """Main function for testing"""
-    from app.core.database import get_async_session
+    from app.database import get_async_session
     
     async with get_async_session() as db:
         try:

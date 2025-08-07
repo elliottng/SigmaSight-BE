@@ -3,7 +3,7 @@ APScheduler Configuration for Batch Processing
 Implements the scheduling requirements from Section 1.6
 """
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from datetime import datetime
@@ -24,12 +24,10 @@ class BatchScheduler:
     """
     
     def __init__(self):
-        # Configure job stores - persist jobs in database
+        # Configure job stores - use memory store to avoid sync/async mixing
+        # Note: Jobs are recreated on restart, but this eliminates greenlet context errors
         jobstores = {
-            'default': SQLAlchemyJobStore(
-                url=settings.DATABASE_URL.replace('+asyncpg', ''),  # Use sync SQLAlchemy
-                tablename='apscheduler_jobs'
-            )
+            'default': MemoryJobStore()
         }
         
         # Configure executors

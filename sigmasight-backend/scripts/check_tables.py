@@ -3,7 +3,7 @@
 
 import asyncio
 from sqlalchemy import text
-from app.core.database import get_db
+from app.database import get_db
 
 async def check_tables():
     """Check which tables exist in the database."""

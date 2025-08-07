@@ -15,9 +15,16 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 ## Phase 2.0: Portfolio Report Generator (PRD Implementation)
 *LLM-Optimized Portfolio Analytics Report - Section PRD_PORTFOLIO_REPORT_SPEC.md*
 
-**Timeline**: 3-5 Days | **Status**: ⏳ **READY TO START**
+**Timeline**: 3-5 Days | **Status**: ⏸️ **PAUSED** - Batch Processing Issues Resolved First
 
 ### 2.0.1 Day 1: Data Verification & Core Infrastructure
+- [x] Verify all 3 demo portfolios exist and have all expected positions ✅ **COMPLETED**
+  - **demo_individual@sigmasight.com**: ✅ 16 positions - "Demo Individual Investor Portfolio"
+  - **demo_hnw@sigmasight.com**: ✅ 17 positions - "Demo High Net Worth Investor Portfolio" 
+  - **demo_hedgefundstyle@sigmasight.com**: ✅ 30 positions - "Demo Hedge Fund Style Investor Portfolio"
+  - **TOTAL**: 63/63 expected positions ✅ **PERFECT MATCH**
+  - **DATA QUALITY**: All positions have proper symbols, quantities, prices, dates, and types
+  - **READY**: Production-ready demo data for Phase 2.0 Portfolio Report Generator
 - [x] Verify all 3 demo portfolios have complete calculation engine data (all 8 engines) ✅ **COMPLETED**
   - Found 8 portfolios total (including 3 target demo portfolios)  
   - Discovered partial data: 11 Position Greeks, 60 Factor Exposures
@@ -284,7 +291,49 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     - Failed calculations return `None` with error logging
     - Options calculations use mibian-only (same quality, no fallbacks)
 
-#### 3.0.2 UUID Serialization Root Cause Investigation
+#### 3.0.2 Production Job Scheduling Architecture Decision ⏳ **RESEARCH NEEDED**
+*Evaluate and select production-ready job scheduling solution*
+
+**Timeline**: 1-2 Days | **Priority**: High (Production Readiness)
+
+**Current State**: Using MemoryJobStore as temporary workaround for APScheduler greenlet errors
+
+**Research Tasks**:
+- [ ] **APScheduler Analysis**: Evaluate current limitations and APScheduler 4.x timeline
+  - [ ] Document specific async/sync issues with current SQLAlchemy jobstore
+  - [ ] Research APScheduler 4.x native async support availability and stability
+  - [ ] Analyze job persistence requirements vs. current MemoryJobStore limitations
+- [ ] **External Job Queue Options**: Research async-native alternatives
+  - [ ] **Arq** - Redis-based async job queue, lightweight, FastAPI compatible
+  - [ ] **Dramatiq** - Multi-broker async task queue with Redis/RabbitMQ support  
+  - [ ] **Celery + async workers** - Traditional choice with recent async improvements
+  - [ ] **RQ** - Simple Redis-based queue (sync, but could work with adaptation)
+- [ ] **Infrastructure-Based Solutions**: Evaluate platform-native scheduling
+  - [ ] **Kubernetes CronJobs** - Cloud-native scheduling with built-in monitoring
+  - [ ] **Traditional cron + API endpoints** - Simple, reliable, OS-level scheduling
+  - [ ] **Cloud provider solutions** - AWS EventBridge, GCP Cloud Scheduler, etc.
+- [ ] **Hybrid Approaches**: Combine multiple strategies
+  - [ ] External scheduler + internal job queue for complex workflows
+  - [ ] API-triggered batch processing with external monitoring
+  - [ ] Multi-tier approach: cron for scheduling + queue for execution
+
+**Decision Criteria**:
+- [ ] **Async Compatibility**: Native async support without greenlet errors
+- [ ] **Job Persistence**: Survive application restarts and crashes  
+- [ ] **Scalability**: Support multiple app instances and load balancing
+- [ ] **Monitoring**: Job history, failure tracking, alerting capabilities
+- [ ] **Operational Complexity**: Deployment, maintenance, debugging overhead
+- [ ] **Development Timeline**: Implementation effort vs. production readiness needs
+
+**Deliverables**:
+- [ ] **Technical Comparison Matrix** - Feature comparison across all options
+- [ ] **Architecture Recommendation** - Preferred solution with rationale  
+- [ ] **Implementation Plan** - Migration steps from current MemoryJobStore
+- [ ] **Rollback Strategy** - Fallback options if chosen solution has issues
+
+**Notes**: Current MemoryJobStore works for development but lacks production reliability. Decision should balance immediate needs vs. long-term architecture goals.
+
+#### 3.0.3 UUID Serialization Root Cause Investigation
 - [ ] **Investigate asyncpg UUID serialization issue** 
   - **Background**: Multiple batch jobs fail with `'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'`
   - **Current Status**: Working with pragmatic workaround (detects error and treats job as successful)

@@ -22,7 +22,7 @@ from app.calculations.greeks import (
     MOCK_GREEKS
 )
 from app.models.positions import PositionType
-from app.core.database import get_db
+from app.database import get_db
 from app.core.logging import setup_logging
 
 # Set up logging

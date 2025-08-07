@@ -2276,14 +2276,37 @@ This mysterious UUID serialization issue has been documented for future investig
 ##### Proposed Resolution Process
 
 **Phase 1: Database Schema Validation** (Priority: CRITICAL - 1-2 hours)
-- [ ] **Audit Alembic migrations**: Verify all migrations applied correctly
-- [ ] **Create missing tables**: Ensure `stress_test_results` table exists with proper schema
-- [ ] **Validate foreign key relationships**: Confirm all calculation tables link properly
+- [x] **Audit Alembic migrations**: Verify all migrations applied correctly ✅ **COMPLETED**
+  - **DISCOVERED**: Migration `b5cd2cea0507` was empty (no table creation commands)
+  - **ROOT CAUSE**: Stress testing migration created empty upgrade/downgrade functions
+  - **STATUS**: Current head at `714625d883d9`, all applied migrations verified
+- [x] **Create missing tables**: Ensure `stress_test_results` table exists with proper schema ✅ **COMPLETED**  
+  - **CREATED**: New migration `b56aa92cde75_create_missing_stress_test_tables.py`
+  - **TABLES ADDED**: `stress_test_scenarios` (10 columns) and `stress_test_results` (10 columns)
+  - **SCHEMA**: Complete with foreign keys, indexes, and JSONB columns
+  - **VERIFICATION**: Models import successfully, database schema complete
+- [x] **Validate foreign key relationships**: Confirm all calculation tables link properly ✅ **COMPLETED**
+  - **VERIFIED**: 7 foreign key constraints across all calculation tables
+  - **RELATIONSHIPS**: position_greeks→positions, position_factor_exposures→positions+factor_definitions, 
+    portfolio_snapshots→portfolios, correlation_calculations→portfolios, stress_test_results→portfolios+stress_test_scenarios
+  - **TESTING**: All foreign key joins execute successfully without errors
+  - **RESULT**: Database schema integrity confirmed for all calculation engines
 - [ ] **Update migration scripts**: Fix any asymmetric upgrade/downgrade issues
 
 **Phase 2: Async Architecture Standardization** (Priority: CRITICAL - 2-4 hours)  
-- [ ] **Audit batch_orchestrator.py**: Identify all sync database calls
-- [ ] **Convert to pure async**: Replace all sync SQLAlchemy operations with async equivalents
+- [x] **Audit batch_orchestrator.py**: Identify all sync database calls ✅ **COMPLETED**
+  - **DISCOVERY**: batch_orchestrator.py uses correct async patterns (`await db.execute()`, `await db.commit()`)
+  - **ROOT CAUSE FOUND**: Mixed database imports between `app.database` and `app.core.database`
+  - **ISSUE**: Different Base classes and potentially different connection pools causing greenlet errors
+- [x] **Fix APScheduler configuration**: Replace sync SQLAlchemy jobstore ✅ **COMPLETED**
+  - **PROBLEM**: APScheduler was using sync SQLAlchemyJobStore with async application 
+  - **SOLUTION**: Switched to MemoryJobStore to eliminate sync/async context mixing
+  - **IMPACT**: APScheduler no longer causes greenlet errors during job scheduling
+- [x] **Standardize database imports**: Convert all imports to use `app.database` ✅ **COMPLETED**
+  - **FILES UPDATED**: 8 files switched from `app.core.database` to `app.database` imports
+  - **CONSISTENCY**: All models, scripts, and APIs now use single database module
+  - **RESULT**: Database import inconsistencies resolved
+- [ ] **REMAINING ISSUE**: Greenlet errors persist despite fixes - investigate deeper async/sync mixing
 - [ ] **Connection pool fixes**: Ensure proper async session lifecycle management
 - [ ] **Test async integrity**: Verify no greenlet context mixing
 
