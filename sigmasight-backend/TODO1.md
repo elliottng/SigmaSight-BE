@@ -2451,13 +2451,20 @@ This mysterious UUID serialization issue has been documented for future investig
   - [ ] Validate Treasury data integration in risk calculations
   - [ ] Add logging to diagnose missing IR exposures
 
-**GICS Sector Data Integration** (Priority: CRITICAL - 2-3 hours)
-- [ ] **Implement Static Sector Mappings**: Add hardcoded sector/industry for demo symbols
-  - [ ] Create SECTOR_MAP dictionary for all demo portfolio positions
-  - [ ] Map common symbols: AAPL→Technology, JPM→Financials, etc.
-  - [ ] Update market_data_service.py to use static mappings
-  - [ ] Modify fetch_gics_data() to return static data instead of null
-- [ ] **Future Enhancement**: Research FMP sector/industry endpoints for dynamic data
+**GICS Sector Data Integration** (Priority: CRITICAL - 2-3 hours) ✅ **COMPLETED 2025-08-07**
+- [x] **Implement FMP Company Profile API**: Dynamic sector/industry data from FMP ✅ **100% SUCCESS**
+  - [x] Added get_company_profile() method to FMP client ✅
+  - [x] Created fetch_company_profiles() in market_data_service ✅
+  - [x] Implemented update_security_metadata() for database integration ✅
+  - [x] Added exchange, country, market_cap fields to MarketDataCache model ✅
+- [x] **Database Migration**: Added metadata fields to support company profiles ✅
+  - [x] Created Alembic migration 580582693ef8 for new columns ✅
+  - [x] Updated MarketDataCache model with exchange, country, market_cap ✅
+  - [x] Fixed unique constraint issue with composite (symbol, date) key ✅
+- [x] **Testing & Validation**: All demo symbols have complete sector data ✅
+  - [x] Tested 10 symbols with 100% retrieval success ✅
+  - [x] Database integration working with proper upsert logic ✅
+  - [x] BRK-B symbol validated (Financial Services / Insurance) ✅
 
 **Polygon Options Pricing Investigation** (Priority: CRITICAL - 1-2 hours)
 - [ ] **Debug Polygon API Access**: Investigate why Starter Plan ($29) not returning data

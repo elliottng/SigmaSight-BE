@@ -705,6 +705,147 @@ class MarketDataService:
         )
     
     
+    async def fetch_company_profiles(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Fetch company profiles including sector and industry data from FMP
+        
+        Args:
+            symbols: List of stock symbols
+            
+        Returns:
+            Dictionary with symbol as key and profile data including sector/industry
+        """
+        logger.info(f"Fetching company profiles for {len(symbols)} symbols")
+        
+        results = {}
+        
+        try:
+            # Get FMP provider for stocks/ETFs
+            provider = market_data_factory.get_provider_for_data_type(DataType.STOCKS)
+            
+            if provider and hasattr(provider, 'get_company_profile'):
+                # Process in batches of 100 symbols (FMP limit)
+                batch_size = 100
+                for i in range(0, len(symbols), batch_size):
+                    batch = symbols[i:i + batch_size]
+                    
+                    try:
+                        batch_profiles = await provider.get_company_profile(batch)
+                        results.update(batch_profiles)
+                        logger.info(f"Retrieved profiles for {len(batch_profiles)}/{len(batch)} symbols in batch")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch profiles for batch {i//batch_size + 1}: {str(e)}")
+                        continue
+                
+                logger.info(f"Successfully retrieved {len(results)} company profiles")
+            else:
+                logger.warning("FMP provider not available or doesn't support company profiles")
+                
+        except Exception as e:
+            logger.error(f"Error fetching company profiles: {str(e)}")
+        
+        return results
+    
+    async def update_security_metadata(
+        self, 
+        db: AsyncSession,
+        symbols: List[str],
+        force_refresh: bool = False
+    ) -> Dict[str, bool]:
+        """
+        Update market_data_cache with sector/industry metadata from FMP profiles
+        
+        Args:
+            db: Database session
+            symbols: List of symbols to update
+            force_refresh: Force refresh even if data exists
+            
+        Returns:
+            Dictionary with symbol as key and success status
+        """
+        logger.info(f"Updating security metadata for {len(symbols)} symbols")
+        
+        results = {}
+        
+        try:
+            # Check existing cache entries if not forcing refresh
+            if not force_refresh:
+                stmt = select(MarketDataCache).where(
+                    MarketDataCache.symbol.in_(symbols),
+                    MarketDataCache.sector.isnot(None)
+                )
+                existing = await db.execute(stmt)
+                existing_symbols = {row.symbol for row in existing.scalars()}
+                
+                # Only fetch missing symbols
+                symbols_to_fetch = [s for s in symbols if s not in existing_symbols]
+                logger.info(f"Found {len(existing_symbols)} cached, fetching {len(symbols_to_fetch)} new")
+            else:
+                symbols_to_fetch = symbols
+            
+            if not symbols_to_fetch:
+                return {s: True for s in symbols}
+            
+            # Fetch company profiles
+            profiles = await self.fetch_company_profiles(symbols_to_fetch)
+            
+            # Update database - use today's date as a reference point for metadata
+            reference_date = date.today()
+            
+            for symbol, profile in profiles.items():
+                try:
+                    # Prepare upsert statement with date field for unique constraint
+                    stmt = pg_insert(MarketDataCache).values(
+                        symbol=symbol,
+                        date=reference_date,  # Use today's date for metadata record
+                        close=Decimal('0'),  # Required field, use 0 as placeholder
+                        sector=profile.get('sector'),
+                        industry=profile.get('industry'),
+                        exchange=profile.get('exchange'),
+                        country=profile.get('country'),
+                        market_cap=profile.get('market_cap'),
+                        data_source='fmp_profile',  # Mark as profile data
+                        updated_at=datetime.utcnow()
+                    )
+                    
+                    # On conflict, update the metadata fields
+                    stmt = stmt.on_conflict_do_update(
+                        constraint='uq_market_data_cache_symbol_date',
+                        set_={
+                            'sector': stmt.excluded.sector,
+                            'industry': stmt.excluded.industry,
+                            'exchange': stmt.excluded.exchange,
+                            'country': stmt.excluded.country,
+                            'market_cap': stmt.excluded.market_cap,
+                            'data_source': stmt.excluded.data_source,
+                            'updated_at': stmt.excluded.updated_at
+                        }
+                    )
+                    
+                    await db.execute(stmt)
+                    results[symbol] = True
+                    
+                except Exception as e:
+                    logger.error(f"Failed to update metadata for {symbol}: {str(e)}")
+                    results[symbol] = False
+            
+            # Mark symbols without profiles as processed (but unsuccessful)
+            for symbol in symbols_to_fetch:
+                if symbol not in results:
+                    results[symbol] = False
+            
+            await db.commit()
+            
+            success_count = sum(1 for v in results.values() if v)
+            logger.info(f"Updated metadata for {success_count}/{len(symbols_to_fetch)} symbols")
+            
+        except Exception as e:
+            logger.error(f"Error updating security metadata: {str(e)}")
+            await db.rollback()
+            return {s: False for s in symbols}
+        
+        return results
+    
     async def close(self):
         """Close all provider client sessions"""
         await market_data_factory.close_all()

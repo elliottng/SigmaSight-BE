@@ -214,3 +214,58 @@ class FMPClient(MarketDataProvider):
         except Exception as e:
             logger.error(f"FMP get_historical_prices failed for {symbol}: {str(e)}")
             raise
+    
+    async def get_company_profile(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Get company profile including sector and industry from FMP
+        
+        Uses the profile endpoint: /profile/{symbol}
+        Returns sector, industry, and other company metadata
+        """
+        results = {}
+        
+        # FMP allows batch profile requests with comma-separated symbols
+        symbols_str = ','.join(symbols)
+        
+        try:
+            data = await self._make_request(f"profile/{symbols_str}")
+            
+            if not isinstance(data, list):
+                logger.error(f"Unexpected FMP profile response format: {type(data)}")
+                return results
+            
+            for profile in data:
+                symbol = profile.get('symbol')
+                if not symbol:
+                    continue
+                
+                try:
+                    results[symbol] = {
+                        'sector': profile.get('sector'),
+                        'industry': profile.get('industry'),
+                        'company_name': profile.get('companyName'),
+                        'exchange': profile.get('exchangeShortName'),
+                        'country': profile.get('country'),
+                        'market_cap': Decimal(str(profile.get('mktCap', 0))) if profile.get('mktCap') else None,
+                        'description': profile.get('description'),
+                        'is_etf': profile.get('isEtf', False),
+                        'is_fund': profile.get('isFund', False),
+                        'ceo': profile.get('ceo'),
+                        'employees': profile.get('fullTimeEmployees'),
+                        'website': profile.get('website'),
+                        'timestamp': datetime.now(),
+                        'provider': 'FMPClient'
+                    }
+                    
+                    logger.debug(f"FMP: Got profile for {symbol} - Sector: {results[symbol]['sector']}, Industry: {results[symbol]['industry']}")
+                    
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error parsing FMP profile data for {symbol}: {str(e)}")
+                    continue
+            
+            logger.info(f"FMP: Successfully retrieved {len(results)} company profiles")
+            return results
+            
+        except Exception as e:
+            logger.error(f"FMP get_company_profile failed: {str(e)}")
+            raise

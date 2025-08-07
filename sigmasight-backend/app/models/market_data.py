@@ -24,9 +24,15 @@ class MarketDataCache(Base):
     close: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     volume: Mapped[Optional[int]] = mapped_column(nullable=True)
     
-    # Sector/Industry data from YFinance
+    # Sector/Industry data from FMP Company Profile API
     sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     industry: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    # Additional company metadata from FMP
+    exchange: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    market_cap: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    
     data_source: Mapped[str] = mapped_column(String(50), nullable=False, default='polygon')  # Updated for Section 1.4.9: supports 'polygon', 'fmp', 'tradefeeds', 'yfinance'
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
