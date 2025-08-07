@@ -11,10 +11,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.logging import get_logger
+from app.core.auth import get_password_hash
 from app.models.users import User, Portfolio
 from app.models.positions import Position, PositionType, Tag, TagType
 
 logger = get_logger(__name__)
+
+# Demo users as specified in DATABASE_DESIGN_ADDENDUM_V1.4.1.md
+DEMO_USERS = [
+    {
+        "username": "demo_individual",
+        "email": "demo_individual@sigmasight.com",
+        "full_name": "Demo Individual Investor",
+        "password": "demo12345",
+        "strategy": "Balanced portfolio with mutual funds and growth stocks"
+    },
+    {
+        "username": "demo_hnw",
+        "email": "demo_hnw@sigmasight.com", 
+        "full_name": "Demo High Net Worth Investor",
+        "password": "demo12345",
+        "strategy": "Sophisticated portfolio with private investments and alternatives"
+    },
+    {
+        "username": "demo_hedgefundstyle",
+        "email": "demo_hedgefundstyle@sigmasight.com",
+        "full_name": "Demo Hedge Fund Style Investor", 
+        "password": "demo12345",
+        "strategy": "Long/short equity with options overlay and volatility trading"
+    }
+]
 
 # Demo portfolio specifications from Ben Mock Portfolios.md
 DEMO_PORTFOLIOS = [
@@ -128,6 +154,38 @@ DEMO_PORTFOLIOS = [
     }
 ]
 
+async def create_demo_users(db: AsyncSession) -> None:
+    """Create all demo users if they don't exist"""
+    logger.info("Creating demo users...")
+    
+    for user_data in DEMO_USERS:
+        # Check if user already exists
+        stmt = select(User).where(User.email == user_data["email"])
+        result = await db.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            logger.info(f"Demo user already exists: {user_data['email']}")
+            continue
+        
+        # Create new demo user
+        hashed_password = get_password_hash(user_data["password"])
+        user = User(
+            id=uuid4(),
+            email=user_data["email"],
+            full_name=user_data["full_name"],
+            hashed_password=hashed_password,
+            is_active=True
+        )
+        
+        db.add(user)
+        logger.info(f"Created demo user: {user_data['email']} ({user_data['strategy']})")
+    
+    # Log credentials for reference
+    logger.info("Demo user credentials:")
+    for user_data in DEMO_USERS:
+        logger.info(f"  Email: {user_data['email']} | Password: {user_data['password']}")
+
 async def get_user_by_email(db: AsyncSession, email: str) -> User:
     """Get user by email"""
     result = await db.execute(select(User).where(User.email == email))
@@ -172,17 +230,20 @@ async def create_demo_portfolio(db: AsyncSession, portfolio_data: Dict[str, Any]
     # Get user
     user = await get_user_by_email(db, portfolio_data["user_email"])
     
-    # Check if portfolio already exists
+    # Check if user already has ANY portfolio (one portfolio per user constraint)
     result = await db.execute(
-        select(Portfolio).where(
-            Portfolio.user_id == user.id,
-            Portfolio.name == portfolio_data["portfolio_name"]
-        )
+        select(Portfolio).where(Portfolio.user_id == user.id)
     )
     existing_portfolio = result.scalar_one_or_none()
     
     if existing_portfolio:
-        logger.info(f"Portfolio already exists: {portfolio_data['portfolio_name']}")
+        logger.info(f"User {user.email} already has portfolio: {existing_portfolio.name}")
+        # Count existing positions
+        position_result = await db.execute(
+            select(Position).where(Position.portfolio_id == existing_portfolio.id)
+        )
+        positions = position_result.scalars().all()
+        logger.info(f"Portfolio has {len(positions)} positions")
         return existing_portfolio
     
     # Create portfolio

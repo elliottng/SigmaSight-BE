@@ -43,8 +43,14 @@ async def seed_database():
             await seed_factors(db)
             logger.info("✅ Factor definitions seeded")
             
-            # Note: Demo users already created by scripts/seed_demo_users.py
-            logger.info("✅ Demo users already exist (run scripts/seed_demo_users.py if needed)")
+            # Create demo users first
+            logger.info("Creating demo users...")
+            from app.db.seed_demo_portfolios import create_demo_users
+            
+            await create_demo_users(db)
+            
+            await db.commit()
+            logger.info("✅ Demo users created")
             
             # Step 2: Demo Portfolio Structure
             logger.info("🏗️ Step 2: Creating demo portfolio structures...")

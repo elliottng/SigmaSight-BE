@@ -3,6 +3,7 @@ Security Master Data Seeding - Section 1.5 Implementation
 Enriches demo portfolio symbols with sector, industry, and classification data required for batch processing
 """
 import asyncio
+from datetime import date
 from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -120,7 +121,7 @@ async def seed_security_master_data(db: AsyncSession, symbol: str, data: Dict[st
             # Create new entry with placeholder price data
             cache_entry = MarketDataCache(
                 symbol=symbol,
-                date=asyncio.get_event_loop().time(),  # Will be updated by price seeding
+                date=date.today(),  # Will be updated by price seeding
                 close=0.0,  # Placeholder - will be updated by initial price seeding
                 sector=data["sector"],
                 industry=data["industry"],

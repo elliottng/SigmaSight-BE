@@ -1447,6 +1447,88 @@ This approach provides the best of both worlds: fast, conflict-free development 
 - ✅ **63 Total Positions** across all asset classes and complexity levels
 - ✅ **All Batch Processing Prerequisites Met** for Section 1.6 framework
 - ✅ **Production-Quality Data** with realistic allocations and strategy tags
+
+---
+
+### 1.5.1 Demo Seeding Scripts Cleanup & Fix ⏳ **IN PROGRESS**
+*Fix seeding script inconsistencies and restore full demo data functionality*
+
+**📊 Current Status**: **PARTIALLY BROKEN** ❌
+- ✅ Email consistency fixed (demo_individual@, demo_hnw@, demo_hedgefundstyle@)
+- ✅ Correct portfolios exist with proper names
+- ❌ Portfolios have 0 positions (should have 63 total as documented above)
+- ❌ Multiple conflicting/obsolete seeding scripts causing confusion
+
+#### Analysis of Current Problems:
+
+**🔍 Root Cause**: Multiple generations of seeding scripts created over time:
+1. **Early development scripts** - Basic user/portfolio creation for testing
+2. **Section 1.5 production scripts** - Comprehensive demo data (documented but not working)
+3. **Recent fixes** - Email consistency patches that broke position seeding
+
+**📁 Current Seeding Files**:
+```
+scripts/
+├── seed_demo_users.py          # ❌ OBSOLETE - Creates users only, conflicts with others
+├── seed_database.py            # ❌ BROKEN - Tries to orchestrate but fails on portfolio conflicts  
+├── reset_and_seed.py           # ❓ UNKNOWN STATUS - May be obsolete
+└── fix_demo_user_consistency.py # ❌ TEMPORARY - One-time fix script, should be deleted
+
+app/db/
+├── seed_demo_portfolios.py     # ✅ CORRECT DESIGN - Should create 63 positions but fails due to conflicts
+├── seed_factors.py             # ✅ WORKING - 8 factor definitions
+├── seed_initial_prices.py      # ✅ WORKING - Market data cache
+└── seed_security_master.py     # ✅ WORKING - Security classifications
+
+docs/
+└── DEMO_SEEDING_GUIDE.md       # ❓ UNKNOWN STATUS - May be outdated
+```
+
+#### Cleanup & Fix Plan:
+
+**Step 1: Inventory & Analysis**
+- [ ] **Document current seeding script status** - Test each script independently
+- [ ] **Identify obsolete scripts** - Mark for deletion vs refactoring  
+- [ ] **Verify demo data expectations** - Cross-check TODO1.md claims vs actual requirements
+- [ ] **Check if reset_and_seed.py works** - May be the intended "single script" solution
+
+**Step 2: Script Consolidation**
+- [ ] **Delete obsolete development scripts**:
+  - [ ] Remove `scripts/seed_demo_users.py` (redundant - users created by portfolio script)
+  - [ ] Remove `scripts/fix_demo_user_consistency.py` (one-time use, completed)
+  - [ ] Remove `scripts/seed_database.py` if broken beyond repair
+- [ ] **Fix or replace seed_database.py**:
+  - [ ] Either fix the orchestration script to work properly
+  - [ ] Or create a new master script: `scripts/seed_complete_demo.py`
+- [ ] **Ensure single source of truth**: One script should handle complete demo setup
+
+**Step 3: Position Data Recovery** 
+- [ ] **Debug why seed_demo_portfolios.py fails** - Fix the "portfolio already exists" error
+- [ ] **Restore 63 positions** - Ensure all documented positions are created:
+  - [ ] Portfolio 1: 16 positions (9 stocks + 4 mutual funds + 3 ETFs)
+  - [ ] Portfolio 2: 17 positions (15 large-cap stocks + 2 alternative ETFs)  
+  - [ ] Portfolio 3: 30 positions (13 long + 9 short + 8 options)
+- [ ] **Validate position data quality** - Ensure realistic market values and tags
+
+**Step 4: Documentation & Testing**
+- [ ] **Update or remove DEMO_SEEDING_GUIDE.md** - Ensure it matches reality
+- [ ] **Update README.md demo instructions** - Single clear command to run
+- [ ] **Test complete seeding workflow**:
+  - [ ] Fresh database → single script → 63 positions → batch processing ready
+  - [ ] Verify all 8 batch calculation engines can run successfully
+- [ ] **Update TODO1.md Section 1.5** - Mark as truly complete when positions are restored
+
+**Step 5: Final Validation**
+- [ ] **Run complete batch processing test** - Ensure all 8 engines work with seeded data
+- [ ] **Generate sample reports** - Validate data quality for upcoming Portfolio Report Generator
+- [ ] **Document the final seeding command** - Single line: `python scripts/seed_complete_demo.py`
+
+#### Success Criteria:
+- ✅ Single authoritative seeding script that works reliably  
+- ✅ All 63 documented positions created correctly
+- ✅ No conflicting or obsolete scripts remain
+- ✅ Clear documentation for new developers
+- ✅ Demo data ready for Portfolio Report Generator Phase 2.0
 - ✅ **Complete Options Support** with OCC symbols and Greeks prerequisites
 - ✅ **Short Positions** properly implemented with negative quantities
 - ✅ **Market Data Foundation** ready for daily batch processing

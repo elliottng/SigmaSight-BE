@@ -30,10 +30,9 @@ async def reset_database():
     logger.warning("⚠️ DESTRUCTIVE OPERATION: Dropping all database tables...")
     
     # Confirm this is not production
-    from app.core.config import get_settings
-    settings = get_settings()
+    from app.config import settings
     
-    if "prod" in settings.database_url.lower() or "production" in settings.database_url.lower():
+    if "prod" in settings.DATABASE_URL.lower() or "production" in settings.DATABASE_URL.lower():
         raise ValueError("❌ SAFETY CHECK: Cannot reset production database!")
     
     # Drop all tables

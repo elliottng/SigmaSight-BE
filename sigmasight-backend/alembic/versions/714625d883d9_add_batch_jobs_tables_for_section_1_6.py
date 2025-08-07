@@ -93,18 +93,31 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Drop indexes
-    op.drop_index('ix_apscheduler_jobs_next_run_time', 'apscheduler_jobs')
-    op.drop_index('idx_batch_jobs_status_started', 'batch_jobs')
-    op.drop_index('idx_batch_jobs_started_at', 'batch_jobs')
-    op.drop_index('idx_batch_jobs_portfolio_id', 'batch_jobs')
-    op.drop_index('idx_batch_jobs_job_name', 'batch_jobs')
-    op.drop_index('idx_batch_jobs_status', 'batch_jobs')
+    # Check if tables exist before dropping
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
     
-    # Drop tables
-    op.drop_table('apscheduler_jobs')
-    op.drop_table('batch_job_schedules')
-    op.drop_table('batch_jobs')
+    # Drop indexes and tables only if they exist
+    if 'apscheduler_jobs' in existing_tables:
+        # Check if index exists before dropping
+        indexes = [idx['name'] for idx in inspector.get_indexes('apscheduler_jobs')]
+        if 'ix_apscheduler_jobs_next_run_time' in indexes:
+            op.drop_index('ix_apscheduler_jobs_next_run_time', 'apscheduler_jobs')
+        op.drop_table('apscheduler_jobs')
+    
+    if 'batch_jobs' in existing_tables:
+        # Drop batch_jobs indexes
+        indexes = [idx['name'] for idx in inspector.get_indexes('batch_jobs')]
+        for idx_name in ['idx_batch_jobs_status_started', 'idx_batch_jobs_started_at', 
+                        'idx_batch_jobs_portfolio_id', 'idx_batch_jobs_job_name', 
+                        'idx_batch_jobs_status']:
+            if idx_name in indexes:
+                op.drop_index(idx_name, 'batch_jobs')
+        op.drop_table('batch_jobs')
+    
+    if 'batch_job_schedules' in existing_tables:
+        op.drop_table('batch_job_schedules')
     
     # Drop enum type
     op.execute('DROP TYPE IF EXISTS jobstatus')

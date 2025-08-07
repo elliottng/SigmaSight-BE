@@ -17,12 +17,13 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 **Timeline**: 3-5 Days | **Status**: ⏳ **READY TO START**
 
-### 2.0.1 Day 1: Data Mapping & Core Infrastructure
+### 2.0.1 Day 1: Data Verification & Core Infrastructure
+- [ ] Verify all 3 demo portfolios have complete calculation engine data (all 8 engines)
+- [ ] Run missing batch calculations if needed to ensure data freshness
 - [ ] Map all PRD placeholders to actual database fields and calculation outputs
-- [ ] Verify demo portfolios have complete calculation engine data (all 8 engines)
-- [ ] Create `app/reports/` directory and `portfolio_report_generator.py` 
-- [ ] Implement data collection functions using existing database queries
-- [ ] Define output file structure: `reports/{portfolio_id}/{date}/`
+- [ ] Create `app/reports/` directory and async `portfolio_report_generator.py` 
+- [ ] Implement async data collection functions using existing database queries
+- [ ] Define output file structure: `reports/{slugified_portfolio_name}_{date}/` (add to .gitignore)
 
 ### 2.0.2 Day 2: Report Generation Implementation
 - [ ] Implement markdown report generation with direct string formatting (no templates)
@@ -33,11 +34,11 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Build Greeks summary using aggregate_portfolio_greeks() output
 
 ### 2.0.3 Day 3: JSON & CSV Export Implementation
-- [ ] Implement JSON export using direct database model serialization
+- [ ] Implement JSON export with moderate nesting (grouped by calculation engine, flat metrics)
 - [ ] Include all 8 calculation engine outputs in structured JSON format
-- [ ] Implement CSV export with complete position details and calculated fields
-- [ ] Add Greeks, factor exposures, and metadata columns to CSV
-- [ ] Validate all data fields populate correctly (no missing/null critical data)
+- [ ] Implement CSV export with 30-40 essential columns (positions + Greeks + key exposures)
+- [ ] Add Greeks, factor exposures, and metadata columns to CSV (skip internal technical fields)
+- [ ] Validate all data fields populate correctly with graceful degradation for missing data
 
 ### 2.0.4 Day 4: Demo Portfolio Testing & Integration
 - [ ] Generate all 3 files for Balanced Individual Investor Portfolio
@@ -48,11 +49,21 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Validate human reports are clean and readable
 
 ### 2.0.5 Day 5: CLI Interface & Final Polish
-- [ ] Create CLI command: `python -m app.reports {portfolio_id}`
-- [ ] Add error handling for missing data with graceful degradation
+- [ ] Create CLI command: `python -m app.reports {portfolio_id} --format md,json,csv`
+- [ ] Add --format flag to generate specific file types (default: all)
+- [ ] Implement async status reporting and detailed logging during report generation
+- [ ] Add error handling with graceful degradation for partial/missing calculation data
 - [ ] Test LLM consumption of JSON/CSV files (manual ChatGPT upload test)
-- [ ] Add basic logging and status reporting
-- [ ] Final validation: all demo portfolios generate complete reports
+- [ ] Final validation: all demo portfolios generate complete reports using most recent batch data
+
+**Implementation Decisions Applied:**
+- **Data Strategy**: Use most recent successful batch run data (no same-day requirement)
+- **File Organization**: `reports/` in project root with slugified portfolio names, added to .gitignore
+- **Error Handling**: Graceful degradation - generate partial reports with "N/A" for missing sections
+- **JSON Structure**: Moderate nesting - grouped by calculation engine, flat metrics within groups  
+- **CSV Scope**: 30-40 essential columns (positions + Greeks + key exposures, skip internal fields)
+- **Architecture**: Fully async implementation with detailed status reporting and logging
+- **CLI Options**: Support --format flag for selective generation (md, json, csv)
 
 **Cross-Reference**: 
 - Implementation based on `_docs/requirements/PRD_PORTFOLIO_REPORT_SPEC.md` sections 4.1-4.3
