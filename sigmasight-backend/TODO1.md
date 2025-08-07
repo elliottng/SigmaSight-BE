@@ -2256,7 +2256,7 @@ This mysterious UUID serialization issue has been documented for future investig
 
 **Results**: Correlations job now working with 5 positions included, 6 excluded, 10 correlation pairs calculated, average correlation: 0.248
 
-#### 1.6.14 Batch Processing Reliability Issues ✅ **FULLY COMPLETED** (2025-08-07)
+#### 1.6.14 Batch Processing Reliability Issues ⚠️ **PHASE 4 IN PROGRESS** (2025-08-07)
 *Production readiness gaps discovered during Phase 2.0 portfolio report development*
 
 **ISSUE DISCOVERED**: Multiple batch processing reliability issues affecting production deployment readiness and portfolio report generation capabilities.
@@ -2437,14 +2437,62 @@ This mysterious UUID serialization issue has been documented for future investig
 - **Testing & Validation**: ✅ 1 hour (5 test scripts created and executed)
 - **Total**: ✅ 6 hours - COMPLETED ahead of schedule
 
-**Phase 4: Treasury Rate Integration Fix** (Priority: HIGH - 4-6 hours) ✅ **INTEGRATED INTO PHASE 3**
-*Note: Treasury rate issues moved to Phase 3 Treasury Rate Integration Fix section for consolidated implementation*
-- [x] **Consolidated with Phase 3**: FRED API and Treasury integration now part of comprehensive market data resilience
-- [x] **Zero-size array resolution**: Included in Phase 3 Treasury Rate Integration Fix 
-- [x] **Date alignment**: Part of Phase 3 Treasury data quality validation
-- [x] **Mock data fallbacks**: Integrated into Phase 3 data validation framework
+**Phase 4: Critical Data Quality Fixes** (Priority: CRITICAL - 1-2 days) 🎯 **IN PROGRESS**
+*Essential fixes identified during demo readiness assessment - cannot defer*
 
-**Phase 5: Production Monitoring** (Priority: MEDIUM - 2-4 hours)
+**Treasury/FRED Integration Fix** (Priority: CRITICAL - 2-3 hours)
+- [ ] **Fix Interest Rate Beta Calculations**: Debug why showing "No exposure found" for all portfolios
+  - [ ] Validate FRED API connection and data retrieval
+  - [ ] Debug date alignment between Treasury rates and equity prices
+  - [ ] Implement minimum 90-day overlapping data validation
+  - [ ] Add mock Treasury data fallback (2.5% risk-free rate) for demo
+- [ ] **Stress Test Interest Rate Shocks**: Ensure IR sensitivity shows realistic impacts
+  - [ ] Fix zero impact issue in stress testing scenarios
+  - [ ] Validate Treasury data integration in risk calculations
+  - [ ] Add logging to diagnose missing IR exposures
+
+**GICS Sector Data Integration** (Priority: CRITICAL - 2-3 hours)
+- [ ] **Implement Static Sector Mappings**: Add hardcoded sector/industry for demo symbols
+  - [ ] Create SECTOR_MAP dictionary for all demo portfolio positions
+  - [ ] Map common symbols: AAPL→Technology, JPM→Financials, etc.
+  - [ ] Update market_data_service.py to use static mappings
+  - [ ] Modify fetch_gics_data() to return static data instead of null
+- [ ] **Future Enhancement**: Research FMP sector/industry endpoints for dynamic data
+
+**Polygon Options Pricing Investigation** (Priority: CRITICAL - 1-2 hours)
+- [ ] **Debug Polygon API Access**: Investigate why Starter Plan ($29) not returning data
+  - [ ] Log exact Polygon API endpoints being called
+  - [ ] Document error responses (404 vs 403 vs other)
+  - [ ] Check authentication and tier entitlements
+  - [ ] Create test script for Polygon customer service
+- [ ] **Endpoints to Verify**:
+  - [ ] `/v2/last/trade/{ticker}` - Last trade endpoint
+  - [ ] `/v3/trades/{ticker}` - Trades endpoint
+  - [ ] `/v2/aggs/ticker/{ticker}/range` - Aggregates endpoint
+  - [ ] `/v3/reference/options/contracts` - Options contracts endpoint
+
+**Simple Data Quality Monitoring** (Priority: HIGH - 2 hours)
+- [ ] **Pre-Flight Data Validation**: Add checks before batch runs
+  - [ ] Create validate_data_coverage() function
+  - [ ] Check symbol availability for all active positions
+  - [ ] Verify data freshness (<24 hours old)
+  - [ ] Log coverage percentage per portfolio
+- [ ] **Batch Result Metrics**: Enhanced logging for data quality
+  - [ ] Add "data_quality_score" to batch results
+  - [ ] Track symbols with missing data
+  - [ ] Report coverage gaps in batch summary
+  - [ ] Create simple data quality dashboard endpoint
+
+**Symbol-Specific Fixes** (Priority: MEDIUM - 1 hour)
+- [ ] **Fix BRK.B Symbol**: Update all references to use BRK-B
+  - [ ] Update seed data files
+  - [ ] Fix positions in database
+  - [ ] Validate with FMP API
+- [ ] **Fix ZOOM Data Format**: Investigate "Unexpected FMP historical data format"
+  - [ ] Debug FMP response for ZOOM
+  - [ ] Add error handling for format variations
+
+**Phase 5: Production Monitoring** (Priority: DEFERRED - 2-4 hours)
 - [ ] **Comprehensive logging**: Add detailed success/failure metrics per engine
 - [ ] **Health check endpoints**: Create batch job status monitoring
 - [ ] **Alert thresholds**: Define acceptable failure rates per calculation engine
@@ -2471,9 +2519,9 @@ This mysterious UUID serialization issue has been documented for future investig
 **Timeline**: 3-5 days total for complete resolution ✅ **COMPLETED IN 6 HOURS AHEAD OF SCHEDULE**
 **Priority**: HIGH (blocks Phase 2.0 Portfolio Report Generator production readiness) ✅ **UNBLOCKED**
 
-#### 🎉 SECTION 1.6.14 COMPLETION SUMMARY (2025-08-07)
+#### 📋 SECTION 1.6.14 STATUS UPDATE (2025-08-07)
 
-**✅ FINAL STATUS: FULLY RESOLVED - ALL OBJECTIVES ACHIEVED**
+**⚠️ CURRENT STATUS: PHASE 4 IN PROGRESS - CRITICAL DATA QUALITY FIXES REQUIRED**
 
 **🎯 MAJOR ACCOMPLISHMENTS:**
 
