@@ -2327,16 +2327,97 @@ This mysterious UUID serialization issue has been documented for future investig
   - **IMPACT**: Production-ready solution available via sequential processing implementation
 
 **Phase 3: Market Data Resilience** (Priority: HIGH - 1-2 days)
-- [ ] **API endpoint validation**: Test all symbol lookups against current providers
-- [ ] **Fallback data sources**: Implement alternative providers for missing symbols
-- [ ] **Graceful degradation**: Allow calculations to proceed with available data
-- [ ] **Data quality metrics**: Track and report data coverage percentages
+*Transform reactive "graceful degradation" to proactive data resilience addressing specific 1.6.14 gaps*
 
-**Phase 4: Treasury Rate Integration Fix** (Priority: HIGH - 4-6 hours)
-- [ ] **FRED API validation**: Confirm Treasury rate data retrieval working
-- [ ] **Date alignment fixes**: Ensure Treasury and equity data date ranges overlap
-- [ ] **Error handling**: Graceful fallback when insufficient rate data available
-- [ ] **Alternative rate sources**: Implement backup Treasury rate providers
+**🎯 Strategic Approach**: Migrate to FMP-primary data architecture with clear error reporting to assess service quality, removing YFinance coverage gaps.
+
+**YFinance Dependency Removal** (Priority: CRITICAL - 2 hours)
+- [ ] **Remove YFinance Integration**: Eliminate coverage gaps and consolidate on FMP
+  - [ ] Remove yfinance dependency from pyproject.toml
+  - [ ] Delete YFinance-based functions in market_data_service.py
+  - [ ] Update all stock/ETF data fetching to use FMP exclusively
+  - [ ] Remove YFinance fallback logic throughout codebase
+- [ ] **Update Market Data Service Architecture**: Streamline to FMP + Polygon model
+  - [ ] FMP: All stock and ETF price data (historical and current)
+  - [ ] Polygon: Options data only (maintain existing options infrastructure)
+  - [ ] FRED: Treasury rates (keep existing integration)
+  - [ ] Clear service boundaries with no fallback chains
+
+**Critical Symbol Data Gaps** (Priority: CRITICAL - 2 hours)
+- [ ] **BRK.B Historical Data Resolution**: Test BRK-B symbol variant for complete data coverage
+  - [ ] Update symbol mapping: BRK.B → BRK-B for FMP API compatibility
+  - [ ] Remove YFinance dependency and fallback chains (focus on FMP data quality assessment)
+  - [ ] Add clear error reporting for FMP data gaps to evaluate service coverage
+  - [ ] Status: BRK.B critical for Sophisticated HNW Portfolio ($2.85M value)
+- [ ] **Options Chain Infrastructure**: Fix SPY/QQQ options 404 errors blocking Greeks calculations
+  - [ ] Validate Polygon options API endpoints with current demo positions
+  - [ ] Implement options symbol standardization (ensure OCC format compliance)
+  - [ ] Add options-specific error handling with chain availability validation
+  - [ ] Status: 8 options positions across demo portfolios require working Greeks
+- [ ] **Factor ETF Complete Coverage via FMP**: Ensure 100% data availability for 7-factor model
+  - [ ] Migrate factor ETF data from YFinance to FMP: MTUM, QUAL, SIZE, USMV, VTV, VUG, SLY
+  - [ ] Remove YFinance ETF data fetching and switch to FMP exclusively
+  - [ ] Add clear error reporting when FMP lacks factor ETF data (no fallbacks)
+  - [ ] Status: Factor analysis incomplete without full ETF data coverage
+
+**Treasury Rate Integration Fix** (Priority: HIGH - 3 hours)  
+- [ ] **FRED API Zero-Size Array Resolution**: Fix Treasury data insufficient for IR beta calculations
+  - [ ] Debug date alignment between Treasury rates and equity price data ranges
+  - [ ] Implement minimum data validation (require 90+ overlapping days)
+  - [ ] Add Treasury data quality checks with specific error messages
+  - [ ] Create intelligent mock Treasury data for development/testing
+- [ ] **Interest Rate Data Pipeline**: Ensure reliable Treasury yield integration
+  - [ ] Validate FRED API key configuration and data retrieval patterns
+  - [ ] Add Treasury rate caching to reduce API dependency during calculations
+  - [ ] Implement Treasury rate interpolation for missing dates (weekends, holidays)
+  - [ ] Status: 10+ positions affected by "zero-size array" calculation errors
+
+**API Error Handling Enhancement** (Priority: MEDIUM - 1.5 hours)
+- [ ] **FMP Error Response Management**: Clear error reporting without fallbacks
+  - [ ] Implement symbol-specific error classification for FMP responses
+  - [ ] Add retry logic with exponential backoff for FMP transient errors only
+  - [ ] Remove fallback provider routing - report FMP failures directly
+  - [ ] Log FMP coverage gaps for service quality assessment
+- [ ] **Production Error Noise Reduction**: Clean up pandas warnings and error logging
+  - [ ] Suppress pandas deprecation warnings in production batch logs
+  - [ ] Standardize error message formats across calculation engines
+  - [ ] Add error aggregation to reduce log spam during batch processing
+
+**Data Quality Monitoring** (Priority: MEDIUM - 3 hours)
+- [ ] **Pre-Flight Data Validation**: Prevent batch failures through proactive checks
+  - [ ] Create market data coverage validation before each batch run
+  - [ ] Add symbol availability verification for all active positions
+  - [ ] Implement data freshness checks (ensure prices < 24 hours old)
+  - [ ] Add calculation engine prerequisite validation (Greeks needs options data)
+- [ ] **Coverage Metrics Dashboard**: Track and report data completeness
+  - [ ] Add data coverage percentages to batch job results
+  - [ ] Create symbol availability tracking over time
+  - [ ] Implement data quality scoring per portfolio (% complete data)
+  - [ ] Add coverage alerts when data falls below 95% for demo portfolios
+
+**Success Criteria**: 
+- ✅ **FMP Data Quality Assessment**: Clear visibility into FMP coverage for all demo portfolio symbols
+- ✅ **YFinance Elimination**: Zero YFinance dependencies in production codebase
+- ✅ **Clean Error Reporting**: FMP data gaps logged clearly (no silent fallback masking)
+- ✅ **BRK.B Resolution**: BRK-B symbol variant provides complete historical data via FMP
+- ✅ **Factor ETF Coverage**: All 7 factor ETFs (MTUM, QUAL, etc.) available via FMP
+- ✅ **Service Boundaries**: Clear FMP (stocks/ETFs) + Polygon (options) + FRED (Treasury) architecture
+- ✅ **Performance Maintained**: Sub-30s batch execution time with streamlined data providers
+
+**Updated Timeline**:
+- **YFinance Removal**: 2 hours (dependency cleanup, service streamlining)
+- **Critical Gaps**: 2 hours (BRK-B symbol, options validation)  
+- **Treasury Integration**: 3 hours (FRED API, zero-size array fixes)
+- **Error Handling**: 1.5 hours (FMP error reporting, log cleanup)
+- **Data Monitoring**: 2.5 hours (FMP coverage validation, quality metrics)
+- **Total**: 11 hours (1.4 days) - accelerated with focused provider strategy
+
+**Phase 4: Treasury Rate Integration Fix** (Priority: HIGH - 4-6 hours) ✅ **INTEGRATED INTO PHASE 3**
+*Note: Treasury rate issues moved to Phase 3 Treasury Rate Integration Fix section for consolidated implementation*
+- [x] **Consolidated with Phase 3**: FRED API and Treasury integration now part of comprehensive market data resilience
+- [x] **Zero-size array resolution**: Included in Phase 3 Treasury Rate Integration Fix 
+- [x] **Date alignment**: Part of Phase 3 Treasury data quality validation
+- [x] **Mock data fallbacks**: Integrated into Phase 3 data validation framework
 
 **Phase 5: Production Monitoring** (Priority: MEDIUM - 2-4 hours)
 - [ ] **Comprehensive logging**: Add detailed success/failure metrics per engine
