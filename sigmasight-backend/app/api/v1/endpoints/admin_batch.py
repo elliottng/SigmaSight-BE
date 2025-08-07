@@ -10,7 +10,7 @@ from sqlalchemy import select, and_
 
 from app.core.dependencies import get_db, require_admin
 from app.models.snapshots import BatchJob
-from app.batch.batch_orchestrator import batch_orchestrator
+from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2 as batch_orchestrator
 from app.batch.scheduler_config import batch_scheduler
 from app.core.logging import get_logger
 

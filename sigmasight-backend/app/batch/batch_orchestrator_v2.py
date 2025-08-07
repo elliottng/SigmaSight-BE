@@ -6,6 +6,8 @@ import asyncio
 from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
+from uuid import UUID
+from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -17,6 +19,32 @@ from app.models.users import Portfolio
 logger = get_logger(__name__)
 
 
+def ensure_uuid(value: str | UUID) -> UUID:
+    """Ensure value is a UUID object, converting from string if needed."""
+    if isinstance(value, str):
+        return UUID(value)
+    elif isinstance(value, UUID):
+        return value
+    else:
+        raise ValueError(f"Expected string or UUID, got {type(value)}")
+
+
+@dataclass
+class PortfolioData:
+    """Simple data structure for portfolio information after database fetch."""
+    id: str
+    name: str
+    user_id: Optional[str]
+    positions_count: int
+
+
+# Configuration constants
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_SESSION_TIMEOUT = 300  # 5 minutes per session
+DEFAULT_PORTFOLIO_DELAY = 1.0  # seconds between portfolios
+DEFAULT_JOB_RETRY_DELAY = 2.0  # base delay for exponential backoff
+
+
 class BatchOrchestratorV2:
     """
     Redesigned batch orchestrator that avoids SQLAlchemy greenlet errors through:
@@ -26,9 +54,9 @@ class BatchOrchestratorV2:
     4. Graceful degradation for failed jobs
     """
     
-    def __init__(self):
-        self.max_retries = 2
-        self.session_timeout = 300  # 5 minutes per session
+    def __init__(self, max_retries: int = DEFAULT_MAX_RETRIES, session_timeout: int = DEFAULT_SESSION_TIMEOUT):
+        self.max_retries = max_retries
+        self.session_timeout = session_timeout
     
     async def run_daily_batch_sequence(
         self, 
@@ -54,6 +82,11 @@ class BatchOrchestratorV2:
             # Process each portfolio independently to avoid connection pool conflicts
             all_results = []
             for i, portfolio in enumerate(portfolios, 1):
+                # Validate portfolio data before processing
+                if not self._validate_portfolio_data(portfolio):
+                    logger.error(f"Skipping invalid portfolio {i}/{len(portfolios)}")
+                    continue
+                
                 logger.info(f"Processing portfolio {i}/{len(portfolios)}: {portfolio.name}")
                 
                 portfolio_results = await self._process_single_portfolio_safely(
@@ -63,7 +96,7 @@ class BatchOrchestratorV2:
                 
                 # Add small delay between portfolios to allow connection cleanup
                 if i < len(portfolios):
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(DEFAULT_PORTFOLIO_DELAY)
             
             duration = datetime.now() - start_time
             logger.info(f"Sequential batch processing completed in {duration.total_seconds():.2f}s")
@@ -96,12 +129,12 @@ class BatchOrchestratorV2:
             
             # Convert to simple data structures to avoid lazy loading later
             return [
-                type('Portfolio', (), {
-                    'id': str(p.id),
-                    'name': str(p.name) if p.name else "Unknown",
-                    'user_id': str(p.user_id) if p.user_id else None,
-                    'positions': len(p.positions) if p.positions else 0
-                })() for p in portfolios
+                PortfolioData(
+                    id=str(p.id),
+                    name=str(p.name) if p.name else "Unknown",
+                    user_id=str(p.user_id) if p.user_id else None,
+                    positions_count=len(p.positions) if p.positions else 0
+                ) for p in portfolios
             ]
     
     @asynccontextmanager
@@ -207,16 +240,25 @@ class BatchOrchestratorV2:
                 duration = (datetime.now() - start_time).total_seconds()
                 error_msg = str(e)
                 
-                # Check if it's a greenlet error
-                if 'greenlet_spawn' in error_msg:
+                # Categorize error types for better handling  
+                is_transient = self._is_transient_error(e)
+                is_greenlet = 'greenlet_spawn' in error_msg
+                
+                # Enhanced logging with context
+                if is_greenlet:
                     logger.error(f"Greenlet error in job {job_name} (attempt {attempt + 1}): {error_msg}")
-                    if attempt < self.max_retries:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                        continue
+                elif is_transient:
+                    logger.warning(f"Transient error in job {job_name} (attempt {attempt + 1}): {error_msg}")
                 else:
                     logger.error(f"Job {job_name} failed (attempt {attempt + 1}): {error_msg}")
+                    # Add stack trace for permanent errors on final attempt
+                    if attempt == self.max_retries:
+                        import traceback
+                        logger.error(f"Stack trace for {job_name}: {traceback.format_exc()}")
                 
-                if attempt == self.max_retries:
+                # Skip retries for permanent errors unless it's the first attempt
+                if not is_transient and not is_greenlet and attempt > 0:
+                    logger.info(f"Permanent error detected for {job_name}, skipping remaining retries")
                     return {
                         'job_name': job_name,
                         'status': 'failed',
@@ -224,8 +266,47 @@ class BatchOrchestratorV2:
                         'error': error_msg,
                         'timestamp': datetime.now(),
                         'portfolio_name': portfolio_name,
-                        'attempts': attempt + 1
+                        'attempts': attempt + 1,
+                        'error_type': 'permanent'
                     }
+                
+                if attempt < self.max_retries:
+                    # Exponential backoff with configurable base delay
+                    delay = DEFAULT_JOB_RETRY_DELAY ** attempt
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    return {
+                        'job_name': job_name,
+                        'status': 'failed',
+                        'duration_seconds': duration,
+                        'error': error_msg,
+                        'timestamp': datetime.now(),
+                        'portfolio_name': portfolio_name,
+                        'attempts': attempt + 1,
+                        'error_type': 'greenlet' if is_greenlet else 'transient' if is_transient else 'permanent'
+                    }
+    
+    def _is_transient_error(self, error: Exception) -> bool:
+        """Categorize if error is likely transient and worth retrying."""
+        error_str = str(error).lower()
+        transient_indicators = [
+            'timeout', 'connection', 'network', 'temporary', 
+            'unavailable', 'busy', 'locked', 'deadlock',
+            '429', '503', '502', '504', 'http error 5'
+        ]
+        return any(indicator in error_str for indicator in transient_indicators)
+    
+    def _validate_portfolio_data(self, portfolio_data: PortfolioData) -> bool:
+        """Validate portfolio data has required fields."""
+        if not portfolio_data.id:
+            logger.error(f"Portfolio missing ID: {portfolio_data}")
+            return False
+        if not portfolio_data.name:
+            logger.warning(f"Portfolio {portfolio_data.id} has no name, using 'Unknown'")
+        if portfolio_data.positions_count == 0:
+            logger.warning(f"Portfolio {portfolio_data.id} has no positions")
+        return True
     
     # Job implementation methods (these would be imported from the original orchestrator)
     async def _update_market_data(self, db: AsyncSession):
@@ -235,8 +316,58 @@ class BatchOrchestratorV2:
     
     async def _calculate_portfolio_aggregation(self, db: AsyncSession, portfolio_id: str):
         """Portfolio aggregation job"""
-        from app.calculations.portfolio_aggregations import calculate_portfolio_exposures
-        return await calculate_portfolio_exposures(db, portfolio_id)
+        from app.calculations.portfolio import calculate_portfolio_exposures
+        from app.models.positions import Position
+        from sqlalchemy import select
+        
+        # Get portfolio positions
+        stmt = select(Position).where(
+            Position.portfolio_id == portfolio_id,
+            Position.deleted_at.is_(None),
+            Position.exit_date.is_(None)
+        )
+        result = await db.execute(stmt)
+        positions = result.scalars().all()
+        
+        if not positions:
+            return {'message': 'No active positions', 'metrics': {}}
+        
+        # Convert positions to format expected by calculate_portfolio_exposures
+        position_dicts = []
+        for pos in positions:
+            # Calculate exposure as market_value with correct sign
+            market_value = float(pos.market_value) if pos.market_value else 0
+            quantity = float(pos.quantity)
+            
+            # For short positions, exposure should be negative
+            if pos.position_type and pos.position_type.value in ['SHORT', 'SC', 'SP']:
+                exposure = -abs(market_value)
+            else:
+                exposure = abs(market_value)
+            
+            position_dict = {
+                'symbol': pos.symbol,
+                'quantity': quantity,
+                'market_value': market_value,
+                'exposure': exposure,  # Add the missing exposure field
+                'last_price': float(pos.last_price) if pos.last_price else 0,
+                'position_type': pos.position_type.value if pos.position_type else 'LONG',
+                'strike_price': float(pos.strike_price) if pos.strike_price else None,
+                'expiration_date': pos.expiration_date
+            }
+            position_dicts.append(position_dict)
+        
+        exposures = calculate_portfolio_exposures(position_dicts)
+        
+        # For options portfolios, also calculate delta-adjusted exposure
+        has_options = any(p.strike_price is not None for p in positions)
+        
+        return {
+            'portfolio_id': portfolio_id,
+            'metrics_calculated': len(exposures),
+            'has_options': has_options,
+            'exposures': exposures
+        }
     
     async def _calculate_greeks(self, db: AsyncSession, portfolio_id: str):
         """Greeks calculation job"""
@@ -246,19 +377,20 @@ class BatchOrchestratorV2:
     async def _calculate_factors(self, db: AsyncSession, portfolio_id: str):
         """Factor analysis job"""
         from app.calculations.factors import calculate_factor_betas_hybrid
-        from uuid import UUID
-        portfolio_uuid = UUID(portfolio_id) if isinstance(portfolio_id, str) else portfolio_id
+        portfolio_uuid = ensure_uuid(portfolio_id)
         return await calculate_factor_betas_hybrid(db, portfolio_uuid, date.today())
     
     async def _calculate_market_risk(self, db: AsyncSession, portfolio_id: str):
         """Market risk scenarios job"""
         from app.calculations.market_risk import calculate_portfolio_market_beta
-        return await calculate_portfolio_market_beta(db, portfolio_id, 252)
+        portfolio_uuid = ensure_uuid(portfolio_id)
+        return await calculate_portfolio_market_beta(db, portfolio_uuid, date.today())
     
     async def _run_stress_tests(self, db: AsyncSession, portfolio_id: str):
         """Stress testing job"""
         from app.calculations.stress_testing import run_comprehensive_stress_test
-        return await run_comprehensive_stress_test(db, portfolio_id)
+        portfolio_uuid = ensure_uuid(portfolio_id)
+        return await run_comprehensive_stress_test(db, portfolio_uuid, date.today())
     
     async def _create_snapshot(self, db: AsyncSession, portfolio_id: str):
         """Portfolio snapshot job"""
@@ -269,7 +401,8 @@ class BatchOrchestratorV2:
         """Position correlations job"""
         from app.services.correlation_service import CorrelationService
         correlation_service = CorrelationService(db)
-        return await correlation_service.calculate_portfolio_correlations(portfolio_id)
+        portfolio_uuid = ensure_uuid(portfolio_id)
+        return await correlation_service.calculate_portfolio_correlations(portfolio_uuid)
 
 
 # Create singleton instance
