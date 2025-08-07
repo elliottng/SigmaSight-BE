@@ -463,6 +463,9 @@ async def fetch_historical_prices(
     # Pivot to have dates as index and symbols as columns
     price_df = df.pivot(index='date', columns='symbol', values='close')
     
+    # Convert index to DatetimeIndex for compatibility with other time series data (e.g., FRED Treasury data)
+    price_df.index = pd.to_datetime(price_df.index)
+    
     # Log data availability
     logger.info(f"Retrieved {len(price_df)} days of data for {len(price_df.columns)} symbols")
     
