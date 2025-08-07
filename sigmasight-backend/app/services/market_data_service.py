@@ -62,69 +62,76 @@ class MarketDataService:
         
         days_back = (end_date - start_date).days
         
-        # Try FMP first
-        provider = market_data_factory.get_provider_for_data_type(DataType.STOCKS)
+        # Separate options from stocks/ETFs
+        # Options symbols typically have 15+ characters and contain expiration dates
+        options_symbols = [s for s in symbols if len(s) > 10 and any(c.isdigit() for c in s[6:])]
+        stock_symbols = [s for s in symbols if s not in options_symbols]
+        
         results = {}
         
-        if provider:
-            try:
-                for symbol in symbols:
-                    try:
-                        historical_data = await provider.get_historical_prices(symbol, days=days_back)
-                        
-                        if historical_data:
-                            # Convert FMP format to our standard format
-                            price_records = []
-                            for day_data in historical_data:
-                                # Handle date field - could be string or date object
-                                date_value = day_data['date']
-                                if isinstance(date_value, str):
-                                    date_obj = datetime.strptime(date_value, '%Y-%m-%d').date()
-                                elif isinstance(date_value, date):
-                                    date_obj = date_value
-                                else:
-                                    date_obj = datetime.fromisoformat(str(date_value)).date()
+        # Process stocks/ETFs with FMP
+        if stock_symbols:
+            provider = market_data_factory.get_provider_for_data_type(DataType.STOCKS)
+            if provider:
+                try:
+                    for symbol in stock_symbols:
+                        try:
+                            historical_data = await provider.get_historical_prices(symbol, days=days_back)
+                            
+                            if historical_data:
+                                # Convert FMP format to our standard format
+                                price_records = []
+                                for day_data in historical_data:
+                                    # Handle date field - could be string or date object
+                                    date_value = day_data['date']
+                                    if isinstance(date_value, str):
+                                        date_obj = datetime.strptime(date_value, '%Y-%m-%d').date()
+                                    elif isinstance(date_value, date):
+                                        date_obj = date_value
+                                    else:
+                                        date_obj = datetime.fromisoformat(str(date_value)).date()
+                                    
+                                    price_records.append({
+                                        'symbol': symbol.upper(),
+                                        'date': date_obj,
+                                        'open': Decimal(str(day_data['open'])),
+                                        'high': Decimal(str(day_data['high'])),
+                                        'low': Decimal(str(day_data['low'])),
+                                        'close': Decimal(str(day_data['close'])),
+                                        'volume': day_data['volume'],
+                                        'data_source': 'fmp'
+                                    })
                                 
-                                price_records.append({
-                                    'symbol': symbol.upper(),
-                                    'date': date_obj,
-                                    'open': Decimal(str(day_data['open'])),
-                                    'high': Decimal(str(day_data['high'])),
-                                    'low': Decimal(str(day_data['low'])),
-                                    'close': Decimal(str(day_data['close'])),
-                                    'volume': day_data['volume'],
-                                    'data_source': 'fmp'
-                                })
-                            
-                            results[symbol] = price_records
-                            logger.debug(f"FMP: Retrieved {len(price_records)} records for {symbol}")
-                        else:
+                                results[symbol] = price_records
+                                logger.debug(f"FMP: Retrieved {len(price_records)} records for {symbol}")
+                            else:
+                                results[symbol] = []
+                                
+                        except Exception as e:
+                            logger.warning(f"FMP error for {symbol}: {str(e)}")
                             results[symbol] = []
-                            
-                    except Exception as e:
-                        logger.warning(f"FMP error for {symbol}: {str(e)}")
-                        results[symbol] = []
                 
-                # Check success rate
-                successful_symbols = [s for s, data in results.items() if data]
-                success_rate = len(successful_symbols) / len(symbols) if symbols else 0
-                
-                if success_rate >= 0.8:  # 80% success rate threshold
-                    logger.info(f"FMP historical data: {len(successful_symbols)}/{len(symbols)} symbols ({success_rate:.1%})")
-                    return results
-                else:
-                    logger.warning(f"FMP success rate too low ({success_rate:.1%}), falling back to Polygon")
+                    # Check success rate for stocks only
+                    successful_stocks = [s for s in stock_symbols if results.get(s)]
+                    stock_success_rate = len(successful_stocks) / len(stock_symbols) if stock_symbols else 0
                     
-            except Exception as e:
-                logger.error(f"FMP historical data provider error: {str(e)}")
+                    if stock_success_rate >= 0.8:  # 80% success rate threshold
+                        logger.info(f"FMP historical data: {len(successful_stocks)}/{len(stock_symbols)} stocks ({stock_success_rate:.1%})")
+                    else:
+                        logger.warning(f"FMP stock success rate low ({stock_success_rate:.1%}), using Polygon fallback for failed symbols")
+                        
+                except Exception as e:
+                    logger.error(f"FMP historical data provider error: {str(e)}")
         
-        # Fallback to Polygon
-        logger.info("Using Polygon for historical data (fallback)")
-        polygon_results = await self.fetch_stock_prices(symbols, start_date, end_date)
+        # Process options and any failed stocks with Polygon
+        symbols_for_polygon = options_symbols + [s for s in stock_symbols if not results.get(s)]
         
-        # Merge FMP successes with Polygon fallbacks
-        for symbol in symbols:
-            if symbol not in results or not results[symbol]:
+        if symbols_for_polygon:
+            logger.info(f"Using Polygon for {len(options_symbols)} options and {len(symbols_for_polygon) - len(options_symbols)} failed stocks")
+            polygon_results = await self.fetch_stock_prices(symbols_for_polygon, start_date, end_date)
+            
+            # Merge Polygon results
+            for symbol in symbols_for_polygon:
                 results[symbol] = polygon_results.get(symbol, [])
         
         return results
