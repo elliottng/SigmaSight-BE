@@ -2235,6 +2235,96 @@ This mysterious UUID serialization issue has been documented for future investig
 
 **Results**: Correlations job now working with 5 positions included, 6 excluded, 10 correlation pairs calculated, average correlation: 0.248
 
+#### 1.6.14 Batch Processing Reliability Issues ⚠️ **IDENTIFIED** (2025-01-16)
+*Production readiness gaps discovered during Phase 2.0 portfolio report development*
+
+**ISSUE DISCOVERED**: Multiple batch processing reliability issues affecting production deployment readiness and portfolio report generation capabilities.
+
+**Current Status**: Batch jobs run with partial success but encounter significant data integrity and infrastructure issues that need systematic resolution.
+
+##### Issues Identified
+
+**1. Missing Database Schema Components** 🔴 **CRITICAL**
+- `stress_test_results` table does not exist in current database
+- Prevents Stress Testing Engine (Job 6) from storing results
+- May indicate incomplete Alembic migration application
+- **Impact**: 1/8 batch engines completely non-functional
+
+**2. Market Data Provider Gaps** 🟡 **HIGH**
+- SPY and QQQ options data unavailable (HTTP 404 errors)
+- Factor ETF data missing: MTUM, QUAL, SIZE, USMV, VTV, VUG  
+- BRK.B historical data insufficient (189 days missing)
+- **Impact**: Greeks calculations fail, factor analysis incomplete
+
+**3. Treasury Data Integration Issues** 🟡 **HIGH**  
+- Interest rate data insufficient for IR beta calculations
+- "Zero-size array" errors affecting 10+ positions
+- Insufficient overlapping data between Treasury rates and position prices
+- **Impact**: Interest rate sensitivity calculations non-functional
+
+**4. Async/Sync Architecture Mismatch** 🔴 **CRITICAL**
+- `greenlet_spawn has not been called` SQLAlchemy errors
+- Database connection pool conflicts in batch orchestrator
+- Mixing of async and sync database operations
+- **Impact**: Batch jobs terminate with connection errors
+
+**5. API Rate Limiting and Error Handling** 🟡 **MEDIUM**
+- HTTP 404 errors not gracefully handled
+- pandas deprecation warnings in production output
+- Missing fallback mechanisms for failed API calls
+
+##### Proposed Resolution Process
+
+**Phase 1: Database Schema Validation** (Priority: CRITICAL - 1-2 hours)
+- [ ] **Audit Alembic migrations**: Verify all migrations applied correctly
+- [ ] **Create missing tables**: Ensure `stress_test_results` table exists with proper schema
+- [ ] **Validate foreign key relationships**: Confirm all calculation tables link properly
+- [ ] **Update migration scripts**: Fix any asymmetric upgrade/downgrade issues
+
+**Phase 2: Async Architecture Standardization** (Priority: CRITICAL - 2-4 hours)  
+- [ ] **Audit batch_orchestrator.py**: Identify all sync database calls
+- [ ] **Convert to pure async**: Replace all sync SQLAlchemy operations with async equivalents
+- [ ] **Connection pool fixes**: Ensure proper async session lifecycle management
+- [ ] **Test async integrity**: Verify no greenlet context mixing
+
+**Phase 3: Market Data Resilience** (Priority: HIGH - 1-2 days)
+- [ ] **API endpoint validation**: Test all symbol lookups against current providers
+- [ ] **Fallback data sources**: Implement alternative providers for missing symbols
+- [ ] **Graceful degradation**: Allow calculations to proceed with available data
+- [ ] **Data quality metrics**: Track and report data coverage percentages
+
+**Phase 4: Treasury Rate Integration Fix** (Priority: HIGH - 4-6 hours)
+- [ ] **FRED API validation**: Confirm Treasury rate data retrieval working
+- [ ] **Date alignment fixes**: Ensure Treasury and equity data date ranges overlap
+- [ ] **Error handling**: Graceful fallback when insufficient rate data available
+- [ ] **Alternative rate sources**: Implement backup Treasury rate providers
+
+**Phase 5: Production Monitoring** (Priority: MEDIUM - 2-4 hours)
+- [ ] **Comprehensive logging**: Add detailed success/failure metrics per engine
+- [ ] **Health check endpoints**: Create batch job status monitoring
+- [ ] **Alert thresholds**: Define acceptable failure rates per calculation engine
+- [ ] **Recovery procedures**: Document manual intervention steps for failed jobs
+
+##### Testing Requirements
+
+**Comprehensive Batch Testing Plan Update** (2-3 hours)
+- [ ] **Update BATCH_TESTING_PRAGMATIC.md**: Add new test scenarios for identified issues
+- [ ] **Database schema tests**: Verify all tables exist before batch execution
+- [ ] **Market data availability tests**: Pre-flight checks for symbol coverage
+- [ ] **Async integrity tests**: Validate no sync/async mixing in execution paths
+- [ ] **End-to-end reliability tests**: Full 8-engine execution with comprehensive validation
+- [ ] **Failure recovery tests**: Simulate and test graceful degradation scenarios
+
+**Success Criteria**:
+- ✅ All 8 batch engines execute without critical errors
+- ✅ 100% database schema completeness
+- ✅ >95% market data coverage for all demo portfolios
+- ✅ Clean async/sync separation throughout batch orchestrator
+- ✅ Comprehensive test coverage for all identified failure scenarios
+
+**Timeline**: 3-5 days total for complete resolution
+**Priority**: HIGH (blocks Phase 2.0 Portfolio Report Generator production readiness)
+
 ----
 
 ### 1.7 Database Import Consistency Cleanup ✅ COMPLETED (2025-08-06)
