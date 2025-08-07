@@ -12,10 +12,67 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - Complete calculation engines integrated and tested
 
 ---
-## Phase 2: API Development
+## Phase 2.0: Portfolio Report Generator (PRD Implementation)
+*LLM-Optimized Portfolio Analytics Report - Section PRD_PORTFOLIO_REPORT_SPEC.md*
+
+**Timeline**: 3-5 Days | **Status**: ⏳ **READY TO START**
+
+### 2.0.1 Day 1: Data Mapping & Core Infrastructure
+- [ ] Map all PRD placeholders to actual database fields and calculation outputs
+- [ ] Verify demo portfolios have complete calculation engine data (all 8 engines)
+- [ ] Create `app/reports/` directory and `portfolio_report_generator.py` 
+- [ ] Implement data collection functions using existing database queries
+- [ ] Define output file structure: `reports/{portfolio_id}/{date}/`
+
+### 2.0.2 Day 2: Report Generation Implementation
+- [ ] Implement markdown report generation with direct string formatting (no templates)
+- [ ] Build executive summary using PortfolioSnapshot + CorrelationCalculation data
+- [ ] Build portfolio snapshot using calculate_portfolio_exposures() output
+- [ ] Build factor analysis table using PositionFactorExposure data
+- [ ] Build stress test table using StressTestResult data
+- [ ] Build Greeks summary using aggregate_portfolio_greeks() output
+
+### 2.0.3 Day 3: JSON & CSV Export Implementation
+- [ ] Implement JSON export using direct database model serialization
+- [ ] Include all 8 calculation engine outputs in structured JSON format
+- [ ] Implement CSV export with complete position details and calculated fields
+- [ ] Add Greeks, factor exposures, and metadata columns to CSV
+- [ ] Validate all data fields populate correctly (no missing/null critical data)
+
+### 2.0.4 Day 4: Demo Portfolio Testing & Integration
+- [ ] Generate all 3 files for Balanced Individual Investor Portfolio
+- [ ] Generate all 3 files for Sophisticated High Net Worth Portfolio  
+- [ ] Generate all 3 files for Long/Short Hedge Fund Style Portfolio
+- [ ] Add report generation as final step in batch_orchestrator.py
+- [ ] Test end-to-end: batch processing → report generation
+- [ ] Validate human reports are clean and readable
+
+### 2.0.5 Day 5: CLI Interface & Final Polish
+- [ ] Create CLI command: `python -m app.reports {portfolio_id}`
+- [ ] Add error handling for missing data with graceful degradation
+- [ ] Test LLM consumption of JSON/CSV files (manual ChatGPT upload test)
+- [ ] Add basic logging and status reporting
+- [ ] Final validation: all demo portfolios generate complete reports
+
+**Cross-Reference**: 
+- Implementation based on `_docs/requirements/PRD_PORTFOLIO_REPORT_SPEC.md` sections 4.1-4.3
+- Leverages all 8 completed calculation engines from Phase 1
+- Outputs human-readable `.md`, machine-readable `.json`, and position-level `.csv` files
+- Integrates with existing batch_orchestrator.py for automated daily generation
+- Supports LLM consumption for portfolio analysis and recommendations
+
+**Success Criteria**:
+- ✅ Generate complete reports for all 3 demo portfolios
+- ✅ Include data from all 8 batch calculation engines  
+- ✅ Produce human-readable markdown format
+- ✅ Include LLM-optimized JSON and CSV data blocks
+- ✅ Update automatically after daily batch processing
+
+---
+## Phase 2.1: API Development
 *All REST API endpoints for exposing backend functionality*
 
-### 2.1 Batch Processing Admin APIs (from Section 1.6.8)
+### 2.1.1 Batch Processing Admin APIs (from Section 1.6.8)
 *Manual trigger endpoints for batch job execution and monitoring*
 
 - [ ] **POST /api/v1/admin/batch/run-all** - Execute complete daily sequence
@@ -31,7 +88,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/admin/batch/history** - View recent job execution history
 - [ ] **GET /api/v1/admin/batch/schedule** - View upcoming scheduled jobs
 
-### 2.2 Portfolio Management APIs (from Section 1.7)
+### 2.1.2 Portfolio Management APIs (from Section 1.7)
 - [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
 - [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
 - [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
@@ -40,7 +97,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Add position type detection logic
 - [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
 
-### 2.3 Position Management APIs (from Section 1.8)
+### 2.1.3 Position Management APIs (from Section 1.8)
 - [ ] **GET /api/v1/positions** - List positions with filtering
 - [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
 - [ ] **GET /api/v1/positions/{id}** - Individual position details
@@ -50,7 +107,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/strategies** - Strategy groupings
 - [ ] Implement position grouping logic
 
-### 2.4 Risk Analytics APIs (from Section 1.9)
+### 2.1.4 Risk Analytics APIs (from Section 1.9)
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
 - [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
@@ -60,7 +117,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
 - [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
 
-### 2.5 Correlation & Stress Testing APIs (from Section 1.9.5)
+### 2.1.5 Correlation & Stress Testing APIs (from Section 1.9.5)
 *API endpoints for Section 1.4.7 stress testing and Section 1.4.8 correlation features*
 
 #### Factor Correlation APIs
@@ -79,7 +136,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/risk/correlations/positions/matrix** - Full pairwise correlation matrix  
 - [ ] **POST /api/v1/risk/correlations/positions/calculate** - Trigger position correlation calculation
 
-### 2.6 Factor Analysis APIs (from Section 1.10)
+### 2.1.6 Factor Analysis APIs (from Section 1.10)
 - [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
 - [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
 - [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
@@ -89,14 +146,14 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Add factor performance attribution
 - [ ] Store both position-level and portfolio-level factor exposures
 
-### 2.7 Tag Management APIs (from Section 1.11)
+### 2.1.7 Tag Management APIs (from Section 1.11)
 - [ ] **GET /api/v1/tags** - List all tags
 - [ ] **POST /api/v1/tags** - Create new tag
 - [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
 - [ ] **DELETE /api/v1/tags/{id}** - Delete tag
 - [ ] Implement tag validation and limits
 
-### 2.8 API Infrastructure (from Section 1.12)
+### 2.1.8 API Infrastructure (from Section 1.12)
 - [ ] Add user activity logging
 - [ ] Create data validation middleware
 - [x] Add rate limiting (100 requests/minute per user) - COMPLETED
