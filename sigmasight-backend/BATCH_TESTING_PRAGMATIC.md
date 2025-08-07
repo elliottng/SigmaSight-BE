@@ -594,7 +594,10 @@ PERFORMANCE_BASELINES = {
     'v2_sequential': {
         'single_portfolio': 29.52,  # seconds
         'success_rate': 1.0,        # 100%
-        'memory_usage': None,       # TBD during next session
+        'memory_usage_mb': None,    # TODO: Measure with 50-user load
+        'peak_memory_mb': None,     # TODO: Critical for container sizing
+        'db_connections': 1,        # Sequential = 1 connection at a time
+        'memory_per_portfolio_mb': None,  # TODO: For capacity planning
         'error_rate': 0.0           # 0% critical errors
     }
 }
@@ -655,6 +658,48 @@ def test_batch_processing_integration():
 - ❌ **Critical errors introduced** that weren't handled gracefully
 - ❌ **Performance degradation** > 50% without proportional feature benefits
 - ❌ **Regression** in any existing calculation engine
+
+### 11.11 Rollback Testing - FOR 50-USER PHASE
+**Quick reversion capability for production issues:**
+
+```python
+async def test_rollback_capability():
+    """Ensure we can quickly revert if issues arise with 50 users"""
+    
+    # 1. Test orchestrator version switching
+    from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
+    assert batch_orchestrator_v2 is not None
+    
+    # 2. Document rollback procedure
+    """
+    ROLLBACK PROCEDURE:
+    1. Update scheduler_config.py to import previous orchestrator
+    2. Update admin_batch.py imports
+    3. Restart application
+    4. Run single portfolio test to verify
+    Total time: < 5 minutes
+    """
+    
+    # 3. Test data compatibility
+    # Ensure v2 data structures work with potential v1 fallback
+    results_v2 = await run_v2_orchestrator()
+    assert validate_backwards_compatible(results_v2)
+    
+    # 4. Verify rollback doesn't lose data
+    pre_rollback_state = await capture_system_state()
+    # Simulate rollback
+    post_rollback_state = await capture_system_state()
+    assert pre_rollback_state == post_rollback_state
+```
+
+#### Rollback Decision Matrix:
+| Issue Type | Severity | Action | Rollback? |
+|------------|----------|--------|----------|
+| Performance degradation > 100% | High | Investigate first | Maybe |
+| Success rate < 95% | Critical | Immediate rollback | Yes |
+| Memory usage > 2x baseline | High | Monitor closely | Maybe |
+| Any data corruption | Critical | Immediate rollback | Yes |
+| User-reported calculation errors | Critical | Investigate + rollback | Yes |
 
 ---
 
