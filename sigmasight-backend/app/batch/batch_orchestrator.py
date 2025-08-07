@@ -7,6 +7,7 @@ from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
 from app.core.logging import get_logger
@@ -133,9 +134,11 @@ class BatchOrchestrator:
         Process all calculations for a single portfolio in the correct sequence.
         """
         results = []
-        portfolio_id = portfolio.id
+        # Convert to string immediately to avoid lazy loading issues
+        portfolio_id = str(portfolio.id)
+        portfolio_name = str(portfolio.name) if portfolio.name else "Unknown"
         
-        logger.info(f"Processing portfolio {portfolio_id}: {portfolio.name}")
+        logger.info(f"Processing portfolio {portfolio_id}: {portfolio_name}")
         
         # Step 1: Replace legacy aggregation with advanced portfolio calculations
         aggregation_result = await self._run_job(
@@ -280,12 +283,16 @@ class BatchOrchestrator:
     ) -> List[Portfolio]:
         """Get portfolios to process in this batch run."""
         if portfolio_id:
-            stmt = select(Portfolio).where(
+            stmt = select(Portfolio).options(
+                selectinload(Portfolio.positions)  # Eager load positions to avoid lazy loading
+            ).where(
                 Portfolio.id == portfolio_id,
                 Portfolio.deleted_at.is_(None)
             )
         else:
-            stmt = select(Portfolio).where(Portfolio.deleted_at.is_(None))
+            stmt = select(Portfolio).options(
+                selectinload(Portfolio.positions)  # Eager load positions to avoid lazy loading
+            ).where(Portfolio.deleted_at.is_(None))
         
         result = await db.execute(stmt)
         return result.scalars().all()

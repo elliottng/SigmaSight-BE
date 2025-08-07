@@ -22,7 +22,7 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False,
+    expire_on_commit=False,  # Prevents greenlet errors in async contexts
 )
 
 # Base class for models
