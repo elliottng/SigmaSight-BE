@@ -2383,19 +2383,10 @@ This mysterious UUID serialization issue has been documented for future investig
   - [x] Add clear error reporting when FMP lacks factor ETF data (no fallbacks) ✅ **Clear logging**
   - [x] Status: All factor ETFs working with FMP (30+ days data each) ✅
 
-**Treasury Rate Integration Fix** (Priority: DEFERRED - Working with graceful degradation) ✅ **FUNCTIONAL**  
-- [x] **FRED API Integration Status**: Working with graceful degradation ✅ **OPERATIONAL**
-  - [x] **FRED API Key**: Configured and functional ✅ **VERIFIED**
-  - [x] **Interest Rate Exposure**: Calculations running, finding no exposure (expected for demo portfolios) ✅ **GRACEFUL**
-  - [x] **Error Resolution**: Zero-size array errors eliminated - no longer blocking batch processing ✅ **RESOLVED**
-  - [x] **Graceful Handling**: System properly handles missing Treasury exposures without job failures ✅ **WORKING**
-- [ ] **Future Enhancements** (DEFERRED - Not blocking demo launch):
-  - [ ] Debug date alignment between Treasury rates and equity price data ranges
-  - [ ] Implement minimum data validation (require 90+ overlapping days)
-  - [ ] Add Treasury data quality checks with specific error messages  
-  - [ ] Add Treasury rate caching to reduce API dependency during calculations
-  - [ ] Implement Treasury rate interpolation for missing dates (weekends, holidays)
-  - [x] **Current Status**: Interest rate calculations functional, graceful degradation when no exposure found ✅ **PRODUCTION-READY**
+**Treasury Rate Integration Fix** ✅ **COMPLETED 2025-08-07** (See Phase 4 below for full details)
+- [x] **ROOT CAUSE FIXED**: Index type mismatch between Treasury and position data resolved ✅
+- [x] **191 regression days** now available (was 0), IR betas calculating successfully ✅
+- [x] **Low/zero IR exposures are CORRECT** - equities have weak Treasury correlations (R² 0.001-0.03) ✅
 
 **API Error Handling Enhancement** (Priority: MEDIUM - 1.5 hours)
 - [ ] **FMP Error Response Management**: Clear error reporting without fallbacks
@@ -2437,8 +2428,8 @@ This mysterious UUID serialization issue has been documented for future investig
 - **Testing & Validation**: ✅ 1 hour (5 test scripts created and executed)
 - **Total**: ✅ 6 hours - COMPLETED ahead of schedule
 
-**Phase 4: Critical Data Quality Fixes** (Priority: CRITICAL - 1-2 days) 🎯 **IN PROGRESS**
-*Essential fixes identified during demo readiness assessment - cannot defer*
+**Phase 4: Critical Data Quality Fixes** (Priority: CRITICAL - 1-2 days) ✅ **50% COMPLETE**
+*Essential fixes identified during demo readiness assessment - 2/4 completed*
 
 **Treasury/FRED Integration Fix** (Priority: CRITICAL - 2-3 hours) ✅ **COMPLETED 2025-08-07**
 - [x] **Fix Interest Rate Beta Calculations**: Resolved index type mismatch preventing regression ✅
