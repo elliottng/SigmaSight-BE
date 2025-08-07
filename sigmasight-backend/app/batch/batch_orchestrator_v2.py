@@ -372,7 +372,48 @@ class BatchOrchestratorV2:
     async def _calculate_greeks(self, db: AsyncSession, portfolio_id: str):
         """Greeks calculation job"""
         from app.calculations.greeks import bulk_update_portfolio_greeks
-        return await bulk_update_portfolio_greeks(db, portfolio_id, date.today())
+        from app.services.market_data_service import market_data_service
+        from app.models.positions import Position
+        
+        # Get portfolio positions to extract symbols
+        stmt = select(Position).where(
+            Position.portfolio_id == portfolio_id,
+            Position.deleted_at.is_(None),
+            Position.exit_date.is_(None)
+        )
+        result = await db.execute(stmt)
+        positions = result.scalars().all()
+        
+        if not positions:
+            logger.warning(f"No positions found for portfolio {portfolio_id} in Greeks calculation")
+            return {"updated": 0, "failed": 0, "errors": ["No positions found"]}
+        
+        # Extract underlying symbols for market data
+        symbols = list(set([
+            pos.underlying_symbol if pos.underlying_symbol else pos.symbol 
+            for pos in positions
+        ]))
+        
+        try:
+            # Get current market prices using hybrid approach
+            current_prices = await market_data_service.fetch_stock_prices_hybrid(symbols)
+            
+            # Convert to format expected by Greeks calculation
+            market_data = {}
+            for symbol, price_data in current_prices.items():
+                if price_data and price_data.get('price'):
+                    market_data[symbol] = {
+                        'current_price': float(price_data['price']),
+                        'implied_volatility': 0.25  # Default 25% IV
+                    }
+            
+            logger.info(f"Fetched market data for {len(market_data)} symbols for Greeks calculation")
+            return await bulk_update_portfolio_greeks(db, portfolio_id, market_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch market data for Greeks calculation: {str(e)}")
+            # Fallback with empty market data (will result in calculation failures)
+            return await bulk_update_portfolio_greeks(db, portfolio_id, {})
     
     async def _calculate_factors(self, db: AsyncSession, portfolio_id: str):
         """Factor analysis job"""
