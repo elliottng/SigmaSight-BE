@@ -246,14 +246,23 @@ async def calculate_direct_stress_impact(
                     'calculation_date': exposure.calculation_date
                 }
         
+        # Factor name mapping (scenario names -> database factor names)
+        FACTOR_NAME_MAP = {
+            'Market': 'Market Beta',
+            'Interest_Rate': 'Interest Rate Beta',  # For future use
+            # Add other mappings as needed
+        }
+        
         # Calculate direct impact for each shocked factor
         shocked_factors = scenario_config.get('shocked_factors', {})
         direct_impacts = {}
         total_direct_pnl = 0.0
         
         for factor_name, shock_amount in shocked_factors.items():
-            if factor_name in latest_exposures:
-                exposure_dollar = latest_exposures[factor_name]['exposure_dollar']
+            # Map factor name if needed
+            mapped_factor_name = FACTOR_NAME_MAP.get(factor_name, factor_name)
+            if mapped_factor_name in latest_exposures:
+                exposure_dollar = latest_exposures[mapped_factor_name]['exposure_dollar']
                 # Direct P&L = Factor Exposure × Shock Amount
                 factor_pnl = exposure_dollar * shock_amount
                 direct_impacts[factor_name] = {
@@ -263,10 +272,12 @@ async def calculate_direct_stress_impact(
                 }
                 total_direct_pnl += factor_pnl
                 
-                logger.debug(f"Factor {factor_name}: ${exposure_dollar:,.0f} exposure × "
+                logger.debug(f"Factor {factor_name} (mapped to {mapped_factor_name}): "
+                           f"${exposure_dollar:,.0f} exposure × "
                            f"{shock_amount:+.1%} shock = ${factor_pnl:,.0f} P&L")
             else:
-                logger.warning(f"No exposure found for shocked factor: {factor_name}")
+                logger.warning(f"No exposure found for shocked factor: {factor_name} "
+                              f"(mapped to {mapped_factor_name})")
                 direct_impacts[factor_name] = {
                     'exposure_dollar': 0.0,
                     'shock_amount': shock_amount,

@@ -682,12 +682,43 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
             "",
         ])
     
-    # Stress Testing section (placeholder for future)
-    lines.extend([
-        "### Stress Testing",
-        "*Stress test scenarios pending implementation (see Phase 2.4)*",
-        "",
-    ])
+    # Stress Testing section
+    stress_results = data.stress_test_results if hasattr(data, 'stress_test_results') else []
+    
+    if stress_results:
+        lines.extend([
+            "### Stress Testing",
+            "",
+            "**Scenario Impact Analysis** (P&L in thousands):",
+            "",
+            "| Scenario | Category | P&L Impact |",
+            "|----------|----------|------------|",
+        ])
+        
+        # Show top 5 worst and best scenarios
+        sorted_results = sorted(stress_results, key=lambda x: x.get('pnl_impact', 0))
+        worst_5 = sorted_results[:5]
+        best_5 = sorted_results[-5:]
+        
+        for result in worst_5:
+            pnl = result.get('pnl_impact', 0) / 1000  # Convert to thousands
+            lines.append(f"| {result.get('scenario_name', 'Unknown')} | {result.get('category', 'N/A')} | ${pnl:,.1f}k |")
+        
+        if len(sorted_results) > 10:
+            lines.append("| *...* | | |")
+        
+        for result in best_5:
+            if result not in worst_5:  # Avoid duplicates if less than 10 total
+                pnl = result.get('pnl_impact', 0) / 1000
+                lines.append(f"| {result.get('scenario_name', 'Unknown')} | {result.get('category', 'N/A')} | ${pnl:,.1f}k |")
+        
+        lines.append("")
+    else:
+        lines.extend([
+            "### Stress Testing",
+            "*No stress test results available - run batch calculations to generate*",
+            "",
+        ])
     
     lines.extend([
         "---",
