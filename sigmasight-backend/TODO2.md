@@ -37,11 +37,21 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     - ❌ **Snapshots**: 0 records (needs portfolio snapshots)
   - **ASSESSMENT**: 80% overall readiness - "MOSTLY READY, can proceed with caution"
   - **RECOMMENDATION**: Run batch calculations to populate calculation engine data
-- [x] Run missing batch calculations if needed to ensure data freshness ⚠️ **DEFERRED 2025-08-08**
-  - **DECISION**: Proceed with Phase 2.0 development using available data
-  - **RATIONALE**: Portfolio structure (63/63 positions) and market data (100% coverage) are perfect
-  - **STATUS**: Calculation engine data can be populated during or after report generator development
-  - **COMMAND**: Run `python scripts/verify_demo_portfolios.py` anytime to re-check status
+- [ ] Run missing batch calculations if needed to ensure data freshness ⚠️ **CHANGED DECISION 2025-08-08**
+  - **DECISION CHANGED**: Run batch calculations to populate calculation engine data before proceeding
+  - **RATIONALE**: Report generator needs actual calculation data, not placeholder/graceful degradation
+  - **CURRENT STATUS**: Batch processing attempted but failed due to database precision errors and insufficient historical data
+  - **VERIFICATION COMMAND**: `uv run python scripts/verify_demo_portfolios.py` - shows 33.3% calculation engine coverage
+  - **BATCH EXECUTION COMMAND**: See batch processing script that needs to be run and fixed
+  - **ISSUES IDENTIFIED**:
+    - Greeks database precision error (NUMERIC(8,6) overflow for delta values >99.999999)
+    - Factor analysis still missing historical data for some symbols
+    - Stress testing cascade failure due to missing factor exposures
+  - **REQUIRED FIXES**: 
+    1. Fix Greeks database schema precision limits
+    2. Debug factor analysis historical data requirements
+    3. Ensure all calculation engines populate database records
+  - **SUCCESS CRITERIA**: `uv run python scripts/verify_demo_portfolios.py` shows >90% calculation engine coverage
 - [x] Map all PRD placeholders to actual database fields and calculation outputs ✅ **IN PROGRESS**
   - **PRD ANALYZED**: Portfolio Report Generator PRD specifications reviewed
   - **DATABASE MODELS**: Confirmed Portfolio, PositionGreeks, FactorExposure, CorrelationCalculation models  

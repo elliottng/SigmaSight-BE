@@ -53,9 +53,9 @@ class PositionGreeks(Base):
     position_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("positions.id"), nullable=False, unique=True)
     calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
     
-    # Greeks values
-    delta: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
-    gamma: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
+    # Greeks values - increased precision to handle large option deltas (migration 99219061f7b0)
+    delta: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 6), nullable=True)  # Allows up to 999,999.999999
+    gamma: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 6), nullable=True)  # Allows up to 999,999.999999
     theta: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
     vega: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
     rho: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
