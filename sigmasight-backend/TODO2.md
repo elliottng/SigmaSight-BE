@@ -46,22 +46,23 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     # Step 2: Verify results
     uv run python scripts/verify_demo_portfolios.py
     ```
-  - **Final Results** (2025-01-08 after Phase 2.2 fix):
+  - **Final Results** (2025-08-08 after correlation fix):
     - **Batch Run**: 100% success rate (21/21 jobs completed)
-    - **Coverage**: 66.7% (4/6 engines have data) - improved from 33.3%
+    - **Coverage**: 83.3% (5/6 engines have data) - improved from 66.7%
     - **Engines Status**:
       - ✅ **Market Data**: 57 symbols available (0 days old)
       - ✅ **Positions**: 63 positions with 100% price coverage
       - ✅ **Greeks**: 8 records (precision fix worked! Now calculating for options)
       - ✅ **Factors**: 378 records (FIXED! Was 0, storage functions weren't being called)
-      - ❌ **Correlations**: 0 records (table has 16 records but verification shows 0 - investigation needed)
-      - ❌ **Snapshots**: 0 records (table exists but empty - investigation needed)
+      - ✅ **Correlations**: 3 records (FIXED! Missing calculation_date parameter)
+      - ❌ **Snapshots**: 0 records (array length error - investigation needed)
   - **Issues Fixed**:
     - ✅ Greeks precision error - **FIXED** via migration 99219061f7b0 (NUMERIC 12,6)
     - ✅ Factor analysis storage - **FIXED** in Phase 2.2 (added storage function calls)
+    - ✅ Correlation calculations - **FIXED** missing calculation_date parameter in batch orchestrator
+    - ✅ Correlation scheduling - **FIXED** changed from weekly (Tuesday) to daily execution
   - **Issues to Investigate**:
-    - Correlations: Table has 16 records but verification script shows 0 - possible join issue
-    - Snapshots: Job runs successfully but table remains empty - storage logic issue
+    - Snapshots: "Error creating portfolio snapshot: All arrays must be of the same length"
   - **Known Limitations**: Options have 0% factor coverage (expected - no historical data from APIs)
 - [x] Map all PRD placeholders to actual database fields and calculation outputs ✅ **IN PROGRESS**
   - **PRD ANALYZED**: Portfolio Report Generator PRD specifications reviewed
@@ -76,7 +77,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - Check calculation engine data completeness (Greeks, Factors, Correlations, etc.)
 - Assess overall readiness score and get actionable recommendations
 - Monitor data quality metrics (price coverage, market data freshness)
-- **Current Status**: 80% ready - portfolio structure perfect, needs batch calculations for full data
+- **Current Status**: 95% ready - portfolio structure perfect, 5/6 calculation engines working
 
 ### 2.0.2 Day 2: Report Generation Implementation
 - [ ] Implement markdown report generation with direct string formatting (no templates)
