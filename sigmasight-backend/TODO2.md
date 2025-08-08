@@ -112,7 +112,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - ✅ Update automatically after daily batch processing
 
 ---
-## Phase 2.0.5: Historical Data Integration for Factor Analysis
+## Phase 2.1: Historical Data Integration for Factor Analysis
 *Fix calculation engine failures by integrating 252-day historical data validation into batch processing*
 
 **Timeline**: 1-2 Days | **Status**: ⚠️ **REQUIRED FOR CALCULATION ENGINES** - Factor analysis failing due to insufficient historical data
@@ -136,7 +136,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - Automatic 252-day backfill trigger when insufficient data detected
 - Factor ETF + position symbol coordination in batch workflow
 
-### 2.0.5.1 Day 1: Pre-Flight Historical Data Validation Integration
+### 2.1.1 Day 1: Pre-Flight Historical Data Validation Integration
 - [ ] **Enhance `app/batch/market_data_sync.py`** - Add 252-day validation function
   - [ ] Create `validate_and_ensure_factor_analysis_data(db: AsyncSession) -> Dict[str, Any]`
   - [ ] Check all position symbols + factor ETFs (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV) for 252-day coverage
@@ -148,7 +148,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
   - [ ] Add validation results to batch execution summary for visibility
   - [ ] Ensure factor analysis jobs only run after historical data validation passes
 
-### 2.0.5.2 Day 2: Automatic Historical Data Backfill Integration  
+### 2.1.2 Day 2: Automatic Historical Data Backfill Integration  
 - [ ] **Implement Smart Backfill Logic** - Automatic 252-day data collection
   - [ ] Enhance `validate_and_ensure_factor_analysis_data()` to trigger backfill for insufficient symbols
   - [ ] Update `fetch_missing_historical_data()` to accept `days_back=252` parameter (override 90-day default)
@@ -160,7 +160,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
   - [ ] Verify cascade fix: Factor analysis success → Market Risk → Stress Testing → Correlations → Snapshots
   - [ ] Validate demo portfolios: All calculation engines populate database records (not just report "success")
 
-### 2.0.5.3 Testing & Validation
+### 2.1.3 Testing & Validation
 - [ ] **Create comprehensive test for historical data workflow**
   - [ ] Test scenario: Fresh database with only current-day market data
   - [ ] Run enhanced batch orchestrator and verify automatic 252-day backfill
@@ -190,10 +190,10 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - Addresses silent failures in batch processing discovered during Phase 1.6.14-1.6.15 reliability work
 
 ---
-## Phase 2.1: API Development
+## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 
-### 2.1.1 Batch Processing Admin APIs (from Section 1.6.8)
+### 3.0.1 Batch Processing Admin APIs (from Section 1.6.8)
 *Manual trigger endpoints for batch job execution and monitoring*
 
 - [ ] **POST /api/v1/admin/batch/run-all** - Execute complete daily sequence
@@ -209,7 +209,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/admin/batch/history** - View recent job execution history
 - [ ] **GET /api/v1/admin/batch/schedule** - View upcoming scheduled jobs
 
-### 2.1.2 Portfolio Management APIs (from Section 1.7)
+### 3.0.2 Portfolio Management APIs (from Section 1.7)
 - [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
 - [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
 - [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
@@ -218,7 +218,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Add position type detection logic
 - [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
 
-### 2.1.3 Position Management APIs (from Section 1.8)
+### 3.0.3 Position Management APIs (from Section 1.8)
 - [ ] **GET /api/v1/positions** - List positions with filtering
 - [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
 - [ ] **GET /api/v1/positions/{id}** - Individual position details
@@ -228,7 +228,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/strategies** - Strategy groupings
 - [ ] Implement position grouping logic
 
-### 2.1.4 Risk Analytics APIs (from Section 1.9)
+### 3.0.4 Risk Analytics APIs (from Section 1.9)
 - [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
 - [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
 - [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
@@ -238,7 +238,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
 - [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
 
-### 2.1.5 Correlation & Stress Testing APIs (from Section 1.9.5)
+### 3.0.5 Correlation & Stress Testing APIs (from Section 1.9.5)
 *API endpoints for Section 1.4.7 stress testing and Section 1.4.8 correlation features*
 
 #### Factor Correlation APIs
@@ -257,7 +257,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] **GET /api/v1/risk/correlations/positions/matrix** - Full pairwise correlation matrix  
 - [ ] **POST /api/v1/risk/correlations/positions/calculate** - Trigger position correlation calculation
 
-### 2.1.6 Factor Analysis APIs (from Section 1.10)
+### 3.0.6 Factor Analysis APIs (from Section 1.10)
 - [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
 - [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
 - [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
@@ -267,14 +267,14 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Add factor performance attribution
 - [ ] Store both position-level and portfolio-level factor exposures
 
-### 2.1.7 Tag Management APIs (from Section 1.11)
+### 3.0.7 Tag Management APIs (from Section 1.11)
 - [ ] **GET /api/v1/tags** - List all tags
 - [ ] **POST /api/v1/tags** - Create new tag
 - [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
 - [ ] **DELETE /api/v1/tags/{id}** - Delete tag
 - [ ] Implement tag validation and limits
 
-### 2.1.8 API Infrastructure (from Section 1.12)
+### 3.0.8 API Infrastructure (from Section 1.12)
 - [ ] Add user activity logging
 - [ ] Create data validation middleware
 - [x] Add rate limiting (100 requests/minute per user) - COMPLETED
@@ -290,12 +290,12 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 ---
 
-## Phase 3: Advanced Features & Frontend Integration (Future)
+## Phase 4: Advanced Features & Frontend Integration (Future)
 
-### 3.0 Developer Experience & Onboarding
+### 4.0 Developer Experience & Onboarding
 *Make the project easy to set up and contribute to*
 
-#### 3.0.1 Developer Onboarding Improvements ⏳ **PLANNED**
+#### 4.0.1 Developer Onboarding Improvements ⏳ **PLANNED**
 *Streamline project setup to reduce friction for new contributors*
 
 **Timeline**: 2-3 Days | **Priority**: High (Developer Productivity)
@@ -361,10 +361,10 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 ---
 
-### 3.1 Code Quality & Technical Debt
+### 4.1 Code Quality & Technical Debt
 *Refactoring, deprecations, and technical improvements*
 
-#### 3.1.1 Greeks Calculation Simplification
+#### 4.1.1 Greeks Calculation Simplification
 - [x] **Remove py_vollib dependency and fallback logic** - **COMPLETED**
   - [x] Remove `py-vollib>=1.0.1` from `pyproject.toml`
   - [x] Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
@@ -383,7 +383,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     - Failed calculations return `None` with error logging
     - Options calculations use mibian-only (same quality, no fallbacks)
 
-#### 3.0.2 Production Job Scheduling Architecture Decision ⏳ **RESEARCH NEEDED**
+#### 4.0.2 Production Job Scheduling Architecture Decision ⏳ **RESEARCH NEEDED**
 *Evaluate and select production-ready job scheduling solution*
 
 **Timeline**: 1-2 Days | **Priority**: High (Production Readiness)
@@ -425,7 +425,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 **Notes**: Current MemoryJobStore works for development but lacks production reliability. Decision should balance immediate needs vs. long-term architecture goals.
 
-#### 3.0.3 UUID Serialization Root Cause Investigation
+#### 4.0.3 UUID Serialization Root Cause Investigation
 - [ ] **Investigate asyncpg UUID serialization issue** 
   - **Background**: Multiple batch jobs fail with `'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'`
   - **Current Status**: Working with pragmatic workaround (detects error and treats job as successful)
@@ -453,7 +453,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
   - **Priority**: Low (system is fully functional with workaround, all 8/8 jobs working)
   - **Reference**: Section 1.6.11 for comprehensive debugging history
 
-#### 3.0.3 Technical Debt & Cleanup (Future)
+#### 4.0.4 Technical Debt & Cleanup (Future)
 - [ ] Standardize error handling patterns across all services
 - [ ] Remove deprecated code comments and TODOs
 - [ ] Consolidate similar utility functions
@@ -550,7 +550,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
   - [ ] Real-time progress updates during onboarding process
   - [ ] Email notifications for onboarding completion/failures
 
-### 2.3 Reporting & Export APIs
+### 3.3 Reporting & Export APIs
 - [ ] **POST /api/v1/reports/generate** - Generate reports
 - [ ] **GET /api/v1/reports/{id}/status** - Check generation status
 - [ ] **GET /api/v1/reports/{id}/download** - Download report
@@ -559,7 +559,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Implement async report generation
 - [ ] Create export templates
 
-### 2.3 AI Agent Preparation
+### 3.4 AI Agent Preparation
 - [ ] Design async job queue for long-running operations
 - [ ] Implement comprehensive error responses
 - [ ] Add detailed operation status endpoints
@@ -568,7 +568,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Add filtering and search capabilities
 - [ ] Document all endpoints with OpenAPI schemas
 
-### 2.4 Performance Optimization
+### 3.5 Performance Optimization
 - [ ] Implement in-memory caching for frequently accessed data
 - [ ] Add database query optimization
 - [ ] Implement connection pooling
@@ -576,9 +576,9 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Profile and optimize critical paths
 - [ ] Add database indexes based on query patterns
 
-## Phase 3: Testing & Deployment (Week 7)
+## Phase 5: Testing & Deployment (Week 7)
 
-### 3.1 Testing
+### 5.1 Testing
 - [ ] Write unit tests for all services
 - [ ] Create integration tests for API endpoints
 - [ ] Add performance tests for critical operations
@@ -586,14 +586,14 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Test authentication flows
 - [ ] Create API documentation with examples
 
-### 3.2 Frontend Integration
+### 5.2 Frontend Integration
 - [ ] Test with deployed Next.js prototype
 - [ ] Adjust API responses to match frontend expectations
 - [ ] Implement any missing endpoints discovered during integration
 - [ ] Add proper CORS configuration
 - [ ] Optimize response formats for frontend consumption
 
-### 3.3 Railway Deployment
+### 5.3 Railway Deployment
 - [ ] Create railway.json configuration
 - [ ] Set up PostgreSQL on Railway
 - [ ] Configure environment variables
@@ -602,7 +602,7 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Configure custom domain (if needed)
 - [ ] Set up monitoring and logging
 
-### 3.4 Documentation
+### 5.4 Documentation
 - [ ] Create comprehensive README
 - [ ] Document all API endpoints
 - [ ] Create deployment guide
@@ -610,23 +610,23 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Document data models and schemas
 - [ ] Create troubleshooting guide
 
-## Phase 4: Demo Preparation (Week 8)
+## Phase 6: Demo Preparation (Week 8)
 
-### 4.1 Demo Data Quality
+### 6.1 Demo Data Quality
 - [ ] Generate realistic 90-day portfolio history
 - [ ] Create compelling demo scenarios
 - [ ] Ensure smooth user flows
 - [ ] Pre-calculate all analytics for demo period
 - [ ] Test all demo script scenarios
 
-### 4.2 Performance Tuning
+### 6.2 Performance Tuning
 - [ ] Ensure all API responses < 200ms
 - [ ] Optimize database queries
 - [ ] Cache all demo data
 - [ ] Load test with expected demo traffic
 - [ ] Fix any performance bottlenecks
 
-### 4.3 Polish & Bug Fixes
+### 6.3 Polish & Bug Fixes
 - [ ] Fix any frontend integration issues
 - [ ] Polish error messages
 - [ ] Ensure consistent API responses
