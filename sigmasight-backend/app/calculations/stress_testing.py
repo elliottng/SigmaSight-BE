@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.models.positions import Position
-from app.models.market_data import FactorDefinition, PositionFactorExposure, FactorExposure
+from app.models.market_data import FactorDefinition, PositionFactorExposure, FactorExposure, StressTestScenario, StressTestResult
 from app.models.users import Portfolio
 from app.calculations.factors import fetch_factor_returns
 from app.constants.factors import FACTOR_ETFS, REGRESSION_WINDOW_DAYS
@@ -577,4 +577,112 @@ async def run_comprehensive_stress_test(
         
     except Exception as e:
         logger.error(f"Error running comprehensive stress test: {str(e)}")
+        raise
+
+
+async def save_stress_test_results(
+    db: AsyncSession,
+    portfolio_id: UUID,
+    stress_test_results: Dict[str, Any]
+) -> int:
+    """
+    Save stress test results to database
+    
+    Args:
+        db: Database session
+        portfolio_id: Portfolio ID
+        stress_test_results: Complete stress test results from run_comprehensive_stress_test
+        
+    Returns:
+        Number of results saved
+    """
+    from decimal import Decimal
+    
+    logger.info(f"Saving stress test results for portfolio {portfolio_id}")
+    
+    try:
+        saved_count = 0
+        calculation_date = stress_test_results['calculation_date']
+        
+        # First, get all scenario IDs from database
+        stmt = select(StressTestScenario)
+        result = await db.execute(stmt)
+        scenarios = result.scalars().all()
+        scenario_map = {s.scenario_id: s.id for s in scenarios}
+        
+        # Delete existing results for this portfolio and date to avoid duplicates
+        from sqlalchemy import delete
+        delete_stmt = delete(StressTestResult).where(
+            and_(
+                StressTestResult.portfolio_id == portfolio_id,
+                StressTestResult.calculation_date == calculation_date
+            )
+        )
+        await db.execute(delete_stmt)
+        
+        # Process all test results
+        stress_data = stress_test_results.get('stress_test_results', {})
+        direct_impacts = stress_data.get('direct_impacts', {})
+        correlated_impacts = stress_data.get('correlated_impacts', {})
+        
+        for category in direct_impacts:
+            for scenario_id in direct_impacts[category]:
+                # Get scenario UUID from database
+                scenario_uuid = scenario_map.get(scenario_id)
+                if not scenario_uuid:
+                    logger.warning(f"Scenario {scenario_id} not found in database, skipping")
+                    continue
+                
+                # Get direct and correlated results
+                direct_result = direct_impacts[category][scenario_id]
+                correlated_result = correlated_impacts[category][scenario_id]
+                
+                # Extract P&L values
+                direct_pnl = Decimal(str(direct_result['total_direct_pnl']))
+                correlated_pnl = Decimal(str(correlated_result['correlated_pnl']))
+                correlation_effect = correlated_pnl - direct_pnl
+                
+                # Prepare factor impacts data
+                factor_impacts = {}
+                for factor_name, impact_data in direct_result['factor_impacts'].items():
+                    factor_impacts[factor_name] = {
+                        'shock_pct': impact_data.get('shock_amount', 0) * 100,  # Convert to percentage
+                        'direct_pnl': float(impact_data.get('factor_pnl', 0)),
+                        'exposure': float(impact_data.get('exposure_dollar', 0))
+                    }
+                
+                # Add correlation impacts
+                if 'factor_correlation_impacts' in correlated_result:
+                    for factor_pair, impact in correlated_result['factor_correlation_impacts'].items():
+                        factor_impacts[f"correlation_{factor_pair}"] = float(impact)
+                
+                # Create result record
+                stress_result = StressTestResult(
+                    portfolio_id=portfolio_id,
+                    scenario_id=scenario_uuid,
+                    calculation_date=calculation_date,
+                    direct_pnl=direct_pnl,
+                    correlated_pnl=correlated_pnl,
+                    correlation_effect=correlation_effect,
+                    factor_impacts=factor_impacts,
+                    calculation_metadata={
+                        'scenario_name': direct_result.get('scenario_name', scenario_id),
+                        'category': category,
+                        'correlation_matrix_date': str(stress_test_results.get('correlation_matrix_info', {}).get('calculation_date', '')),
+                        'data_days': stress_test_results.get('correlation_matrix_info', {}).get('data_days')
+                    }
+                )
+                
+                db.add(stress_result)
+                saved_count += 1
+        
+        # Commit all results
+        await db.commit()
+        
+        logger.info(f"Saved {saved_count} stress test results to database")
+        return saved_count
+        
+    except Exception as e:
+        logger.error(f"Error saving stress test results: {str(e)}")
+        await db.rollback()
         raise

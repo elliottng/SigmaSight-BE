@@ -474,7 +474,37 @@ async def _collect_report_data(
     else:
         factor_exposures = []
     
-    # 8. Build the complete data structure (maintaining Decimal precision)
+    # 8. Fetch stress test results if available
+    from app.models.market_data import StressTestResult, StressTestScenario
+    stress_test_results = []
+    try:
+        stress_stmt = (
+            select(StressTestResult, StressTestScenario)
+            .join(StressTestScenario, StressTestResult.scenario_id == StressTestScenario.id)
+            .where(
+                and_(
+                    StressTestResult.portfolio_id == portfolio_id,
+                    StressTestResult.calculation_date == anchor_date
+                )
+            )
+        )
+        stress_result = await db.execute(stress_stmt)
+        stress_test_data = stress_result.all()
+        
+        for result, scenario in stress_test_data:
+            stress_test_results.append({
+                'scenario_name': scenario.name,
+                'category': scenario.category,
+                'direct_pnl': float(result.direct_pnl),
+                'correlated_pnl': float(result.correlated_pnl),
+                'correlation_effect': float(result.correlation_effect),
+                'pnl_impact': float(result.correlated_pnl)  # Use correlated P&L as the main impact
+            })
+    except Exception as e:
+        logger.warning(f"Could not fetch stress test results: {e}")
+        stress_test_results = []
+    
+    # 9. Build the complete data structure (maintaining Decimal precision)
     return {
         "meta": {
             "portfolio_id": portfolio_id,
@@ -511,7 +541,8 @@ async def _collect_report_data(
                 "exposure_value": fe.exposure_value,  # Keep as Decimal
             }
             for fe, factor_def in factor_exposures
-        ] if factor_exposures else []
+        ] if factor_exposures else [],
+        "stress_test_results": stress_test_results
     }
 
 
@@ -683,7 +714,7 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
         ])
     
     # Stress Testing section
-    stress_results = data.stress_test_results if hasattr(data, 'stress_test_results') else []
+    stress_results = data.get('stress_test_results', [])
     
     if stress_results:
         lines.extend([
@@ -735,7 +766,7 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
     engines_status.append(f"✅ **Greeks Aggregation**: {'Calculated' if greeks else 'Not Available'}")
     engines_status.append(f"✅ **Factor Analysis**: {len(factor_exposures)} exposures" if factor_exposures else "❌ **Factor Analysis**: Not Available")
     engines_status.append(f"✅ **Correlations**: {'Available' if correlation else 'Not Available'}")
-    engines_status.append("❌ **Stress Testing**: Pending Implementation")
+    engines_status.append(f"✅ **Stress Testing**: {len(stress_results)} scenarios tested" if stress_results else "❌ **Stress Testing**: Not Available")
     engines_status.append("❌ **Interest Rate Betas**: No Data")
     
     lines.extend(engines_status)

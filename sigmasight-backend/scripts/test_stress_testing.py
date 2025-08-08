@@ -18,7 +18,8 @@ from app.calculations.stress_testing import (
     load_stress_scenarios,
     calculate_direct_stress_impact,
     calculate_correlated_stress_impact,
-    run_comprehensive_stress_test
+    run_comprehensive_stress_test,
+    save_stress_test_results
 )
 from sqlalchemy import select
 

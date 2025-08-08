@@ -446,9 +446,18 @@ class BatchOrchestratorV2:
     
     async def _run_stress_tests(self, db: AsyncSession, portfolio_id: str):
         """Stress testing job"""
-        from app.calculations.stress_testing import run_comprehensive_stress_test
+        from app.calculations.stress_testing import run_comprehensive_stress_test, save_stress_test_results
         portfolio_uuid = ensure_uuid(portfolio_id)
-        return await run_comprehensive_stress_test(db, portfolio_uuid, date.today())
+        
+        # Run stress tests
+        results = await run_comprehensive_stress_test(db, portfolio_uuid, date.today())
+        
+        # Save results to database
+        if results and 'stress_test_results' in results:
+            saved_count = await save_stress_test_results(db, portfolio_uuid, results)
+            results['saved_to_database'] = saved_count
+            
+        return results
     
     async def _create_snapshot(self, db: AsyncSession, portfolio_id: str):
         """Portfolio snapshot job"""
