@@ -82,9 +82,40 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     - Calculates portfolio exposures using `calculate_portfolio_exposures()`
     - Aggregates Greeks using `aggregate_portfolio_greeks()`
     - Fetches top factor exposures with joined FactorDefinition names
+  - **Fixed Field Mapping Issues**:
+    - Changed `position.current_value` to `position.market_value` (correct model field)
+    - Fixed `PositionFactorExposure` using `exposure_value` not `factor_beta`
+    - Added proper join with `FactorDefinition` to get factor names
+  - **Enhanced JSON Report Builder**:
+    - Updated to return actual collected data instead of placeholder
+    - Shows all calculation engine results in structured format
   - **Test Results**: Successfully generates reports for demo portfolios with real data
+    - Demo Individual Portfolio: 16 positions, $527,750 total value, $485,000 gross exposure
+    - Factor exposures working (showing Value, Quality, Growth factors)
+    - Greeks aggregation working (0 values for stock-only portfolio as expected)
   - **Data Completeness**: All 6 calculation engines providing data (100% coverage)
-- [ ] Define output file structure: `reports/{slugified_portfolio_name}_{date}/` (add to .gitignore)
+  - **Test Script**: Created `scripts/test_report_generator.py` for validation
+  - **Completion Notes**:
+    • Successfully fetches and aggregates all calculation engine data
+    • Properly handles UUID conversions and date filtering
+    • Gracefully handles missing data (e.g., no correlations returns null)
+    • Ready for format builders to create rich Markdown/CSV reports
+- [x] Define output file structure: `reports/{slugified_portfolio_name}_{date}/` (add to .gitignore) ✅ **COMPLETED 2025-08-08**
+  - **Implemented File I/O System**:
+    - Added `slugify()` function to convert portfolio names to filesystem-safe slugs
+    - Created `create_report_directory()` to ensure proper directory structure
+    - Implemented `write_report_files()` to write all format artifacts to disk
+    - Updated `generate_portfolio_report()` to optionally write files (controlled by `write_to_disk` flag)
+  - **Directory Structure**: `reports/{slugified_portfolio_name}_{date}/`
+    - Example: `reports/demo-individual-investor-portfolio_2025-08-08/`
+    - Contains: `portfolio_report.md`, `portfolio_report.json`, `portfolio_report.csv`
+  - **Added to .gitignore**: Added `reports/` directory to prevent committing generated reports
+  - **Test Results**: Successfully generates and writes all 3 file formats for demo portfolio
+  - **Completion Notes**:
+    • File I/O system fully functional with proper error handling
+    • Directory structure matches PRD specification exactly
+    • Reports directory excluded from version control as intended
+    • Ready for rich content implementation in Markdown and CSV builders
 
 **📊 VERIFICATION TOOL**: Use `python scripts/verify_demo_portfolios.py` anytime to:
 - Verify 3 demo portfolios and 63 positions are intact

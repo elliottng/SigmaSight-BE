@@ -1,17 +1,19 @@
 """
 Async Portfolio Report Generator scaffolding (Phase 2.0).
 
-Scope for TODO2.md line 69:
-- Create app/reports/ directory and this async module.
-- Do NOT define output file structure yet (covered by TODO2.md line 71).
+This module provides the public orchestration entrypoint with full data
+collection implementation and file I/O support for writing reports to disk.
 
-This module provides the public orchestration entrypoint and stubs for data
-collection and format builders. Subsequent tasks (lines 70-71, 80-91, etc.)
-will flesh out implementations and file outputs.
+File structure: reports/{slugified_portfolio_name}_{date}/
+- portfolio_report.md
+- portfolio_report.json
+- portfolio_report.csv
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -46,6 +48,79 @@ class ReportRequest:
     portfolio_id: str  # UUID as str or DB-native identifier
     as_of: Optional[date] = None
     formats: Iterable[AllowedFormat] = ("md", "json", "csv")
+    write_to_disk: bool = True  # Whether to write files to disk
+
+
+def slugify(text: str) -> str:
+    """Convert text to filesystem-safe slug.
+    
+    Examples:
+    - "Balanced Individual Investor" -> "balanced-individual-investor"
+    - "Long/Short Hedge Fund" -> "long-short-hedge-fund"
+    """
+    # Convert to lowercase
+    text = text.lower()
+    # Replace spaces and special chars with hyphens
+    text = re.sub(r'[^a-z0-9]+', '-', text)
+    # Remove leading/trailing hyphens
+    text = text.strip('-')
+    # Collapse multiple hyphens
+    text = re.sub(r'-+', '-', text)
+    return text
+
+
+def create_report_directory(portfolio_name: str, report_date: date) -> Path:
+    """Create report directory structure.
+    
+    Returns:
+        Path to the created directory
+    
+    Example:
+        "Balanced Individual Investor" on 2025-01-08
+        -> reports/balanced-individual-investor_2025-01-08/
+    """
+    base_dir = Path("reports")
+    slugified_name = slugify(portfolio_name)
+    date_str = report_date.isoformat()
+    
+    report_dir = base_dir / f"{slugified_name}_{date_str}"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    
+    return report_dir
+
+
+def write_report_files(
+    report_dir: Path,
+    artifacts: ReportArtifacts,
+    portfolio_name: str,
+) -> Dict[str, Path]:
+    """Write report artifacts to disk.
+    
+    Returns:
+        Dict mapping format to file path
+    """
+    written_files = {}
+    
+    if "md" in artifacts:
+        md_path = report_dir / "portfolio_report.md"
+        md_path.write_text(artifacts["md"])
+        written_files["md"] = md_path
+        logger.info(f"Wrote markdown report to {md_path}")
+    
+    if "json" in artifacts:
+        json_path = report_dir / "portfolio_report.json"
+        with json_path.open("w") as f:
+            json.dump(artifacts["json"], f, indent=2, default=str)
+        written_files["json"] = json_path
+        logger.info(f"Wrote JSON report to {json_path}")
+    
+    if "csv" in artifacts:
+        csv_path = report_dir / "portfolio_report.csv"
+        csv_path.write_text(artifacts["csv"])
+        written_files["csv"] = csv_path
+        logger.info(f"Wrote CSV report to {csv_path}")
+    
+    return written_files
 
 
 async def generate_portfolio_report(
@@ -56,20 +131,26 @@ async def generate_portfolio_report(
 
     Notes
     -----
-    - Minimal implementation at this stage (TODO2.md line 69):
-      - Define async entrypoint and data/formatter stubs.
-      - Do not write files to disk yet.
-    - Later tasks will implement data collection and formatting details.
+    - Collects data from all calculation engines
+    - Generates reports in requested formats (md, json, csv)
+    - Optionally writes files to disk in reports/{portfolio_name}_{date}/
     """
     logger.info(
-        "Starting portfolio report generation: portfolio_id=%s, as_of=%s, formats=%s",
+        "Starting portfolio report generation: portfolio_id=%s, as_of=%s, formats=%s, write_to_disk=%s",
         request.portfolio_id,
         request.as_of,
         list(request.formats),
+        request.write_to_disk,
     )
 
-    # Collect data (placeholder structure). Implementation in next task.
+    # Collect data from database
     data = await _collect_report_data(db, portfolio_id=request.portfolio_id, as_of=request.as_of)
+    
+    # Check if we got valid data
+    if "error" in data.get("meta", {}):
+        logger.error(f"Failed to collect data: {data['meta']['error']}")
+        # Return empty artifacts for error case
+        return {}
 
     artifacts: ReportArtifacts = {}
     for fmt in request.formats:
@@ -81,6 +162,20 @@ async def generate_portfolio_report(
             artifacts["csv"] = build_csv_report(data)
         else:  # pragma: no cover - guarded by AllowedFormat Literal
             logger.warning("Unknown format requested: %s", fmt)
+
+    # Write to disk if requested
+    if request.write_to_disk and artifacts:
+        portfolio_name = data.get("meta", {}).get("portfolio_name", "unknown")
+        report_date = request.as_of or date.today()
+        
+        report_dir = create_report_directory(portfolio_name, report_date)
+        written_files = write_report_files(report_dir, artifacts, portfolio_name)
+        
+        logger.info(
+            "Wrote %d report files to %s",
+            len(written_files),
+            report_dir,
+        )
 
     logger.info(
         "Completed portfolio report generation: portfolio_id=%s; produced=%s",
