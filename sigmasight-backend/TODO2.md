@@ -112,6 +112,84 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - ✅ Update automatically after daily batch processing
 
 ---
+## Phase 2.0.5: Historical Data Integration for Factor Analysis
+*Fix calculation engine failures by integrating 252-day historical data validation into batch processing*
+
+**Timeline**: 1-2 Days | **Status**: ⚠️ **REQUIRED FOR CALCULATION ENGINES** - Factor analysis failing due to insufficient historical data
+
+### **ROOT CAUSE ANALYSIS COMPLETE**
+- **✅ Functions Built**: Historical data fetching infrastructure exists but not integrated into batch workflow
+- **❌ Missing Integration**: Batch orchestrator doesn't validate 252-day requirements before factor analysis
+- **🔍 Evidence**: Static code analysis shows factor analysis requires 252+ days but daily sync only fetches 5 days
+- **💥 Impact**: All calculation engines fail cascade due to factor analysis requiring historical price alignment
+
+### **BACKGROUND: Existing Infrastructure Assessment**
+**✅ ALREADY BUILT (from Phase 1):**
+- `app/batch/market_data_sync.py::fetch_missing_historical_data()` - Fetches historical data with configurable lookback
+- `app/calculations/market_data.py::validate_historical_data_availability()` - Validates 252-day data requirements  
+- `scripts/backfill_position_symbols.py` - Manual backfill script (300 days)
+- `scripts/backfill_factor_etfs.py` - Manual factor ETF backfill script
+- `app/batch/scheduler_config.py::_backfill_historical_data()` - Weekly 90-day scheduler (repurposable)
+
+**❌ MISSING INTEGRATION POINTS:**
+- Pre-flight validation before calculation engines run
+- Automatic 252-day backfill trigger when insufficient data detected
+- Factor ETF + position symbol coordination in batch workflow
+
+### 2.0.5.1 Day 1: Pre-Flight Historical Data Validation Integration
+- [ ] **Enhance `app/batch/market_data_sync.py`** - Add 252-day validation function
+  - [ ] Create `validate_and_ensure_factor_analysis_data(db: AsyncSession) -> Dict[str, Any]`
+  - [ ] Check all position symbols + factor ETFs (SPY, VTV, VUG, MTUM, QUAL, SIZE, USMV) for 252-day coverage
+  - [ ] Return validation report: symbols with sufficient data vs. symbols needing backfill
+  - [ ] Log detailed coverage analysis for troubleshooting
+- [ ] **Integrate validation into `batch_orchestrator_v2.py`** - Pre-flight check before calculations
+  - [ ] Add validation call to `_update_market_data()` method  
+  - [ ] Modify Step 1 workflow: `sync_market_data()` → `validate_252_day_requirements()` → proceed
+  - [ ] Add validation results to batch execution summary for visibility
+  - [ ] Ensure factor analysis jobs only run after historical data validation passes
+
+### 2.0.5.2 Day 2: Automatic Historical Data Backfill Integration  
+- [ ] **Implement Smart Backfill Logic** - Automatic 252-day data collection
+  - [ ] Enhance `validate_and_ensure_factor_analysis_data()` to trigger backfill for insufficient symbols
+  - [ ] Update `fetch_missing_historical_data()` to accept `days_back=252` parameter (override 90-day default)
+  - [ ] Add factor ETF symbols to backfill process automatically (no manual script dependency)
+  - [ ] Implement backfill progress tracking and error reporting for large symbol sets
+- [ ] **End-to-End Workflow Integration** - Complete batch processing fix
+  - [ ] Test Step 1: Market data sync validates and backfills 252-day requirements
+  - [ ] Test Step 3: Factor analysis successfully uses historical data for regression calculations
+  - [ ] Verify cascade fix: Factor analysis success → Market Risk → Stress Testing → Correlations → Snapshots
+  - [ ] Validate demo portfolios: All calculation engines populate database records (not just report "success")
+
+### 2.0.5.3 Testing & Validation
+- [ ] **Create comprehensive test for historical data workflow**
+  - [ ] Test scenario: Fresh database with only current-day market data
+  - [ ] Run enhanced batch orchestrator and verify automatic 252-day backfill
+  - [ ] Confirm factor analysis creates `PositionFactorExposure` database records
+  - [ ] Verify all 8 calculation engines complete successfully with real data
+- [ ] **Update verification scripts** 
+  - [ ] Enhance `scripts/verify_demo_portfolios.py` to check 252-day historical coverage
+  - [ ] Add historical data quality metrics to data quality dashboard
+  - [ ] Create diagnostic command: `python -m app.batch.market_data_sync validate-historical`
+
+### **REUSABLE COMPONENTS STRATEGY:**
+- **Repurpose Weekly Scheduler**: Update `scheduler_config.py::_backfill_historical_data()` from 90-day to 252-day maintenance
+- **Leverage Existing Scripts**: Integrate logic from `backfill_position_symbols.py` and `backfill_factor_etfs.py` into automated workflow  
+- **Enhance Data Quality Module**: Extend `app/batch/data_quality.py` to include 252-day factor analysis requirements
+
+### **SUCCESS CRITERIA:**
+- ✅ **Batch orchestrator automatically validates 252-day historical data before factor analysis**
+- ✅ **Insufficient data triggers automatic backfill without manual intervention**  
+- ✅ **Factor analysis creates database records (not just reports success)**
+- ✅ **All calculation engines work end-to-end: Factor Analysis → Market Risk → Stress Testing → Correlations → Snapshots**
+- ✅ **Demo portfolios populate complete calculation data for Phase 2.0 Portfolio Report Generator**
+
+### **CROSS-REFERENCE:**
+- Fixes root cause identified in factor analysis static code analysis
+- Enables Phase 2.0 Portfolio Report Generator with complete calculation engine data
+- Leverages existing infrastructure from TODO1.md Phase 1 market data integration
+- Addresses silent failures in batch processing discovered during Phase 1.6.14-1.6.15 reliability work
+
+---
 ## Phase 2.1: API Development
 *All REST API endpoints for exposing backend functionality*
 
