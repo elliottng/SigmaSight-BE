@@ -51,14 +51,18 @@ class PortfolioReportGenerator:
             write_to_disk=True
         )
         
-        # Call the main generate function
+        # Call the main generate function which handles file writing internally
         artifacts = await generate_portfolio_report(self.db, request)
         
-        # Write files and return path
-        if artifacts:
-            files = write_report_files(artifacts, request)
-            if format in files:
-                return str(files[format])
+        # Return success/failure message
+        if artifacts and format in artifacts:
+            # Build expected file path
+            from pathlib import Path
+            portfolio_slug = artifacts.get("meta", {}).get("portfolio_slug", "unknown")
+            report_dir = Path("reports") / f"{portfolio_slug}_{report_date}"
+            file_ext = "md" if format == "md" else format
+            file_path = report_dir / f"portfolio_report.{file_ext}"
+            return str(file_path)
         
         return f"Report generation failed for format: {format}"
 
