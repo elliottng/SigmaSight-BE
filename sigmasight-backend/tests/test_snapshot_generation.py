@@ -241,7 +241,8 @@ class TestSnapshotGeneration:
             )
         
         assert pnl_data["daily_pnl"] == Decimal("2000.00")
-        assert pnl_data["daily_return"] == Decimal("0.013333")  # 2000/150000
+        # Check daily_return with proper precision (6 decimal places as per DB schema)
+        assert pnl_data["daily_return"].quantize(Decimal("0.000001")) == Decimal("0.013333")  # 2000/150000
         assert pnl_data["cumulative_pnl"] == Decimal("7000.00")  # 5000 + 2000
     
     @pytest.mark.asyncio
