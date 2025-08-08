@@ -62,11 +62,17 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
     - ✅ Correlation scheduling - **FIXED** changed from weekly (Tuesday) to daily execution
     - ✅ Snapshot array length error - **FIXED** in Phase 2.3 (defensive input handling & enum normalization)
   - **Known Limitations**: Options have 0% factor coverage (expected - no historical data from APIs)
-- [x] Map all PRD placeholders to actual database fields and calculation outputs ✅ **IN PROGRESS**
+- [x] Map all PRD placeholders to actual database fields and calculation outputs ✅ **COMPLETED 2025-08-08**
   - **PRD ANALYZED**: Portfolio Report Generator PRD specifications reviewed
   - **DATABASE MODELS**: Confirmed Portfolio, PositionGreeks, FactorExposure, CorrelationCalculation models  
   - **MAPPING READY**: Ready to implement data collection functions using existing schemas
-- [ ] Create `app/reports/` directory and async `portfolio_report_generator.py` 
+  - **Completion Notes**:
+    • Successfully mapped all PRD placeholders to actual database fields and calculation outputs
+    • Verified database models and confirmed readiness for data collection implementation
+- [x] Create `app/reports/` directory and async `portfolio_report_generator.py`
+  - Created `app/reports/__init__.py` and `app/reports/portfolio_report_generator.py` (2025-08-08)
+  - Added async `generate_portfolio_report()` entrypoint and stubs: `_collect_report_data`, `build_markdown_report`, `build_json_report`, `build_csv_report`
+  - No file I/O yet; output path and .gitignore will be handled in line 71
 - [ ] Implement async data collection functions using existing database queries
 - [ ] Define output file structure: `reports/{slugified_portfolio_name}_{date}/` (add to .gitignore)
 

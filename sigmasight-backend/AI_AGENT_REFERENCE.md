@@ -233,6 +233,70 @@ asyncio.run(check())
 
 ---
 
+## 🚀 First 15 Minutes Runbook
+
+### **Quick Start for New Engineers**
+```bash
+# 1. Start PostgreSQL database
+docker-compose up -d
+
+# 2. Apply database migrations
+uv run alembic upgrade head
+
+# 3. Seed demo data (3 portfolios, 63 positions)
+python scripts/reset_and_seed.py seed
+
+# 4. Run snapshot tests to verify fix
+uv run pytest tests/test_snapshot_generation.py -q
+
+# 5. Check database for snapshot records
+uv run python -c "
+import asyncio
+from sqlalchemy import select, func
+from app.database import get_async_session
+from app.models.snapshots import PortfolioSnapshot
+
+async def check():
+    async with get_async_session() as db:
+        count = await db.execute(select(func.count(PortfolioSnapshot.id)))
+        print(f'PortfolioSnapshot records: {count.scalar()}')
+        
+asyncio.run(check())
+"
+
+# 6. Run batch calculations to populate all engines
+uv run python scripts/run_batch_calculations.py
+
+# 7. Verify complete system status
+uv run python scripts/verify_demo_portfolios.py
+```
+
+### **Manual Snapshot Test**
+```python
+# Quick smoke test for snapshot generation
+import asyncio
+from datetime import date
+from uuid import UUID
+from app.database import get_async_session
+from app.calculations.snapshots import create_portfolio_snapshot
+
+async def test_snapshot():
+    # Use demo portfolio ID
+    portfolio_id = UUID("51134ffd-2f13-49bd-b1f5-0c327e801b69")  # Demo Individual
+    
+    async with get_async_session() as db:
+        result = await create_portfolio_snapshot(
+            db=db,
+            portfolio_id=portfolio_id,
+            calculation_date=date.today()
+        )
+        print(f"Snapshot result: {result}")
+        
+asyncio.run(test_snapshot())
+```
+
+---
+
 ## 🔧 Environment & Dependencies
 
 ### **Database Setup**
@@ -405,9 +469,10 @@ aggregations = calculate_portfolio_exposures(positions_list)
 - `greeks`: Dict or None (optional, for options only)
 
 **Output Fields:**
-- `gross_exposure`: Sum of absolute exposures
+- `gross_exposure`: Sum of absolute exposures (calculated from `exposure` field)
 - `net_exposure`: Sum of signed exposures  
-- `notional`: Total notional value (same as gross_exposure)
+- `notional`: Sum of absolute market values (calculated from `market_value` field)
+  - Note: Often equals gross_exposure when exposure == market_value, but computed separately
 - Note: "notional_exposure" is NOT used in code, only "notional"
 
 ### **Position Type Handling** ⚠️ **IMPORTANT**
@@ -477,16 +542,24 @@ portfolio_delta = delta.quantize(Decimal("0.00"))  # 2 dp for storage
 
 ### **Cache Implementation** 🔄
 **Current Status:**
-- `timed_lru_cache` decorator with 60-second TTL
-- `clear_portfolio_cache()` function exists in `app/calculations/portfolio.py`
-- Not fully implemented across all endpoints
+- `timed_lru_cache` decorator with 60-second TTL (lines 36-65 in `app/calculations/portfolio.py`)
+- `clear_portfolio_cache()` function at lines 638-652 in `app/calculations/portfolio.py`
+- Clears cache for all aggregation functions via `.cache_clear()` method
+- Note: Currently no functions use `@timed_lru_cache` decorator - caching ready but not active
 
 **Usage:**
 ```python
 from app.calculations.portfolio import clear_portfolio_cache
-# Clear after data changes
-clear_portfolio_cache()
+# Clear all portfolio aggregation caches
+clear_portfolio_cache()  # Logs: "Cleared all portfolio aggregation caches"
 ```
+
+### **Market Data Storage** 📊
+**Database Table:**
+- Model: `app.models.market_data.MarketDataCache` (lines 14-45)
+- Table: `market_data_cache` 
+- Stores historical price data with symbol, date, OHLCV, sector/industry info
+- Unique constraint on (symbol, date) pair
 
 ---
 
@@ -658,6 +731,9 @@ uv run pytest -m asyncio
 ### **Test Gotchas**
 - **Greeks Precision**: Tests should expect 2dp for snapshot Greeks (DB constraint)
 - **Field Names**: Use `notional` not `notional_exposure` in assertions
+  - **Compatibility Note**: If older tests expect `notional_exposure`, either:
+    1. Update tests to use `notional` (preferred), or
+    2. Add temporary alias: `result["notional_exposure"] = result["notional"]` in `calculate_portfolio_exposures()`
 - **Position Types**: Test data may use enums - normalize to strings in tests
 - **Async Tests**: Use `@pytest.mark.asyncio` decorator for async test functions
 
@@ -676,7 +752,11 @@ uv run pytest -m asyncio
 - **Calculations**: Maintain full precision (4dp for Greeks)
 - **Database Storage**: Round to match column constraints at write time
 - **API Response**: Final rounding at serialization layer
-- **Current Practice**: Round in calculations to match DB (may change)
+- **Current Implementation**:
+  - `calculate_portfolio_exposures()` rounds to 2dp (lines 180-188)
+  - `aggregate_portfolio_greeks()` rounds to 4dp (lines 264-266)
+  - This matches DB constraints: exposures use NUMERIC(16,2), Greeks use NUMERIC(12,4)
+  - Note: May change to round only at DB/API layer in future
 
 ### **Field Naming Standards**
 - **Canonical**: Use `notional` (not `notional_exposure`)
@@ -686,7 +766,11 @@ uv run pytest -m asyncio
 ### **Rho Handling**
 - **Policy**: Calculate rho but do NOT store in PortfolioSnapshot
 - **Rationale**: Rarely used metric, saves storage
-- **Access**: Available in PositionGreeks, can aggregate if needed
+- **Details**: 
+  - `aggregate_portfolio_greeks()` returns rho in its output (line 240)
+  - `PortfolioSnapshot` model has no `portfolio_rho` field (`app/models/snapshots.py` lines 14-57)
+  - Snapshot write path ignores rho when storing aggregated Greeks
+- **Access**: Available in PositionGreeks table, can aggregate if needed
 
 ### **Trading Calendar Gating**
 - **Snapshots**: Check `trading_calendar.is_trading_day()` before creation
@@ -694,11 +778,12 @@ uv run pytest -m asyncio
 - **Tests**: Mock calendar or use known trading dates
 
 ### **Aggregation Function Status**
-- ✅ `calculate_portfolio_exposures` - Fully implemented
-- ✅ `aggregate_portfolio_greeks` - Fully implemented  
-- ✅ `calculate_delta_adjusted_exposure` - Fully implemented
-- ✅ `aggregate_by_tags` - Fully implemented
-- ✅ `aggregate_by_underlying` - Fully implemented
+All functions in `app/calculations/portfolio.py`:
+- ✅ `calculate_portfolio_exposures` (lines 68-197) - Fully implemented
+- ✅ `aggregate_portfolio_greeks` (lines 200-284) - Fully implemented  
+- ✅ `calculate_delta_adjusted_exposure` (lines 287-370) - Fully implemented
+- ✅ `aggregate_by_tags` (lines 373-502) - Fully implemented
+- ✅ `aggregate_by_underlying` (lines 505-634) - Fully implemented
 
 ---
 
