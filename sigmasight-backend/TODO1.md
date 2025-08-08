@@ -264,7 +264,7 @@ sigmasight-backend/
 - Real: Greeks, factor betas (7 factors, 12-month window), portfolio aggregations
 - Mock: Fallback values when calculations fail
 - Postponed to V1.5: Risk metrics (VaR, Sharpe), Short Interest factor
-- Forward-looking: 252-day regression window for better predictive power
+- Forward-looking: 150-day regression window (previously 252d, changed due to data feed limitations) for better predictive power
 - See ANALYTICAL_ARCHITECTURE_V1.4.md and RISK_FACTOR_AND_METRICS_V1.4.md for details
 
 **⚠️ IMPORTANT**: Before implementing any calculation function, review the legacy analytics code in:
@@ -475,19 +475,19 @@ sigmasight-backend/
   - Updated `app/models/__init__.py` exports
 
 - [x] **Update `calculate_daily_pnl()` in Section 1.4.1** ✅ COMPLETED
-  - Enhanced with `lookback_days` parameter supporting 252-day historical lookups
+  - Enhanced with `lookback_days` parameter supporting 150-day historical lookups (previously 252d)
   - Added `fetch_historical_prices()` and `validate_historical_data_availability()` functions
   - Backward compatibility maintained for existing daily P&L calculations
 
 - [x] **Verify market_data_cache historical depth** ✅ COMPLETED
   - **YFinance Integration**: Successfully implemented for factor ETFs
-  - **Historical Data**: All 7 factor ETFs have 273+ trading days (exceeds 252-day requirement)
+  - **Historical Data**: All 7 factor ETFs have 273+ trading days (exceeds 150-day requirement, previously 252d)
   - **Data Sources**: Factor ETFs via YFinance, individual stocks via existing Polygon integration
   - **Backfill Scripts**: Automated `backfill_factor_etfs.py` successfully populated database
 
 **Core Factor Analysis Functions:**
 - [x] **`calculate_factor_betas_hybrid(portfolio_id, calculation_date, use_delta_adjusted=False)`** ✅ COMPLETED
-  - **Implementation**: 252-day regression using statsmodels OLS with beta capping at ±3
+  - **Implementation**: 150-day regression (previously 252d) using statsmodels OLS with beta capping at ±3
   - **Testing**: Successfully calculated portfolio betas (Market: 0.96, Growth: 0.79, Value: 1.08)
   - **Data Quality**: 189 days of regression data, 10 positions processed
   - **Quality Flags**: `full_history` and `limited_history` implemented
@@ -514,7 +514,7 @@ sigmasight-backend/
 
 - [x] **Create factor configuration constants** ✅ COMPLETED
   - **File**: `app/constants/factors.py` with all required constants
-  - **Constants**: REGRESSION_WINDOW_DAYS=252, MIN_REGRESSION_DAYS=60, BETA_CAP_LIMIT=3.0
+  - **Constants**: REGRESSION_WINDOW_DAYS=150 (previously 252), MIN_REGRESSION_DAYS=60, BETA_CAP_LIMIT=3.0
   - **Integration**: Used throughout factor calculation functions
 
 **🎉 Implementation Summary (2025-08-04):**
@@ -946,7 +946,7 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
 
 **Implementation Summary:**
 - **Two-Tier Stress Testing Engine**: Direct impact calculation + correlated impact with factor cross-correlations
-- **Factor Correlation Matrix**: Exponentially weighted correlations with 94% decay factor, 252-day lookback
+- **Factor Correlation Matrix**: Exponentially weighted correlations with 94% decay factor, 150-day lookback (previously 252d)
 - **Comprehensive Scenario Library**: 18 scenarios across 5 categories including historical crisis replays
 - **Database Infrastructure**: Three new tables for scenarios, results, and factor correlations
 - **Production Testing**: Portfolio risk range $-159,659 to $114,042, mean correlation effect $16,310
@@ -960,8 +960,8 @@ When FRED API unavailable, uses asset-type heuristics for realistic mock data:
   - Extensible JSON configuration for custom scenarios
   - File: `app/config/stress_scenarios.json`
 
-- [x] **`calculate_factor_correlation_matrix(lookback_days=252)`** ✅ COMPLETED
-  - Input: Database session, lookback period (default 252 days), decay factor (default 0.94)
+- [x] **`calculate_factor_correlation_matrix(lookback_days=150)`** ✅ COMPLETED (previously 252d)
+  - Input: Database session, lookback period (default 150 days, previously 252d), decay factor (default 0.94)
   - Output: Factor cross-correlation matrix with metadata and statistics
   - Implementation: Exponentially weighted correlation with recent data prioritization
   - Testing: 7 factors analyzed, mean correlation 0.729, 189 days of data
@@ -1688,7 +1688,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
     ```
   - **Status**: Function name mapping fixed, orchestration complete, ready for Phase 1 testing
   - **Database**: Store in `factor_exposures` table
-  - **Features**: 7-factor model, 252-day regression, beta calculations
+  - **Features**: 7-factor model, 150-day regression (previously 252d), beta calculations
 
 - [x] **Step 4: Calculate Market Risk Scenarios (5:20 PM Daily)** ✅ PLACEHOLDER WORKING
   - **Completed Engine**: `app/services/market_risk_service.py`
@@ -2968,7 +2968,7 @@ Database consistency issue transformed from technical debt into competitive adva
 - **Database module unification** completed with 88.9% regression test pass rate ✅
 - **Options Greeks calculations** (section 1.4.2) with mibian library and comprehensive testing ✅
 - **Portfolio aggregation functions** (section 1.4.3) with 29 passing tests and <1s performance ✅
-- **7-factor risk analysis** (section 1.4.4) with 252-day regression and database storage ✅
+- **7-factor risk analysis** (section 1.4.4) with 150-day regression (previously 252d) and database storage ✅
 - **Market risk scenarios** (section 1.4.5) with factor-based approach and FRED API integration ✅
 - **Comprehensive stress testing framework** (section 1.4.7) with 18 predefined scenarios and correlation modeling ✅
 - **YFinance integration** for factor ETFs with 273+ days of historical data ✅

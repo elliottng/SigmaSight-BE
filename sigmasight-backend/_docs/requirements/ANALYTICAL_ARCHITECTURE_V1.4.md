@@ -73,7 +73,7 @@ This document details the technical rationale behind our quantitative library ch
 - Matches Bloomberg/Reuters Greeks for verification
 
 ### Risk Metrics (Industry Conventions)
-- 252 trading days annualization
+- 150 trading days annualization (previously 252d, changed due to data feed limitations)
 - 95% and 99% VaR (regulatory standard)
 - Sharpe ratio with risk-free rate parameter
 - Maximum drawdown (peak-to-trough)

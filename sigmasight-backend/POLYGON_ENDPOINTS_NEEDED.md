@@ -74,7 +74,7 @@ This document lists all Polygon API endpoints needed for full functionality of t
 **Usage**: Historical OHLC data for stocks/ETFs  
 **Example**: `/v2/aggs/ticker/AAPL/range/1/day/2024-01-01/2024-12-31`  
 **Why Important**:
-- Factor analysis (need 252 days history)
+- Factor analysis (need 150 days history, previously 252d)
 - Correlation calculations
 - Performance analytics
 

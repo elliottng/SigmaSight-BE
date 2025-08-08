@@ -28,7 +28,7 @@
    - Market value calculations (need current prices)
    - Greeks calculations (need underlying stock prices)
    - P&L calculations (need price history)
-   - Factor analysis (need 252 days of prices)
+   - Factor analysis (need 150 days of prices, previously 252d)
 
 ## Root Cause
 

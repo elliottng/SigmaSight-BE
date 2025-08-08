@@ -280,7 +280,7 @@ The following implementation decisions have been made:
   - BATCH_JOB_ENABLED (default: true)
   - FACTOR_USE_DELTA_ADJUSTED (default: false)
 - **Config constants** (in app/constants/factors.py):
-  - REGRESSION_WINDOW_DAYS = 252  # 12-month window
+  - REGRESSION_WINDOW_DAYS = 150  # 6-month window (previously 252d/12-month, changed due to data feed limitations)
   - MIN_REGRESSION_DAYS = 60      # 3-month minimum
   - BETA_CAP_LIMIT = 3.0
   - FACTOR_JOB_SCHEDULE = "0 17 15 * * *"  # 5:15 PM daily
