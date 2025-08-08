@@ -54,11 +54,14 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
       - ✅ **Positions**: 63 positions with 100% price coverage
       - ✅ **Greeks**: 8 records (precision fix worked! Now calculating for options)
       - ✅ **Factors**: 378 records (FIXED! Was 0, storage functions weren't being called)
-      - ❌ **Correlations**: 0 records (separate calculation needed)
-      - ❌ **Snapshots**: 0 records (separate calculation needed)
+      - ❌ **Correlations**: 0 records (table has 16 records but verification shows 0 - investigation needed)
+      - ❌ **Snapshots**: 0 records (table exists but empty - investigation needed)
   - **Issues Fixed**:
     - ✅ Greeks precision error - **FIXED** via migration 99219061f7b0 (NUMERIC 12,6)
     - ✅ Factor analysis storage - **FIXED** in Phase 2.2 (added storage function calls)
+  - **Issues to Investigate**:
+    - Correlations: Table has 16 records but verification script shows 0 - possible join issue
+    - Snapshots: Job runs successfully but table remains empty - storage logic issue
   - **Known Limitations**: Options have 0% factor coverage (expected - no historical data from APIs)
 - [x] Map all PRD placeholders to actual database fields and calculation outputs ✅ **IN PROGRESS**
   - **PRD ANALYZED**: Portfolio Report Generator PRD specifications reviewed
@@ -777,6 +780,52 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - [ ] Create demo reset functionality
 
 ## Future Enhancements (Post-Demo)
+
+### Data Quality & Calculation Improvements
+*Identified during Phase 2.2 factor analysis debug - non-critical but valuable*
+
+#### Factor Analysis Enhancements
+- [ ] **Fix SIZE vs SLY ETF inconsistency**
+  - `FACTOR_ETFS` uses "SIZE" in `app/constants/factors.py`
+  - Backfill list uses "SLY" in `app/batch/market_data_sync.py`
+  - Harmonize across codebase to prevent data gaps
+  - Verify `FactorDefinition.etf_proxy` matches consistently
+
+- [ ] **Add regression diagnostics logging**
+  - Log R² and p-values for each factor regression
+  - Detect degenerate cases (near-zero variance)
+  - Add warnings for low statistical significance
+  - Store regression quality metrics in database
+
+- [ ] **Implement factor correlation matrix**
+  - Calculate and store factor correlations
+  - Detect multicollinearity issues
+  - Warn when factors are highly correlated (>0.8)
+  - Use for stress testing and risk analysis
+
+- [ ] **Reconcile 7 vs 8 factor count**
+  - Constants define 7 factors with ETF proxies
+  - Database has 8 factors (includes "Short Interest" without ETF)
+  - Either add 8th ETF proxy or remove from active factors
+  - Ensure consistency across seeds, constants, and calculations
+
+#### Calculation Engine Robustness
+- [ ] **Improve upsert logic for all calculation engines**
+  - Current fix uses existence check + update/insert pattern
+  - Consider using PostgreSQL `ON CONFLICT` for atomic upserts
+  - Reduce database round trips and improve performance
+
+- [ ] **Add comprehensive calculation diagnostics**
+  - Log input data quality (missing values, date gaps)
+  - Track calculation duration and resource usage
+  - Create calculation audit trail for debugging
+  - Add data lineage tracking
+
+- [ ] **Enhance error recovery**
+  - Implement partial failure recovery (continue with available data)
+  - Add retry logic for transient failures
+  - Better error categorization and reporting
+  - Create fallback calculations for missing data
 
 ### Backlog Items
 - [ ] WebSocket support for real-time updates

@@ -62,7 +62,7 @@ class BatchScheduler:
         - 4:30 PM: Portfolio aggregation and Greeks
         - 5:00 PM: Factor analysis and risk metrics
         - 5:30 PM: Stress testing
-        - 6:00 PM: Correlations (Tuesday only)
+        - 6:00 PM: Correlations (Daily)
         - 6:30 PM: Portfolio snapshots
         """
         
@@ -80,15 +80,14 @@ class BatchScheduler:
             replace_existing=True
         )
         
-        # Weekly correlation calculation - Tuesday at 6:00 PM ET
+        # Daily correlation calculation - Every day at 6:00 PM ET
         self.scheduler.add_job(
-            func=self._run_weekly_correlations,
+            func=self._run_daily_correlations,
             trigger='cron',
-            day_of_week='tue',
             hour=18,  # 6:00 PM
             minute=0,
-            id='weekly_correlations',
-            name='Weekly Correlation Calculation',
+            id='daily_correlations',
+            name='Daily Correlation Calculation',
             replace_existing=True
         )
         
@@ -144,9 +143,9 @@ class BatchScheduler:
             await self._send_batch_alert(f"Daily batch failed: {str(e)}", None)
             raise
     
-    async def _run_weekly_correlations(self):
-        """Execute weekly correlation calculations."""
-        logger.info("Starting scheduled weekly correlation calculation")
+    async def _run_daily_correlations(self):
+        """Execute daily correlation calculations."""
+        logger.info("Starting scheduled daily correlation calculation")
         
         try:
             # Run batch with correlations explicitly enabled
@@ -160,10 +159,10 @@ class BatchScheduler:
                 if 'correlation' in r.get('job_name', '')
             ]
             
-            logger.info(f"Weekly correlations completed: {len(correlation_results)} portfolios")
+            logger.info(f"Daily correlations completed: {len(correlation_results)} portfolios")
             
         except Exception as e:
-            logger.error(f"Weekly correlation calculation failed: {str(e)}")
+            logger.error(f"Daily correlation calculation failed: {str(e)}")
             await self._send_batch_alert(f"Correlation calculation failed: {str(e)}", None)
             raise
     
