@@ -479,6 +479,128 @@ Portfolio snapshot generation was failing with "All arrays must be of the same l
 
 ---
 
+## Phase 2.4: Stress Testing Debug Investigation
+*Systematic investigation to fix the stress testing calculation engine and enable stress test data in reports*
+
+**Timeline**: 1-2 Days | **Status**: 🔴 NOT STARTED | **Priority**: HIGH
+
+### **Current State Analysis**
+- **Database Tables**: `stress_test_scenarios` and `stress_test_results` exist (migration b5cd2cea0507)
+- **Scenario Data**: 0 scenarios defined in database
+- **Results Data**: 0 stress test results calculated
+- **Calculation Module**: `app/calculations/stress_testing.py` exists
+- **Batch Integration**: Listed in batch_orchestrator_v2.py but may not be executing
+
+### **Investigation Steps**
+
+#### Step 1: Verify Database Schema & Seed Data
+- [ ] Check if stress_test_scenarios table is properly created
+- [ ] Verify stress_test_results table structure matches model
+- [ ] Check for any seed data scripts for scenarios
+- [ ] Identify if scenarios should be loaded from `app/config/stress_scenarios.json`
+- [ ] Create script to populate standard scenarios if missing
+
+#### Step 2: Trace Stress Testing Execution Path
+- [ ] Review batch_orchestrator_v2.py to find stress test calculation call
+- [ ] Check if stress testing is actually being invoked during batch runs
+- [ ] Identify any try/except blocks silently swallowing errors
+- [ ] Add detailed logging to stress test calculation pipeline
+- [ ] Verify async/sync context compatibility
+
+#### Step 3: Debug Calculation Module
+- [ ] Test `app/calculations/stress_testing.py` in isolation
+- [ ] Check `calculate_stress_tests()` function signature and requirements
+- [ ] Verify it has access to required data (positions, factor exposures, correlations)
+- [ ] Test with a single portfolio to identify failure point
+- [ ] Check for missing dependencies or data requirements
+
+#### Step 4: Fix Data Dependencies
+- [ ] Ensure factor exposures are calculated before stress tests (dependency chain)
+- [ ] Verify correlation data is available (required for correlated stress tests)
+- [ ] Check if market data is sufficient for scenario calculations
+- [ ] Validate position data structure matches expectations
+- [ ] Fix any missing data or calculation order issues
+
+#### Step 5: Implement Scenario Loading
+- [ ] Load scenarios from `app/config/stress_scenarios.json` if it exists
+- [ ] Or create standard scenarios programmatically:
+  - Market Down 10% / Market Up 10%
+  - Interest Rates +100bps / -100bps
+  - Factor Rotation (Value to Growth)
+  - Volatility Spike
+  - Sector Crash (Tech -20%)
+- [ ] Store scenarios in database with proper configuration
+
+#### Step 6: Fix Batch Integration
+- [ ] Ensure stress testing runs AFTER prerequisites:
+  1. Market data sync
+  2. Position updates
+  3. Factor calculations
+  4. Correlation calculations
+  5. THEN stress testing
+- [ ] Add proper error handling with detailed logging
+- [ ] Implement retry logic for transient failures
+- [ ] Add stress test results to batch summary output
+
+#### Step 7: Validate Results
+- [ ] Run full batch for all 3 demo portfolios
+- [ ] Verify stress_test_results table populates
+- [ ] Check calculations are reasonable (not all zeros or nulls)
+- [ ] Compare with manual calculations for validation
+- [ ] Document any limitations or assumptions
+
+### **Diagnostic Commands**
+```bash
+# Check current state
+uv run python -c "
+from app.database import get_async_session
+import asyncio
+from sqlalchemy import select, func
+from app.models.market_data import StressTestScenario, StressTestResult
+
+async def check():
+    async with get_async_session() as db:
+        scenarios = await db.scalar(select(func.count(StressTestScenario.id)))
+        results = await db.scalar(select(func.count(StressTestResult.id)))
+        print(f'Scenarios: {scenarios}, Results: {results}')
+        
+asyncio.run(check())
+"
+
+# Test stress calculation in isolation
+uv run python -c "
+from app.calculations.stress_testing import calculate_stress_tests
+# Test with demo portfolio
+"
+
+# Check if stress scenarios config exists
+ls -la app/config/stress_scenarios.json
+```
+
+### **Expected Outcomes**
+- ✅ 5-10 standard stress test scenarios populated in database
+- ✅ Stress test calculations running successfully in batch
+- ✅ 15-30 stress test results per portfolio (5-10 scenarios × 3 portfolios)
+- ✅ Results showing realistic P&L impacts for each scenario
+- ✅ Batch orchestrator reporting stress test completion
+- ✅ Report generator can access and display stress test data
+
+### **Files to Modify/Create**
+1. `scripts/seed_stress_scenarios.py` - Populate standard scenarios
+2. `scripts/test_stress_calculations.py` - Isolated testing script
+3. `app/batch/batch_orchestrator_v2.py` - Fix integration and error handling
+4. `app/calculations/stress_testing.py` - Fix calculation logic if needed
+5. `scripts/debug_stress_testing.py` - Comprehensive debugging script
+
+### **Success Criteria**
+- Stress test data appears in database after batch run
+- Portfolio reports show stress test section with scenario impacts
+- All 3 demo portfolios have stress test results
+- Clear documentation of calculation methodology
+- No silent failures in batch pipeline
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 
