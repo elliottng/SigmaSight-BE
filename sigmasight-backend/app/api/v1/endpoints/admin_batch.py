@@ -12,6 +12,7 @@ from app.core.dependencies import get_db, require_admin
 from app.models.snapshots import BatchJob
 from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2 as batch_orchestrator
 from app.batch.scheduler_config import batch_scheduler
+from app.batch.data_quality import pre_flight_validation
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -414,5 +415,87 @@ async def cancel_batch_job(
         "status": "cancelled",
         "job_id": job_id,
         "cancelled_by": admin_user.email,
+        "timestamp": datetime.now()
+    }
+
+
+@router.get("/data-quality")
+async def get_data_quality_status(
+    portfolio_id: Optional[str] = Query(None, description="Specific portfolio ID or all portfolios"),
+    db: AsyncSession = Depends(get_db),
+    admin_user = Depends(require_admin)
+):
+    """
+    Get data quality status and metrics for portfolios.
+    Provides pre-flight validation results without running batch processing.
+    """
+    logger.info(f"Admin {admin_user.email} requested data quality status for portfolio {portfolio_id or 'all'}")
+    
+    try:
+        # Run data quality validation
+        validation_results = await pre_flight_validation(db, portfolio_id)
+        
+        # Add admin metadata
+        validation_results['requested_by'] = admin_user.email
+        validation_results['request_timestamp'] = datetime.now()
+        
+        logger.info(
+            f"Data quality check completed for admin {admin_user.email}: "
+            f"score {validation_results.get('quality_score', 0):.1%}"
+        )
+        
+        return validation_results
+        
+    except Exception as e:
+        logger.error(f"Data quality check failed for admin {admin_user.email}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Data quality validation failed: {str(e)}"
+        )
+
+
+@router.post("/data-quality/refresh")
+async def refresh_market_data_for_quality(
+    background_tasks: BackgroundTasks,
+    portfolio_id: Optional[str] = Query(None, description="Specific portfolio ID or all portfolios"),
+    db: AsyncSession = Depends(get_db),
+    admin_user = Depends(require_admin)
+):
+    """
+    Refresh market data to improve data quality scores.
+    Runs market data sync in the background based on data quality recommendations.
+    """
+    logger.info(f"Admin {admin_user.email} requested market data refresh for data quality improvement")
+    
+    # First, check current data quality to identify what needs refreshing
+    validation_results = await pre_flight_validation(db, portfolio_id)
+    recommendations = validation_results.get('recommendations', [])
+    
+    if not recommendations or 'within acceptable thresholds' in recommendations[0]:
+        return {
+            "status": "no_action_needed",
+            "message": "Data quality is already within acceptable thresholds",
+            "current_quality_score": validation_results.get('quality_score', 0),
+            "requested_by": admin_user.email,
+            "timestamp": datetime.now()
+        }
+    
+    # Run market data sync in background
+    background_tasks.add_task(
+        batch_orchestrator._update_market_data,
+        db
+    )
+    
+    logger.info(
+        f"Market data refresh initiated by admin {admin_user.email} "
+        f"(current quality: {validation_results.get('quality_score', 0):.1%})"
+    )
+    
+    return {
+        "status": "refresh_started",
+        "message": "Market data refresh started to improve data quality",
+        "current_quality_score": validation_results.get('quality_score', 0),
+        "recommendations": recommendations[:3],  # Show top 3 recommendations
+        "requested_by": admin_user.email,
         "timestamp": datetime.now()
     }

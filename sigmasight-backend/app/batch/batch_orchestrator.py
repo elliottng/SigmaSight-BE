@@ -42,6 +42,7 @@ from app.calculations.stress_testing import (
     run_comprehensive_stress_test,
     calculate_factor_correlation_matrix
 )
+from app.batch.data_quality import pre_flight_validation
 
 logger = get_logger(__name__)
 
@@ -91,7 +92,22 @@ class BatchOrchestrator:
                 
                 logger.info(f"Processing {len(portfolios)} portfolio(s)")
                 
-                # Step 0: Update market data (shared across all portfolios)
+                # Step 0: Pre-flight data quality validation
+                validation_result = await self._run_job(
+                    "data_quality_validation",
+                    self._validate_data_quality,
+                    db, portfolio_id
+                )
+                results.append(validation_result)
+                
+                # Check if validation passed
+                if validation_result['status'] == 'failed':
+                    logger.error("Pre-flight validation failed, aborting batch sequence")
+                    return results
+                elif validation_result['status'] == 'warning':
+                    logger.warning("Pre-flight validation has warnings, proceeding with caution")
+                
+                # Step 1: Update market data (shared across all portfolios)
                 market_data_result = await self._run_job(
                     "market_data_update",
                     self._update_market_data,
@@ -108,14 +124,21 @@ class BatchOrchestrator:
                     )
                     results.extend(portfolio_results)
                 
-                # Log summary
+                # Log summary with data quality metrics
                 duration = (datetime.now() - start_time).total_seconds()
                 successful = sum(1 for r in results if r['status'] == 'completed')
                 failed = sum(1 for r in results if r['status'] == 'failed')
                 
+                # Extract data quality score if available
+                quality_info = ""
+                validation_result = next((r for r in results if r.get('job_type') == 'data_quality_validation'), None)
+                if validation_result:
+                    quality_score = validation_result.get('quality_score', 0)
+                    quality_info = f", data quality: {quality_score:.1%}"
+                
                 logger.info(
                     f"Batch sequence completed in {duration:.2f}s: "
-                    f"{successful} successful, {failed} failed"
+                    f"{successful} successful, {failed} failed{quality_info}"
                 )
                 
                 return results
@@ -655,6 +678,57 @@ class BatchOrchestrator:
         except Exception as e:
             logger.error(f"Portfolio snapshot error: {str(e)}")
             raise
+    
+    async def _validate_data_quality(
+        self,
+        db: AsyncSession,
+        portfolio_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Step 0: Pre-flight data quality validation before batch processing
+        """
+        try:
+            logger.info(f"Running pre-flight data quality validation for portfolio: {portfolio_id or 'ALL'}")
+            
+            # Use the data quality validation function
+            validation_results = await pre_flight_validation(db, portfolio_id)
+            
+            # Extract key metrics for logging
+            quality_score = validation_results.get('quality_score', 0.0)
+            total_symbols = validation_results.get('total_symbols', 0)
+            status = validation_results.get('status', 'unknown')
+            
+            # Log results
+            logger.info(
+                f"Data quality validation complete: {status.upper()} "
+                f"(score: {quality_score:.2%}, symbols: {total_symbols})"
+            )
+            
+            # Log recommendations if any
+            recommendations = validation_results.get('recommendations', [])
+            if recommendations:
+                logger.info(f"Data quality recommendations: {'; '.join(recommendations[:3])}")
+            
+            # Return enriched results for batch orchestrator
+            return {
+                'job_type': 'data_quality_validation',
+                'status': status,
+                'quality_score': quality_score,
+                'total_symbols': total_symbols,
+                'validation_details': validation_results,
+                'message': f"Data quality score: {quality_score:.1%}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Data quality validation failed: {str(e)}")
+            return {
+                'job_type': 'data_quality_validation',
+                'status': 'error',
+                'quality_score': 0.0,
+                'total_symbols': 0,
+                'error': str(e),
+                'message': f"Validation error: {str(e)}"
+            }
     
     # Batch job tracking methods
     
