@@ -320,7 +320,6 @@ async def _create_or_update_snapshot(
         "portfolio_gamma": greeks['gamma'],
         "portfolio_theta": greeks['theta'],
         "portfolio_vega": greeks['vega'],
-        "portfolio_rho": greeks['rho'],
         "num_positions": position_counts['total'],
         "num_long_positions": position_counts['long'],
         "num_short_positions": position_counts['short']
@@ -365,7 +364,6 @@ async def _create_zero_snapshot(
         portfolio_gamma=zero_decimal,
         portfolio_theta=zero_decimal,
         portfolio_vega=zero_decimal,
-        portfolio_rho=zero_decimal,
         num_positions=0,
         num_long_positions=0,
         num_short_positions=0
