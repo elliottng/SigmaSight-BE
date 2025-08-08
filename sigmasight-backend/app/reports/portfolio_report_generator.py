@@ -28,6 +28,40 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+
+class PortfolioReportGenerator:
+    """Portfolio Report Generator class wrapper for async report generation."""
+    
+    def __init__(self, db: 'AsyncSession'):
+        """Initialize the generator with a database session."""
+        self.db = db
+    
+    async def generate_report(
+        self,
+        portfolio_id: str,
+        report_date: date,
+        format: Literal["md", "json", "csv"] = "md"
+    ) -> str:
+        """Generate report using instance method."""
+        # Create ReportRequest object
+        request = ReportRequest(
+            portfolio_id=str(portfolio_id),
+            as_of=report_date,
+            formats={format},
+            write_to_disk=True
+        )
+        
+        # Call the main generate function
+        artifacts = await generate_portfolio_report(self.db, request)
+        
+        # Write files and return path
+        if artifacts:
+            files = write_report_files(artifacts, request)
+            if format in files:
+                return str(files[format])
+        
+        return f"Report generation failed for format: {format}"
+
 AllowedFormat = Literal["md", "json", "csv"]
 
 
