@@ -330,7 +330,62 @@ async def calculate_factor_betas_hybrid(
             position_betas=position_betas
         )
         
-        # Step 6: Prepare results
+        # Step 6: Store factor exposures in database
+        storage_results = {}
+        
+        # Store position-level factor exposures
+        if position_betas:
+            logger.info("Storing position factor exposures to database...")
+            position_storage = await store_position_factor_exposures(
+                db=db,
+                position_betas=position_betas,
+                calculation_date=calculation_date,
+                quality_flag=quality_flag
+            )
+            storage_results['position_storage'] = position_storage
+            logger.info(f"Stored {position_storage['records_stored']} position factor exposures")
+        
+        # Store portfolio-level factor exposures
+        if portfolio_betas:
+            logger.info("Storing portfolio factor exposures to database...")
+            # Get portfolio exposures for dollar calculations
+            from app.calculations.portfolio import calculate_portfolio_exposures
+            from app.models.positions import Position
+            
+            stmt = select(Position).where(
+                and_(
+                    Position.portfolio_id == portfolio_id,
+                    Position.exit_date.is_(None)
+                )
+            )
+            result = await db.execute(stmt)
+            positions = result.scalars().all()
+            
+            position_dicts = []
+            for pos in positions:
+                market_value = float(pos.market_value) if pos.market_value else 0
+                position_dicts.append({
+                    'symbol': pos.symbol,
+                    'quantity': float(pos.quantity),
+                    'market_value': market_value,
+                    'exposure': market_value,
+                    'position_type': pos.position_type.value if pos.position_type else 'LONG',
+                    'last_price': float(pos.last_price) if pos.last_price else 0
+                })
+            
+            portfolio_exposures = calculate_portfolio_exposures(position_dicts) if position_dicts else {}
+            
+            portfolio_storage = await aggregate_portfolio_factor_exposures(
+                db=db,
+                position_betas=position_betas,
+                portfolio_exposures=portfolio_exposures,
+                portfolio_id=portfolio_id,
+                calculation_date=calculation_date
+            )
+            storage_results['portfolio_storage'] = portfolio_storage
+            logger.info("Portfolio factor exposures stored successfully")
+        
+        # Step 7: Prepare results
         results = {
             'factor_betas': portfolio_betas,
             'position_betas': position_betas,
@@ -349,10 +404,11 @@ async def calculate_factor_betas_hybrid(
                 'regression_window_days': REGRESSION_WINDOW_DAYS,
                 'portfolio_id': str(portfolio_id)
             },
-            'regression_stats': regression_stats
+            'regression_stats': regression_stats,
+            'storage_results': storage_results
         }
         
-        logger.info(f"Factor betas calculated successfully: {len(position_betas)} positions, {quality_flag}")
+        logger.info(f"Factor betas calculated and stored successfully: {len(position_betas)} positions, {quality_flag}")
         return results
         
     except Exception as e:
@@ -479,29 +535,59 @@ async def store_position_factor_exposures(
         
         factor_name_to_id = {fd.name: fd.id for fd in factor_definitions}
         
+        # Add mapping for factor name differences
+        factor_name_mapping = {
+            'Market': 'Market Beta',  # Map "Market" to "Market Beta" as in database
+            'Value': 'Value',
+            'Growth': 'Growth',
+            'Momentum': 'Momentum',
+            'Quality': 'Quality',
+            'Size': 'Size',
+            'Low Volatility': 'Low Volatility'
+        }
+        
         for position_id_str, factor_betas in position_betas.items():
             try:
                 position_id = UUID(position_id_str)
                 results["positions_processed"] += 1
                 
                 for factor_name, beta_value in factor_betas.items():
-                    if factor_name not in factor_name_to_id:
-                        logger.warning(f"Factor '{factor_name}' not found in database")
+                    # Map factor name if needed
+                    mapped_name = factor_name_mapping.get(factor_name, factor_name)
+                    
+                    if mapped_name not in factor_name_to_id:
+                        logger.warning(f"Factor '{mapped_name}' (original: '{factor_name}') not found in database")
                         continue
                     
-                    factor_id = factor_name_to_id[factor_name]
+                    factor_id = factor_name_to_id[mapped_name]
                     
-                    # Create or update position factor exposure record
-                    exposure_record = PositionFactorExposure(
-                        position_id=position_id,
-                        factor_id=factor_id,
-                        calculation_date=calculation_date,
-                        exposure_value=Decimal(str(beta_value)),
-                        quality_flag=quality_flag
+                    # Check if record exists
+                    existing = await db.execute(
+                        select(PositionFactorExposure).where(
+                            and_(
+                                PositionFactorExposure.position_id == position_id,
+                                PositionFactorExposure.factor_id == factor_id,
+                                PositionFactorExposure.calculation_date == calculation_date
+                            )
+                        )
                     )
+                    existing_record = existing.scalar_one_or_none()
                     
-                    # Use merge to handle upserts
-                    db.add(exposure_record)
+                    if existing_record:
+                        # Update existing record
+                        existing_record.exposure_value = Decimal(str(beta_value))
+                        existing_record.quality_flag = quality_flag
+                    else:
+                        # Create new record
+                        exposure_record = PositionFactorExposure(
+                            position_id=position_id,
+                            factor_id=factor_id,
+                            calculation_date=calculation_date,
+                            exposure_value=Decimal(str(beta_value)),
+                            quality_flag=quality_flag
+                        )
+                        db.add(exposure_record)
+                    
                     results["records_stored"] += 1
                 
             except Exception as e:
@@ -559,31 +645,62 @@ async def aggregate_portfolio_factor_exposures(
         
         factor_name_to_id = {fd.name: fd.id for fd in factor_definitions}
         
+        # Add mapping for factor name differences (same as position-level)
+        factor_name_mapping = {
+            'Market': 'Market Beta',
+            'Value': 'Value',
+            'Growth': 'Growth',
+            'Momentum': 'Momentum',
+            'Quality': 'Quality',
+            'Size': 'Size',
+            'Low Volatility': 'Low Volatility'
+        }
+        
         # Store portfolio-level factor exposures
         from app.models.market_data import FactorExposure
         
         records_stored = 0
         for factor_name, beta_value in portfolio_betas.items():
-            if factor_name not in factor_name_to_id:
-                logger.warning(f"Factor '{factor_name}' not found in database")
+            # Map factor name if needed
+            mapped_name = factor_name_mapping.get(factor_name, factor_name)
+            
+            if mapped_name not in factor_name_to_id:
+                logger.warning(f"Factor '{mapped_name}' (original: '{factor_name}') not found in database")
                 continue
             
-            factor_id = factor_name_to_id[factor_name]
+            factor_id = factor_name_to_id[mapped_name]
             
             # Calculate dollar exposure (beta * portfolio value)
             portfolio_value = portfolio_exposures.get("gross_exposure", Decimal('0'))
             exposure_dollar = float(beta_value) * float(portfolio_value) if portfolio_value else None
             
-            # Create portfolio factor exposure record
-            exposure_record = FactorExposure(
-                portfolio_id=portfolio_id,
-                factor_id=factor_id,
-                calculation_date=calculation_date,
-                exposure_value=Decimal(str(beta_value)),
-                exposure_dollar=Decimal(str(exposure_dollar)) if exposure_dollar else None
+            # Check if record exists
+            existing = await db.execute(
+                select(FactorExposure).where(
+                    and_(
+                        FactorExposure.portfolio_id == portfolio_id,
+                        FactorExposure.factor_id == factor_id,
+                        FactorExposure.calculation_date == calculation_date
+                    )
+                )
             )
+            existing_record = existing.scalar_one_or_none()
             
-            db.add(exposure_record)
+            if existing_record:
+                # Update existing record
+                existing_record.exposure_value = Decimal(str(beta_value))
+                existing_record.exposure_dollar = Decimal(str(exposure_dollar)) if exposure_dollar else None
+            else:
+                # Create new record
+                exposure_record = FactorExposure(
+                    portfolio_id=portfolio_id,
+                    factor_id=factor_id,
+                    calculation_date=calculation_date,
+                    exposure_value=Decimal(str(beta_value)),
+                    exposure_dollar=Decimal(str(exposure_dollar)) if exposure_dollar else None
+                )
+                db.add(exposure_record)
+            
             records_stored += 1
         
         await db.commit()
