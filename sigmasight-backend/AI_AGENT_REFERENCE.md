@@ -21,7 +21,7 @@ app/
 │   ├── snapshots.py  - PortfolioSnapshot
 │   └── history.py    - Historical data models
 ├── batch/            - Batch processing framework (8 calculation engines)
-│   ├── batch_orchestrator.py - Main orchestration (run_daily_batch)
+│   ├── batch_orchestrator_v2.py - Main orchestration (run_daily_batch_sequence)
 │   └── scheduler_config.py   - APScheduler configuration  
 ├── calculations/     - Core calculation engines
 │   ├── greeks.py     - Options Greeks (mibian library)
@@ -77,7 +77,7 @@ from app.database import get_async_session, AsyncSessionLocal
 ### **Batch Processing**
 ```python
 # Main batch orchestrator
-from app.batch.batch_orchestrator import run_daily_batch, BatchOrchestrator
+from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
 
 # Individual calculation engines
 from app.calculations.greeks import calculate_position_greeks
@@ -166,13 +166,13 @@ else:
 ### **Batch Execution**
 ```python
 # Main entry point
-await run_daily_batch()  # Runs all 8 engines
+await batch_orchestrator_v2.run_daily_batch_sequence()  # Runs all 8 engines
 
 # Individual portfolio  
-await run_daily_batch(portfolio_id="uuid-string")
+await batch_orchestrator_v2.run_daily_batch_sequence(portfolio_id="uuid-string")
 
 # Check if batch orchestrator imports correctly
-from app.batch.batch_orchestrator import batch_orchestrator
+from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
 print("Batch orchestrator ready!")
 ```
 
@@ -333,7 +333,7 @@ else:
 uv run python -c "
 from app.models.users import Portfolio
 from app.models.market_data import PositionGreeks
-from app.batch.batch_orchestrator import run_daily_batch
+from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
 from app.database import get_async_session
 print('✅ All critical imports working')
 "

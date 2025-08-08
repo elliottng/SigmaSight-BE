@@ -22,7 +22,7 @@ def test_import_orchestrator():
     print("="*70)
     
     try:
-        from app.batch.batch_orchestrator import batch_orchestrator
+        from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
         print("✓ batch_orchestrator imported successfully")
         return True
     except Exception as e:

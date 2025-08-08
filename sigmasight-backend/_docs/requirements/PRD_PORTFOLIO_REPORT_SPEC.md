@@ -384,7 +384,7 @@ def generate_portfolio_reports(portfolio_id: str) -> dict:
 - [ ] Generate all 3 files for Balanced Individual Investor Portfolio
 - [ ] Generate all 3 files for Sophisticated High Net Worth Portfolio  
 - [ ] Generate all 3 files for Long/Short Hedge Fund Style Portfolio
-- [ ] Add report generation as final step in batch_orchestrator.py
+- [ ] Add report generation as final step in batch_orchestrator_v2.py
 - [ ] Test end-to-end: batch processing → report generation
 - [ ] Validate human reports are clean and readable
 

@@ -89,12 +89,12 @@ class DatabaseRegressionTester:
         test_name = "Batch Processing Imports"
         try:
             # Import all batch modules
-            from app.batch.batch_orchestrator import BatchOrchestrator
+            from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
             from app.batch.market_data_sync import sync_market_data
             from app.batch.daily_calculations import run_daily_calculations
             
             # Verify they can access database
-            orchestrator = BatchOrchestrator()
+            orchestrator = batch_orchestrator_v2
             
             self.log_test(test_name, True)
             return True

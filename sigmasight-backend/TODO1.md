@@ -1670,7 +1670,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Completed Engine**: `app/calculations/greeks.py` with mibian library
   - **Implementation**:
     ```python
-    # FIXED in batch_orchestrator.py:
+    # FIXED in batch_orchestrator_v2.py:
     from app.calculations.greeks import bulk_update_portfolio_greeks
     # Correctly integrated in daily batch sequence
     ```
@@ -1682,7 +1682,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
   - **Completed Engine**: `app/calculations/factors.py` 
   - **Implementation**:
     ```python
-    # FIXED in batch_orchestrator.py:
+    # FIXED in batch_orchestrator_v2.py:
     from app.calculations.factors import calculate_factor_betas_hybrid
     # Correctly integrated in daily batch sequence  
     ```
@@ -1893,12 +1893,12 @@ This section only requires orchestration and scheduling, NOT implementation of c
 
 - [x] **Fix function name mappings in batch orchestrator** ✅ COMPLETED
   ```python
-  # Fixed in app/batch/batch_orchestrator.py:
+  # Fixed in app/batch/batch_orchestrator_v2.py:
   from app.calculations.greeks import bulk_update_portfolio_greeks
   from app.calculations.factors import calculate_factor_betas_hybrid
   # All calculation engine function names now match actual implementations
   ```
-  - **File**: `app/batch/batch_orchestrator.py`
+  - **File**: `app/batch/batch_orchestrator_v2.py`
   - **Status**: All 8 calculation engines properly mapped to real function names
 
 - [x] **Add missing `require_admin` dependency** ✅ COMPLETED
@@ -1939,7 +1939,7 @@ This section only requires orchestration and scheduling, NOT implementation of c
    - **Solution**: Updated to use actual function names:
      - `calculate_portfolio_greeks` → `bulk_update_portfolio_greeks`
      - Mapped all calculation engine functions to their real implementations
-   - **Files**: `app/batch/batch_orchestrator.py`
+   - **Files**: `app/batch/batch_orchestrator_v2.py`
 
 3. **Missing Authentication Dependency** ✅ FIXED
    - **Issue**: Admin endpoints referenced non-existent `require_admin` function
@@ -2179,7 +2179,7 @@ The error occurs deep in the asyncpg/SQLAlchemy layer when UUID objects from dat
 Since the calculations complete successfully and only the batch tracking fails, we implemented a smart workaround:
 
 ```python
-# In batch_orchestrator.py _run_job method
+# In batch_orchestrator_v2.py _run_job method
 if "'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'" in error_msg:
     logger.warning(f"Job {job_name} hit known UUID serialization issue - treating as successful")
     return {
@@ -2315,8 +2315,8 @@ This mysterious UUID serialization issue has been documented for future investig
 - [ ] **Update migration scripts**: Fix any asymmetric upgrade/downgrade issues
 
 **Phase 2: Async Architecture Standardization** (Priority: CRITICAL - 2-4 hours) ✅ **COMPLETED WITH WORKAROUND**  
-- [x] **Audit batch_orchestrator.py**: Identify all sync database calls ✅ **COMPLETED**
-  - **DISCOVERY**: batch_orchestrator.py uses correct async patterns (`await db.execute()`, `await db.commit()`)
+- [x] **Audit batch_orchestrator_v2.py**: Identify all sync database calls ✅ **COMPLETED**
+  - **DISCOVERY**: batch_orchestrator_v2.py uses correct async patterns (`await db.execute()`, `await db.commit()`)
   - **ROOT CAUSE FOUND**: Mixed database imports between `app.database` and `app.core.database`
   - **ISSUE**: Different Base classes and potentially different connection pools causing greenlet errors
 - [x] **Fix APScheduler configuration**: Replace sync SQLAlchemy jobstore ✅ **COMPLETED**
@@ -2721,7 +2721,7 @@ batch_orchestrator = batch_orchestrator_v2
 - [x] **Added proper type hints** and async generator patterns
 
 **2. Fixed Critical Batch Processing Files:**
-- [x] **`app/batch/batch_orchestrator.py`**: Updated to use `app.database.AsyncSessionLocal`
+- [x] **`app/batch/batch_orchestrator_v2.py`**: Updated to use `app.database.AsyncSessionLocal`
 - [x] **`app/batch/market_data_sync.py`**: Updated import path 
 - [x] **`app/core/dependencies.py`**: Updated to use unified `get_db`
 - [x] **`tests/batch/test_batch_reality_check.py`**: Fixed session imports
@@ -2810,7 +2810,7 @@ Database consistency issue transformed from technical debt into competitive adva
 **🔍 Critical Path Components (Must Test First):**
 
 1. **Batch Processing System (7 files) - HIGHEST PRIORITY**
-   - [x] `app/batch/batch_orchestrator.py` - ✅ Imports working correctly
+   - [x] `app/batch/batch_orchestrator_v2.py` - ✅ Imports working correctly
    - [x] `app/batch/market_data_sync.py` - ✅ Imports working correctly
    - [x] `app/batch/daily_calculations.py` - ✅ Imports working correctly
    - [ ] `app/api/batch.py` - Test admin trigger endpoints

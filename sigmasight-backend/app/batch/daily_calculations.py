@@ -16,7 +16,7 @@ from app.calculations.market_data import (
     bulk_update_position_values,
     fetch_and_cache_prices
 )
-from app.batch.batch_orchestrator import batch_orchestrator
+from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
 
 logger = get_logger(__name__)
 
@@ -47,7 +47,7 @@ async def run_daily_calculations(portfolio_id: Optional[str] = None):
     
     try:
         # Use the new batch orchestrator
-        results = await batch_orchestrator.run_daily_batch_sequence(portfolio_id)
+        results = await batch_orchestrator_v2.run_daily_batch_sequence(portfolio_id)
         
         duration = datetime.now() - start_time
         
