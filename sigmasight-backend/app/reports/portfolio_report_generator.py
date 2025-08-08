@@ -196,6 +196,9 @@ async def _collect_report_data(
 ) -> Dict[str, Any]:
     """Collect data needed for all report formats.
 
+    Uses snapshot date as anchor for cross-engine consistency.
+    Maintains Decimal precision for financial calculations.
+
     Fetches:
     - portfolio_snapshot: latest PortfolioSnapshot for as_of (or most recent)
     - correlation_summary: latest CorrelationCalculation summary
@@ -206,6 +209,7 @@ async def _collect_report_data(
 
     Returns a dict to feed the format builders below.
     """
+    from decimal import Decimal
     from sqlalchemy import select, and_, func
     from sqlalchemy.orm import selectinload
     from uuid import UUID
@@ -228,8 +232,8 @@ async def _collect_report_data(
     # Convert string portfolio_id to UUID
     portfolio_uuid = UUID(portfolio_id) if isinstance(portfolio_id, str) else portfolio_id
     
-    # Determine the report date
-    report_date = as_of or date.today()
+    # Initial report date (may be adjusted by snapshot)
+    initial_date = as_of or date.today()
     
     # 1. Fetch Portfolio with basic info
     portfolio_result = await db.execute(
@@ -250,13 +254,13 @@ async def _collect_report_data(
             }
         }
     
-    # 2. Fetch latest Portfolio Snapshot
+    # 2. Fetch latest Portfolio Snapshot (establishes anchor date)
     snapshot_result = await db.execute(
         select(PortfolioSnapshot)
         .where(
             and_(
                 PortfolioSnapshot.portfolio_id == portfolio_uuid,
-                PortfolioSnapshot.snapshot_date <= report_date
+                PortfolioSnapshot.snapshot_date <= initial_date
             )
         )
         .order_by(PortfolioSnapshot.snapshot_date.desc())
@@ -264,13 +268,17 @@ async def _collect_report_data(
     )
     snapshot = snapshot_result.scalar_one_or_none()
     
-    # 3. Fetch latest Correlation Calculation
+    # IMPORTANT: Use snapshot date as anchor for all other queries
+    anchor_date = snapshot.snapshot_date if snapshot else initial_date
+    logger.info(f"Using anchor date {anchor_date} for all calculation engines")
+    
+    # 3. Fetch latest Correlation Calculation (using anchor date)
     correlation_result = await db.execute(
         select(CorrelationCalculation)
         .where(
             and_(
                 CorrelationCalculation.portfolio_id == portfolio_uuid,
-                CorrelationCalculation.calculation_date <= report_date
+                CorrelationCalculation.calculation_date <= anchor_date
             )
         )
         .order_by(CorrelationCalculation.calculation_date.desc())
@@ -278,53 +286,80 @@ async def _collect_report_data(
     )
     correlation = correlation_result.scalar_one_or_none()
     
-    # 4. Fetch active positions with their Greeks
+    # 4. Fetch active positions (using anchor date)
     positions_result = await db.execute(
         select(Position)
         .where(
             and_(
                 Position.portfolio_id == portfolio_uuid,
-                Position.entry_date <= report_date,
+                Position.entry_date <= anchor_date,
                 Position.deleted_at.is_(None)
             )
         )
     )
     positions = list(positions_result.scalars().all())
     
-    # 5. Prepare position data for aggregation functions
-    position_data = []
-    for position in positions:
-        # Fetch Greeks for this position
-        greeks_result = await db.execute(
-            select(PositionGreeks)
+    # 5. BULK FETCH all Greeks in one query (fixes N+1 problem)
+    greeks_by_position = {}
+    if positions:
+        position_ids = [p.id for p in positions]
+        
+        # Subquery to get max calculation_date per position
+        from sqlalchemy import select as sql_select
+        from sqlalchemy.sql import func as sql_func
+        
+        latest_dates_subq = (
+            sql_select(
+                PositionGreeks.position_id,
+                sql_func.max(PositionGreeks.calculation_date).label("max_date")
+            )
             .where(
                 and_(
-                    PositionGreeks.position_id == position.id,
-                    PositionGreeks.calculation_date <= report_date
+                    PositionGreeks.position_id.in_(position_ids),
+                    PositionGreeks.calculation_date <= anchor_date
                 )
             )
-            .order_by(PositionGreeks.calculation_date.desc())
-            .limit(1)
+            .group_by(PositionGreeks.position_id)
+            .subquery()
         )
-        greeks_record = greeks_result.scalar_one_or_none()
         
-        greeks = None
-        if greeks_record:
-            greeks = {
-                "delta": greeks_record.delta,
-                "gamma": greeks_record.gamma,
-                "theta": greeks_record.theta,
-                "vega": greeks_record.vega,
-                "rho": greeks_record.rho
+        # Fetch all latest Greeks in one query
+        greeks_result = await db.execute(
+            select(PositionGreeks)
+            .join(
+                latest_dates_subq,
+                and_(
+                    PositionGreeks.position_id == latest_dates_subq.c.position_id,
+                    PositionGreeks.calculation_date == latest_dates_subq.c.max_date
+                )
+            )
+        )
+        
+        for greek_record in greeks_result.scalars().all():
+            greeks_by_position[greek_record.position_id] = {
+                "delta": greek_record.delta,  # Keep as Decimal
+                "gamma": greek_record.gamma,  # Keep as Decimal
+                "theta": greek_record.theta,  # Keep as Decimal
+                "vega": greek_record.vega,    # Keep as Decimal
+                "rho": greek_record.rho       # Keep as Decimal
             }
+    
+    # 6. Prepare position data with Decimal precision maintained
+    position_data = []
+    for position in positions:
+        # Get Greeks from bulk fetch
+        greeks = greeks_by_position.get(position.id)
+        
+        # Maintain Decimal precision - DO NOT convert to float yet
+        market_val = position.market_value if position.market_value else (position.quantity * position.entry_price)
         
         position_dict = {
             "id": str(position.id),
             "symbol": position.symbol,
-            "quantity": float(position.quantity),
-            "entry_price": float(position.entry_price),
-            "market_value": float(position.market_value) if position.market_value else float(position.quantity * position.entry_price),
-            "exposure": float(position.market_value) if position.market_value else float(position.quantity * position.entry_price),
+            "quantity": position.quantity,  # Keep as Decimal
+            "entry_price": position.entry_price,  # Keep as Decimal
+            "market_value": market_val,  # Keep as Decimal
+            "exposure": market_val,  # Keep as Decimal
             "position_type": position.position_type,
             "greeks": greeks
         }
@@ -338,28 +373,35 @@ async def _collect_report_data(
         exposures = calculate_portfolio_exposures(position_data)
         greeks_aggregated = aggregate_portfolio_greeks(position_data)
     
-    # 7. Fetch Factor Exposures (sample - top 5 by absolute exposure)
+    # 7. Fetch Factor Exposures (using anchor date)
     from app.models.market_data import FactorDefinition
     if positions:
+        position_ids = [p.id for p in positions]
+        
+        # Get latest factor exposures for each position at anchor date
         factors_result = await db.execute(
             select(PositionFactorExposure, FactorDefinition)
             .join(FactorDefinition, PositionFactorExposure.factor_id == FactorDefinition.id)
             .where(
-                PositionFactorExposure.position_id.in_([p.id for p in positions])
+                and_(
+                    PositionFactorExposure.position_id.in_(position_ids),
+                    PositionFactorExposure.calculation_date <= anchor_date
+                )
             )
             .order_by(func.abs(PositionFactorExposure.exposure_value).desc())
-            .limit(15)  # Top 5 per factor (3 factors)
+            .limit(15)  # Top exposures across all factors
         )
         factor_exposures = list(factors_result.all())
     else:
         factor_exposures = []
     
-    # 8. Build the complete data structure
+    # 8. Build the complete data structure (maintaining Decimal precision)
     return {
         "meta": {
             "portfolio_id": portfolio_id,
             "portfolio_name": portfolio.name,
-            "as_of": report_date.isoformat(),
+            "as_of": initial_date.isoformat(),
+            "anchor_date": anchor_date.isoformat(),  # Document the anchor date used
             "generated_at": datetime.utcnow().isoformat() + "Z",
         },
         "portfolio": {
@@ -370,36 +412,24 @@ async def _collect_report_data(
         },
         "snapshot": {
             "date": snapshot.snapshot_date.isoformat() if snapshot else None,
-            "total_value": float(snapshot.total_value) if snapshot else 0,
-            "daily_pnl": float(snapshot.daily_pnl) if snapshot and snapshot.daily_pnl else 0,
-            "daily_return": float(snapshot.daily_return) if snapshot and snapshot.daily_return else 0,
+            "total_value": snapshot.total_value if snapshot else Decimal("0"),  # Keep as Decimal
+            "daily_pnl": snapshot.daily_pnl if snapshot and snapshot.daily_pnl else Decimal("0"),
+            "daily_return": snapshot.daily_return if snapshot and snapshot.daily_return else Decimal("0"),
         } if snapshot else None,
         "correlation": {
             "calculation_date": correlation.calculation_date.isoformat() if correlation else None,
-            "average_correlation": float(correlation.average_correlation) if correlation else 0,
-            "max_correlation": float(correlation.max_correlation) if correlation else 0,
-            "min_correlation": float(correlation.min_correlation) if correlation else 0,
+            "average_correlation": correlation.average_correlation if correlation else Decimal("0"),
+            "max_correlation": correlation.max_correlation if correlation else Decimal("0"),
+            "min_correlation": correlation.min_correlation if correlation else Decimal("0"),
         } if correlation else None,
-        "exposures": {
-            "gross_exposure": float(exposures.get("gross_exposure", 0)),
-            "net_exposure": float(exposures.get("net_exposure", 0)),
-            "long_exposure": float(exposures.get("long_exposure", 0)),
-            "short_exposure": float(exposures.get("short_exposure", 0)),
-            "notional": float(exposures.get("notional", 0)),
-        } if exposures else None,
-        "greeks": {
-            "delta": float(greeks_aggregated.get("delta", 0)),
-            "gamma": float(greeks_aggregated.get("gamma", 0)),
-            "theta": float(greeks_aggregated.get("theta", 0)),
-            "vega": float(greeks_aggregated.get("vega", 0)),
-            "rho": float(greeks_aggregated.get("rho", 0)),
-        } if greeks_aggregated else None,
-        "positions": position_data,
+        "exposures": exposures if exposures else None,  # Already Decimal from calculations
+        "greeks": greeks_aggregated if greeks_aggregated else None,  # Already Decimal
+        "positions": position_data,  # Contains Decimals
         "factor_exposures": [
             {
                 "position_symbol": next((p.symbol for p in positions if p.id == fe.position_id), "Unknown"),
                 "factor_name": factor_def.name,
-                "exposure_value": float(fe.exposure_value) if fe.exposure_value else 0,
+                "exposure_value": fe.exposure_value,  # Keep as Decimal
             }
             for fe, factor_def in factor_exposures
         ] if factor_exposures else []
@@ -411,23 +441,201 @@ async def _collect_report_data(
 # ---------------------------------------------------------------------------
 
 def build_markdown_report(data: Mapping[str, Any]) -> str:
-    """Return a minimal markdown string as a placeholder.
-
-    The full implementation (Day 2) will render all sections:
-    - Executive summary (PortfolioSnapshot + CorrelationCalculation)
-    - Portfolio snapshot (calculate_portfolio_exposures)
-    - Factors, Stress tests, Greeks summary
+    """Build comprehensive markdown report with proper formatting.
+    
+    Formats Decimals with appropriate precision:
+    - Money: 2 decimal places
+    - Greeks: 4 decimal places
+    - Correlations: 6 decimal places
     """
+    from decimal import Decimal
+    
+    def format_money(value: Any) -> str:
+        """Format monetary values to 2 decimal places."""
+        if value is None:
+            return "N/A"
+        if isinstance(value, Decimal):
+            return f"${value:,.2f}"
+        return f"${float(value):,.2f}"
+    
+    def format_percent(value: Any, decimals: int = 2) -> str:
+        """Format percentage values."""
+        if value is None:
+            return "N/A"
+        if isinstance(value, Decimal):
+            return f"{value * 100:.{decimals}f}%"
+        return f"{float(value) * 100:.{decimals}f}%"
+    
+    def format_greek(value: Any) -> str:
+        """Format Greeks to 4 decimal places."""
+        if value is None or value == 0:
+            return "0.0000"
+        if isinstance(value, Decimal):
+            return f"{value:.4f}"
+        return f"{float(value):.4f}"
+    
+    def format_correlation(value: Any) -> str:
+        """Format correlations to 6 decimal places."""
+        if value is None:
+            return "N/A"
+        if isinstance(value, Decimal):
+            return f"{value:.6f}"
+        return f"{float(value):.6f}"
+    
+    # Extract data sections
     meta = data.get("meta", {})
+    portfolio = data.get("portfolio", {})
+    snapshot = data.get("snapshot", {})
+    correlation = data.get("correlation", {})
+    exposures = data.get("exposures", {})
+    greeks = data.get("greeks", {})
+    factor_exposures = data.get("factor_exposures", [])
+    
     lines = [
-        "# Portfolio Report (Draft)",
+        f"# Portfolio Report: {portfolio.get('name', 'Unknown')}",
         "",
-        f"Portfolio ID: {meta.get('portfolio_id')}",
-        f"As Of: {meta.get('as_of')}",
-        f"Generated At: {meta.get('generated_at')}",
+        f"**Report Date**: {meta.get('as_of', 'Unknown')}  ",
+        f"**Data Anchor Date**: {meta.get('anchor_date', 'Unknown')}  ",
+        f"**Generated**: {meta.get('generated_at', 'Unknown')}  ",
         "",
-        "> This is a scaffold. Sections will be populated in subsequent tasks.",
+        "---",
+        "",
+        "## Executive Summary",
+        "",
     ]
+    
+    # Portfolio snapshot section
+    if snapshot:
+        lines.extend([
+            "### Portfolio Value",
+            f"- **Total Value**: {format_money(snapshot.get('total_value', 0))}",
+            f"- **Daily P&L**: {format_money(snapshot.get('daily_pnl', 0))}",
+            f"- **Daily Return**: {format_percent(snapshot.get('daily_return', 0), 4)}",
+            f"- **Positions**: {portfolio.get('position_count', 0)}",
+            "",
+        ])
+    else:
+        lines.extend([
+            "### Portfolio Value",
+            "*No snapshot data available*",
+            "",
+        ])
+    
+    # Exposures section
+    if exposures:
+        lines.extend([
+            "### Portfolio Exposures",
+            f"- **Gross Exposure**: {format_money(exposures.get('gross_exposure', 0))}",
+            f"- **Net Exposure**: {format_money(exposures.get('net_exposure', 0))}",
+            f"- **Long Exposure**: {format_money(exposures.get('long_exposure', 0))}",
+            f"- **Short Exposure**: {format_money(exposures.get('short_exposure', 0))}",
+            f"- **Notional**: {format_money(exposures.get('notional', 0))}",
+            "",
+        ])
+    
+    # Correlation section
+    if correlation:
+        lines.extend([
+            "### Correlation Analysis",
+            f"- **Average Correlation**: {format_correlation(correlation.get('average_correlation', 0))}",
+            f"- **Maximum Correlation**: {format_correlation(correlation.get('max_correlation', 0))}",
+            f"- **Minimum Correlation**: {format_correlation(correlation.get('min_correlation', 0))}",
+            f"- **Calculation Date**: {correlation.get('calculation_date', 'N/A')}",
+            "",
+        ])
+    
+    lines.extend([
+        "---",
+        "",
+        "## Risk Analytics",
+        "",
+    ])
+    
+    # Greeks section
+    if greeks:
+        all_zeros = all(
+            float(greeks.get(g, 0)) == 0 
+            for g in ['delta', 'gamma', 'theta', 'vega', 'rho']
+        )
+        
+        lines.extend([
+            "### Portfolio Greeks",
+        ])
+        
+        if all_zeros:
+            lines.append("*No options positions - Greeks are zero for stock-only portfolios*")
+        else:
+            lines.extend([
+                f"- **Delta**: {format_greek(greeks.get('delta', 0))}",
+                f"- **Gamma**: {format_greek(greeks.get('gamma', 0))}",
+                f"- **Theta**: {format_greek(greeks.get('theta', 0))}",
+                f"- **Vega**: {format_greek(greeks.get('vega', 0))}",
+                f"- **Rho**: {format_greek(greeks.get('rho', 0))}",
+            ])
+        lines.append("")
+    
+    # Factor Analysis section (our richest data!)
+    if factor_exposures:
+        lines.extend([
+            "### Factor Analysis",
+            "",
+            "**Top Factor Exposures** (by absolute value):",
+            "",
+            "| Position | Factor | Exposure |",
+            "|----------|--------|----------|",
+        ])
+        
+        # Show top 10 factor exposures
+        for fe in factor_exposures[:10]:
+            symbol = fe.get('position_symbol', 'Unknown')
+            factor = fe.get('factor_name', 'Unknown')
+            exposure = fe.get('exposure_value', 0)
+            lines.append(f"| {symbol} | {factor} | {format_correlation(exposure)} |")
+        
+        if len(factor_exposures) > 10:
+            lines.append(f"| *...and {len(factor_exposures) - 10} more* | | |")
+        
+        lines.append("")
+    else:
+        lines.extend([
+            "### Factor Analysis",
+            "*No factor exposure data available*",
+            "",
+        ])
+    
+    # Stress Testing section (placeholder for future)
+    lines.extend([
+        "### Stress Testing",
+        "*Stress test scenarios pending implementation (see Phase 2.4)*",
+        "",
+    ])
+    
+    lines.extend([
+        "---",
+        "",
+        "## Data Availability",
+        "",
+        "### Calculation Engines with Data:",
+    ])
+    
+    # Document which engines have data
+    engines_status = []
+    engines_status.append(f"✅ **Portfolio Snapshots**: {'Available' if snapshot else 'Not Available'}")
+    engines_status.append(f"✅ **Position Exposures**: {'Calculated' if exposures else 'Not Available'}")
+    engines_status.append(f"✅ **Greeks Aggregation**: {'Calculated' if greeks else 'Not Available'}")
+    engines_status.append(f"✅ **Factor Analysis**: {len(factor_exposures)} exposures" if factor_exposures else "❌ **Factor Analysis**: Not Available")
+    engines_status.append(f"✅ **Correlations**: {'Available' if correlation else 'Not Available'}")
+    engines_status.append("❌ **Stress Testing**: Pending Implementation")
+    engines_status.append("❌ **Interest Rate Betas**: No Data")
+    
+    lines.extend(engines_status)
+    lines.extend([
+        "",
+        "---",
+        "",
+        "*Report generated by SigmaSight Portfolio Analytics Platform*",
+    ])
+    
     return "\n".join(lines) + "\n"
 
 
