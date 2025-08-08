@@ -101,30 +101,213 @@ async def _collect_report_data(
 ) -> Dict[str, Any]:
     """Collect data needed for all report formats.
 
-    Expected future contents (will be populated in the next task):
+    Fetches:
     - portfolio_snapshot: latest PortfolioSnapshot for as_of (or most recent)
     - correlation_summary: latest CorrelationCalculation summary
     - exposures: output from calculate_portfolio_exposures()
     - greeks: output from aggregate_portfolio_greeks()
     - factors: PositionFactorExposure aggregated/selected for display
-    - stress_results: StressTestResult aggregated/selected for display
     - positions: lightweight listing for CSV export
 
     Returns a dict to feed the format builders below.
     """
+    from sqlalchemy import select, and_, func
+    from sqlalchemy.orm import selectinload
+    from uuid import UUID
+    from app.models.users import Portfolio
+    from app.models.positions import Position
+    from app.models.snapshots import PortfolioSnapshot
+    from app.models.correlations import CorrelationCalculation
+    from app.models.market_data import PositionFactorExposure, PositionGreeks
+    from app.calculations.portfolio import (
+        calculate_portfolio_exposures,
+        aggregate_portfolio_greeks
+    )
+    
     logger.debug(
-        "Collecting report data (stub) for portfolio_id=%s, as_of=%s",
+        "Collecting report data for portfolio_id=%s, as_of=%s",
         portfolio_id,
         as_of,
     )
-    # Placeholder structure to enable format builder scaffolding.
+    
+    # Convert string portfolio_id to UUID
+    portfolio_uuid = UUID(portfolio_id) if isinstance(portfolio_id, str) else portfolio_id
+    
+    # Determine the report date
+    report_date = as_of or date.today()
+    
+    # 1. Fetch Portfolio with basic info
+    portfolio_result = await db.execute(
+        select(Portfolio)
+        .where(Portfolio.id == portfolio_uuid)
+        .options(selectinload(Portfolio.positions))
+    )
+    portfolio = portfolio_result.scalar_one_or_none()
+    
+    if not portfolio:
+        logger.warning(f"Portfolio not found: {portfolio_id}")
+        return {
+            "meta": {
+                "portfolio_id": portfolio_id,
+                "as_of": report_date.isoformat(),
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "error": "Portfolio not found"
+            }
+        }
+    
+    # 2. Fetch latest Portfolio Snapshot
+    snapshot_result = await db.execute(
+        select(PortfolioSnapshot)
+        .where(
+            and_(
+                PortfolioSnapshot.portfolio_id == portfolio_uuid,
+                PortfolioSnapshot.snapshot_date <= report_date
+            )
+        )
+        .order_by(PortfolioSnapshot.snapshot_date.desc())
+        .limit(1)
+    )
+    snapshot = snapshot_result.scalar_one_or_none()
+    
+    # 3. Fetch latest Correlation Calculation
+    correlation_result = await db.execute(
+        select(CorrelationCalculation)
+        .where(
+            and_(
+                CorrelationCalculation.portfolio_id == portfolio_uuid,
+                CorrelationCalculation.calculation_date <= report_date
+            )
+        )
+        .order_by(CorrelationCalculation.calculation_date.desc())
+        .limit(1)
+    )
+    correlation = correlation_result.scalar_one_or_none()
+    
+    # 4. Fetch active positions with their Greeks
+    positions_result = await db.execute(
+        select(Position)
+        .where(
+            and_(
+                Position.portfolio_id == portfolio_uuid,
+                Position.entry_date <= report_date,
+                Position.deleted_at.is_(None)
+            )
+        )
+    )
+    positions = list(positions_result.scalars().all())
+    
+    # 5. Prepare position data for aggregation functions
+    position_data = []
+    for position in positions:
+        # Fetch Greeks for this position
+        greeks_result = await db.execute(
+            select(PositionGreeks)
+            .where(
+                and_(
+                    PositionGreeks.position_id == position.id,
+                    PositionGreeks.calculation_date <= report_date
+                )
+            )
+            .order_by(PositionGreeks.calculation_date.desc())
+            .limit(1)
+        )
+        greeks_record = greeks_result.scalar_one_or_none()
+        
+        greeks = None
+        if greeks_record:
+            greeks = {
+                "delta": greeks_record.delta,
+                "gamma": greeks_record.gamma,
+                "theta": greeks_record.theta,
+                "vega": greeks_record.vega,
+                "rho": greeks_record.rho
+            }
+        
+        position_dict = {
+            "id": str(position.id),
+            "symbol": position.symbol,
+            "quantity": float(position.quantity),
+            "entry_price": float(position.entry_price),
+            "market_value": float(position.market_value) if position.market_value else float(position.quantity * position.entry_price),
+            "exposure": float(position.market_value) if position.market_value else float(position.quantity * position.entry_price),
+            "position_type": position.position_type,
+            "greeks": greeks
+        }
+        position_data.append(position_dict)
+    
+    # 6. Calculate portfolio aggregations
+    exposures = {}
+    greeks_aggregated = {}
+    
+    if position_data:
+        exposures = calculate_portfolio_exposures(position_data)
+        greeks_aggregated = aggregate_portfolio_greeks(position_data)
+    
+    # 7. Fetch Factor Exposures (sample - top 5 by absolute exposure)
+    from app.models.market_data import FactorDefinition
+    if positions:
+        factors_result = await db.execute(
+            select(PositionFactorExposure, FactorDefinition)
+            .join(FactorDefinition, PositionFactorExposure.factor_id == FactorDefinition.id)
+            .where(
+                PositionFactorExposure.position_id.in_([p.id for p in positions])
+            )
+            .order_by(func.abs(PositionFactorExposure.exposure_value).desc())
+            .limit(15)  # Top 5 per factor (3 factors)
+        )
+        factor_exposures = list(factors_result.all())
+    else:
+        factor_exposures = []
+    
+    # 8. Build the complete data structure
     return {
         "meta": {
             "portfolio_id": portfolio_id,
-            "as_of": as_of.isoformat() if as_of else None,
+            "portfolio_name": portfolio.name,
+            "as_of": report_date.isoformat(),
             "generated_at": datetime.utcnow().isoformat() + "Z",
         },
-        # Real data fields will be added in the next task.
+        "portfolio": {
+            "id": str(portfolio.id),
+            "name": portfolio.name,
+            "created_at": portfolio.created_at.isoformat() if portfolio.created_at else None,
+            "position_count": len(positions)
+        },
+        "snapshot": {
+            "date": snapshot.snapshot_date.isoformat() if snapshot else None,
+            "total_value": float(snapshot.total_value) if snapshot else 0,
+            "daily_pnl": float(snapshot.daily_pnl) if snapshot and snapshot.daily_pnl else 0,
+            "daily_return": float(snapshot.daily_return) if snapshot and snapshot.daily_return else 0,
+        } if snapshot else None,
+        "correlation": {
+            "calculation_date": correlation.calculation_date.isoformat() if correlation else None,
+            "average_correlation": float(correlation.average_correlation) if correlation else 0,
+            "max_correlation": float(correlation.max_correlation) if correlation else 0,
+            "min_correlation": float(correlation.min_correlation) if correlation else 0,
+        } if correlation else None,
+        "exposures": {
+            "gross_exposure": float(exposures.get("gross_exposure", 0)),
+            "net_exposure": float(exposures.get("net_exposure", 0)),
+            "long_exposure": float(exposures.get("long_exposure", 0)),
+            "short_exposure": float(exposures.get("short_exposure", 0)),
+            "notional": float(exposures.get("notional", 0)),
+        } if exposures else None,
+        "greeks": {
+            "delta": float(greeks_aggregated.get("delta", 0)),
+            "gamma": float(greeks_aggregated.get("gamma", 0)),
+            "theta": float(greeks_aggregated.get("theta", 0)),
+            "vega": float(greeks_aggregated.get("vega", 0)),
+            "rho": float(greeks_aggregated.get("rho", 0)),
+        } if greeks_aggregated else None,
+        "positions": position_data,
+        "factor_exposures": [
+            {
+                "position_symbol": next((p.symbol for p in positions if p.id == fe.position_id), "Unknown"),
+                "factor_name": factor_def.name,
+                "exposure_value": float(fe.exposure_value) if fe.exposure_value else 0,
+            }
+            for fe, factor_def in factor_exposures
+        ] if factor_exposures else []
     }
 
 
@@ -154,16 +337,25 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
 
 
 def build_json_report(data: Mapping[str, Any]) -> Dict[str, Any]:
-    """Return a minimal JSON structure as a placeholder.
+    """Return a JSON structure with all collected data.
 
     The full implementation (Day 3) will include all calculation engines
     grouped by category with flat metrics.
     """
-    return {
-        "version": "0.1-draft",
+    # Return the full data structure as JSON
+    # Remove positions for brevity in preview (can be added back if needed)
+    result = {
+        "version": "1.0",
         "meta": data.get("meta", {}),
-        "sections": {},  # to be populated later
+        "portfolio": data.get("portfolio", {}),
+        "snapshot": data.get("snapshot", {}),
+        "correlation": data.get("correlation", {}),
+        "exposures": data.get("exposures", {}),
+        "greeks": data.get("greeks", {}),
+        "factor_exposures": data.get("factor_exposures", []),
+        "position_count": len(data.get("positions", [])),
     }
+    return result
 
 
 def build_csv_report(data: Mapping[str, Any]) -> str:
