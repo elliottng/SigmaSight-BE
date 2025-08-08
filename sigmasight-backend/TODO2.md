@@ -127,12 +127,16 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 ### 2.0.2 Day 2: Markdown Report Implementation
 **Current Data Availability**: 6/8 calculation engines have data (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
 
+- [ ] Fix N+1 query problem: Bulk-fetch all PositionGreeks in one query instead of per-position loop
+- [ ] Implement consistent date anchoring: Use snapshot date as anchor for all engine queries
+- [ ] Maintain Decimal precision: Keep values as Decimal internally, only convert at output formatting
 - [ ] Implement markdown report generation with direct string formatting (no templates)
-- [ ] Build executive summary using available PortfolioSnapshot data (3 records)
+- [ ] Build executive summary using available PortfolioSnapshot data (display anchor date)
 - [ ] Build portfolio exposures section using calculate_portfolio_exposures() output
 - [ ] Build factor analysis table using PositionFactorExposure data (756 records available!)
 - [ ] Build Greeks summary with graceful handling of zero values for stock-only portfolios
 - [ ] Add "Data Availability" section showing what calculation engines have data
+- [ ] Format output with proper precision: 2 decimal places for money, 4 for Greeks
 
 **📝 Note**: Stress test tables will be added in a future phase after debugging the stress test calculation engine and batch framework. Currently no stress test scenarios or results in database.
 
@@ -140,33 +144,52 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 **Focus**: Enhance existing JSON output and implement comprehensive CSV export
 
 - [ ] Enhance JSON export structure (already returns real data, needs better organization)
+- [ ] Serialize Decimals as strings in JSON with explicit precision to avoid float conversion
 - [ ] Document 6 available calculation engines in JSON (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
-- [ ] Implement full CSV export with position-level details (30-40 columns)
-- [ ] Include per-position data: symbol, quantity, entry/current price, market value, P&L, Greeks (if options)
-- [ ] Add factor exposures and sector/industry data from MarketDataCache to CSV
+- [ ] Define and implement explicit CSV column contract (exact 30-40 columns):
+  - Core: position_id, symbol, quantity, entry_price, current_price, market_value, cost_basis
+  - P&L: unrealized_pnl, realized_pnl, daily_pnl
+  - Greeks: delta, gamma, theta, vega, rho (4 decimal precision)
+  - Options: underlying_symbol, strike_price, expiration_date, position_type
+  - Metadata: sector, industry, tags, entry_date
+  - Exposures: gross_exposure, net_exposure, notional (not notional_exposure)
+- [ ] Include factor exposures per position where available
 - [ ] Ensure graceful handling of missing data (e.g., no stress tests, zero Greeks for stocks)
+- [ ] Document precision policy: 2dp for monetary values, 4dp for Greeks, 6dp for correlations
 
 ### 2.0.4 Day 4: Demo Portfolio Testing & Batch Integration
 **Demo Portfolios**: Individual (16 positions), HNW (17 positions), Hedge Fund (30 positions)
 
+- [ ] Implement idempotent report writes: Define overwrite behavior for portfolio_id+date combinations
 - [ ] Generate all 3 files for Demo Individual Investor Portfolio (16 stocks, no options)
 - [ ] Generate all 3 files for Demo High Net Worth Portfolio (17 positions)
 - [ ] Generate all 3 files for Demo Hedge Fund Style Portfolio (30 positions, most complex)
+- [ ] Verify anchor date consistency across all report sections (snapshot/correlation/exposures)
 - [ ] Add report generation as final step in batch_orchestrator_v2.py (ensure async context compatibility)
+- [ ] Ensure thread-safe writes to reports/ directory for concurrent portfolio processing
 - [ ] Test end-to-end: batch processing → report generation
 - [ ] Validate markdown reports are clean, readable, and highlight factor exposures (our richest data)
+- [ ] Document report overwrite policy in logs (e.g., "Overwriting existing report for portfolio X")
 
 ### 2.0.5 Day 5: CLI Interface & Production Readiness
-**Goal**: Production-ready CLI with comprehensive error handling
+**Goal**: Production-ready CLI with comprehensive error handling and testing
 
 - [ ] Create CLI command: `python -m app.reports {portfolio_id} --format md,json,csv`
 - [ ] Add --portfolio-name flag to use portfolio name instead of UUID
+- [ ] Add --as-of YYYY-MM-DD flag for historical report generation
+- [ ] Add --no-write flag for dry runs (generate artifacts only, no disk writes)
 - [ ] Add --output-dir flag to specify custom output directory
 - [ ] Add --format flag to generate specific file types (default: all)
 - [ ] Create scripts/run_batch_with_reports.py combining batch + report generation
 - [ ] Implement comprehensive error handling with clear user feedback
+- [ ] Add basic test coverage:
+  - Unit tests for `slugify()` function
+  - CSV column contract validation test
+  - Integration test: Generate reports for one demo portfolio and verify files exist
+  - Precision tests: Verify Decimal handling in JSON/CSV output
 - [ ] Test LLM consumption of JSON/CSV files (manual ChatGPT upload test)
 - [ ] Final validation: all 3 demo portfolios generate complete reports with factor analysis featured prominently
+- [ ] Document CLI usage in README with examples
 
 **Implementation Decisions (Updated for Data Reality):**
 - **Data Strategy**: Use available calculation engines (6/8 have data), gracefully handle missing ones
