@@ -124,59 +124,89 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 - Monitor data quality metrics (price coverage, market data freshness)
 - **Current Status**: 95% ready - portfolio structure perfect, 5/6 calculation engines working
 
-### 2.0.2 Day 2: Report Generation Implementation
+### 2.0.2 Day 2: Markdown Report Implementation
+**Current Data Availability**: 6/8 calculation engines have data (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
+
 - [ ] Implement markdown report generation with direct string formatting (no templates)
-- [ ] Build executive summary using PortfolioSnapshot + CorrelationCalculation data
-- [ ] Build portfolio snapshot using calculate_portfolio_exposures() output
-- [ ] Build factor analysis table using PositionFactorExposure data
-- [ ] Build stress test table using StressTestResult data
-- [ ] Build Greeks summary using aggregate_portfolio_greeks() output
+- [ ] Build executive summary using available PortfolioSnapshot data (3 records)
+- [ ] Build portfolio exposures section using calculate_portfolio_exposures() output
+- [ ] Build factor analysis table using PositionFactorExposure data (756 records available!)
+- [ ] Build Greeks summary with graceful handling of zero values for stock-only portfolios
+- [ ] Add "Data Availability" section showing what calculation engines have data
 
-### 2.0.3 Day 3: JSON & CSV Export Implementation
-- [ ] Implement JSON export with moderate nesting (grouped by calculation engine, flat metrics)
-- [ ] Include all 8 calculation engine outputs in structured JSON format
-- [ ] Implement CSV export with 30-40 essential columns (positions + Greeks + key exposures)
-- [ ] Add Greeks, factor exposures, and metadata columns to CSV (skip internal technical fields)
-- [ ] Validate all data fields populate correctly with graceful degradation for missing data
+**📝 Note**: Stress test tables will be added in a future phase after debugging the stress test calculation engine and batch framework. Currently no stress test scenarios or results in database.
 
-### 2.0.4 Day 4: Demo Portfolio Testing & Integration
-- [ ] Generate all 3 files for Balanced Individual Investor Portfolio
-- [ ] Generate all 3 files for Sophisticated High Net Worth Portfolio  
-- [ ] Generate all 3 files for Long/Short Hedge Fund Style Portfolio
-- [ ] Add report generation as final step in batch_orchestrator_v2.py
+### 2.0.3 Day 3: JSON & CSV Export Enhancement
+**Focus**: Enhance existing JSON output and implement comprehensive CSV export
+
+- [ ] Enhance JSON export structure (already returns real data, needs better organization)
+- [ ] Document 6 available calculation engines in JSON (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
+- [ ] Implement full CSV export with position-level details (30-40 columns)
+- [ ] Include per-position data: symbol, quantity, entry/current price, market value, P&L, Greeks (if options)
+- [ ] Add factor exposures and sector/industry data from MarketDataCache to CSV
+- [ ] Ensure graceful handling of missing data (e.g., no stress tests, zero Greeks for stocks)
+
+### 2.0.4 Day 4: Demo Portfolio Testing & Batch Integration
+**Demo Portfolios**: Individual (16 positions), HNW (17 positions), Hedge Fund (30 positions)
+
+- [ ] Generate all 3 files for Demo Individual Investor Portfolio (16 stocks, no options)
+- [ ] Generate all 3 files for Demo High Net Worth Portfolio (17 positions)
+- [ ] Generate all 3 files for Demo Hedge Fund Style Portfolio (30 positions, most complex)
+- [ ] Add report generation as final step in batch_orchestrator_v2.py (ensure async context compatibility)
 - [ ] Test end-to-end: batch processing → report generation
-- [ ] Validate human reports are clean and readable
+- [ ] Validate markdown reports are clean, readable, and highlight factor exposures (our richest data)
 
-### 2.0.5 Day 5: CLI Interface & Final Polish
+### 2.0.5 Day 5: CLI Interface & Production Readiness
+**Goal**: Production-ready CLI with comprehensive error handling
+
 - [ ] Create CLI command: `python -m app.reports {portfolio_id} --format md,json,csv`
+- [ ] Add --portfolio-name flag to use portfolio name instead of UUID
+- [ ] Add --output-dir flag to specify custom output directory
 - [ ] Add --format flag to generate specific file types (default: all)
-- [ ] Implement async status reporting and detailed logging during report generation
-- [ ] Add error handling with graceful degradation for partial/missing calculation data
+- [ ] Create scripts/run_batch_with_reports.py combining batch + report generation
+- [ ] Implement comprehensive error handling with clear user feedback
 - [ ] Test LLM consumption of JSON/CSV files (manual ChatGPT upload test)
-- [ ] Final validation: all demo portfolios generate complete reports using most recent batch data
+- [ ] Final validation: all 3 demo portfolios generate complete reports with factor analysis featured prominently
 
-**Implementation Decisions Applied:**
-- **Data Strategy**: Use most recent successful batch run data (no same-day requirement)
-- **File Organization**: `reports/` in project root with slugified portfolio names, added to .gitignore
-- **Error Handling**: Graceful degradation - generate partial reports with "N/A" for missing sections
-- **JSON Structure**: Moderate nesting - grouped by calculation engine, flat metrics within groups  
-- **CSV Scope**: 30-40 essential columns (positions + Greeks + key exposures, skip internal fields)
-- **Architecture**: Fully async implementation with detailed status reporting and logging
-- **CLI Options**: Support --format flag for selective generation (md, json, csv)
+**Implementation Decisions (Updated for Data Reality):**
+- **Data Strategy**: Use available calculation engines (6/8 have data), gracefully handle missing ones
+- **File Organization**: ✅ `reports/{slugified_name}_{date}/` structure implemented, added to .gitignore
+- **Error Handling**: Graceful degradation - clearly indicate which engines have no data
+- **Focus Areas**: Emphasize factor analysis (756 records!) and portfolio exposures as primary value
+- **JSON Structure**: Already returns real data, needs organization by calculation engine
+- **CSV Scope**: Full position details with Greeks, factor exposures, sector/industry data
+- **Stress Tests**: Deferred to future phase after debugging calculation engine
+- **Architecture**: Fully async implementation with file I/O support already working
 
 **Cross-Reference**: 
 - Implementation based on `_docs/requirements/PRD_PORTFOLIO_REPORT_SPEC.md` sections 4.1-4.3
-- Leverages all 8 completed calculation engines from Phase 1
+- Leverages 6 calculation engines with data (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
 - Outputs human-readable `.md`, machine-readable `.json`, and position-level `.csv` files
 - Integrates with existing batch_orchestrator_v2.py for automated daily generation
 - Supports LLM consumption for portfolio analysis and recommendations
 
-**Success Criteria**:
-- ✅ Generate complete reports for all 3 demo portfolios
-- ✅ Include data from all 8 batch calculation engines  
-- ✅ Produce human-readable markdown format
-- ✅ Include LLM-optimized JSON and CSV data blocks
-- ✅ Update automatically after daily batch processing
+**Success Criteria (Revised for Current Data)**:
+- ✅ Generate reports for all 3 demo portfolios (16, 17, and 30 positions)
+- ✅ Include data from 6 available calculation engines (defer stress tests, IR betas)
+- ✅ Feature factor analysis prominently (756 exposure records available!)
+- ✅ Produce clean markdown with portfolio exposures and Greeks summaries
+- ✅ Generate comprehensive CSV with 30-40 columns of position details
+- ✅ Ensure JSON output suitable for LLM analysis
+- ✅ Clear documentation of which calculation engines have/lack data
+
+---
+
+## 2.0.6 Future Enhancement: Stress Test Integration
+**Status**: DEFERRED - Awaiting stress test calculation engine debugging
+
+Once the stress test calculation engine and batch framework are debugged:
+- [ ] Populate StressTestScenario table with standard scenarios (Market Down 10%, etc.)
+- [ ] Implement stress test calculations in batch orchestrator
+- [ ] Add stress test results section to markdown report
+- [ ] Include stress test data in JSON export
+- [ ] Update report to show scenario analysis with dollar/percentage impacts
+
+**Note**: The report generator is already designed to gracefully handle missing stress test data, so reports will continue to function while this enhancement is pending.
 
 ---
 
