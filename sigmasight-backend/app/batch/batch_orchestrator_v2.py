@@ -455,9 +455,13 @@ class BatchOrchestratorV2:
     async def _calculate_correlations(self, db: AsyncSession, portfolio_id: str):
         """Position correlations job"""
         from app.services.correlation_service import CorrelationService
+        from datetime import datetime
         correlation_service = CorrelationService(db)
         portfolio_uuid = ensure_uuid(portfolio_id)
-        return await correlation_service.calculate_portfolio_correlations(portfolio_uuid)
+        return await correlation_service.calculate_portfolio_correlations(
+            portfolio_uuid,
+            calculation_date=datetime.now()
+        )
 
 
 # Create singleton instance
