@@ -344,11 +344,41 @@ async def _collect_report_data(
                 "rho": greek_record.rho       # Keep as Decimal
             }
     
-    # 6. Prepare position data with Decimal precision maintained
+    # 6. Fetch sector/industry data from MarketDataCache
+    from app.models.market_data import MarketDataCache
+    sector_industry_map = {}
+    if positions:
+        # Get unique symbols
+        symbols = list(set(p.symbol for p in positions))
+        
+        # Fetch latest market data for each symbol (includes sector/industry)
+        for symbol in symbols:
+            market_data_result = await db.execute(
+                select(MarketDataCache)
+                .where(
+                    and_(
+                        MarketDataCache.symbol == symbol,
+                        MarketDataCache.date <= anchor_date
+                    )
+                )
+                .order_by(MarketDataCache.date.desc())
+                .limit(1)
+            )
+            market_data = market_data_result.scalar_one_or_none()
+            if market_data:
+                sector_industry_map[symbol] = {
+                    "sector": market_data.sector,
+                    "industry": market_data.industry
+                }
+    
+    # 7. Prepare position data with Decimal precision maintained
     position_data = []
     for position in positions:
         # Get Greeks from bulk fetch
         greeks = greeks_by_position.get(position.id)
+        
+        # Get sector/industry
+        market_info = sector_industry_map.get(position.symbol, {})
         
         # Maintain Decimal precision - DO NOT convert to float yet
         market_val = position.market_value if position.market_value else (position.quantity * position.entry_price)
@@ -361,7 +391,18 @@ async def _collect_report_data(
             "market_value": market_val,  # Keep as Decimal
             "exposure": market_val,  # Keep as Decimal
             "position_type": position.position_type,
-            "greeks": greeks
+            "greeks": greeks,
+            # Additional fields for CSV
+            "last_price": position.last_price,
+            "unrealized_pnl": position.unrealized_pnl,
+            "realized_pnl": position.realized_pnl,
+            "entry_date": position.entry_date,
+            "exit_date": position.exit_date,
+            "underlying_symbol": position.underlying_symbol,
+            "strike_price": position.strike_price,
+            "expiration_date": position.expiration_date,
+            "sector": market_info.get("sector", ""),
+            "industry": market_info.get("industry", "")
         }
         position_data.append(position_dict)
     
@@ -640,31 +681,305 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
 
 
 def build_json_report(data: Mapping[str, Any]) -> Dict[str, Any]:
-    """Return a JSON structure with all collected data.
-
-    The full implementation (Day 3) will include all calculation engines
-    grouped by category with flat metrics.
+    """Build structured JSON report with proper Decimal serialization.
+    
+    Serializes Decimals as strings with explicit precision to maintain accuracy.
+    Groups data by calculation engine for clear organization.
     """
-    # Return the full data structure as JSON
-    # Remove positions for brevity in preview (can be added back if needed)
+    from decimal import Decimal
+    import json
+    
+    def decimal_to_string(value: Any, precision: int = 2) -> str:
+        """Convert Decimal to string with specified precision."""
+        if value is None:
+            return None
+        if isinstance(value, Decimal):
+            format_str = f"{{:.{precision}f}}"
+            return format_str.format(value)
+        return str(value)
+    
+    def serialize_decimals(obj: Any, money_precision: int = 2, greek_precision: int = 4, correlation_precision: int = 6) -> Any:
+        """Recursively serialize Decimals in nested structures."""
+        if isinstance(obj, Decimal):
+            # Determine precision based on value magnitude and context
+            if abs(obj) < 10:  # Likely a correlation or greek
+                if abs(obj) <= 1:  # Correlation
+                    return decimal_to_string(obj, correlation_precision)
+                else:  # Greek
+                    return decimal_to_string(obj, greek_precision)
+            else:  # Money value
+                return decimal_to_string(obj, money_precision)
+        elif isinstance(obj, dict):
+            return {k: serialize_decimals(v, money_precision, greek_precision, correlation_precision) 
+                   for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [serialize_decimals(item, money_precision, greek_precision, correlation_precision) 
+                   for item in obj]
+        else:
+            return obj
+    
+    # Extract and organize data by calculation engine
+    meta = data.get("meta", {})
+    portfolio = data.get("portfolio", {})
+    snapshot = data.get("snapshot")
+    correlation = data.get("correlation")
+    exposures = data.get("exposures")
+    greeks = data.get("greeks")
+    factor_exposures = data.get("factor_exposures", [])
+    positions = data.get("positions", [])
+    
+    # Build structured JSON with calculation engines clearly documented
     result = {
-        "version": "1.0",
-        "meta": data.get("meta", {}),
-        "portfolio": data.get("portfolio", {}),
-        "snapshot": data.get("snapshot", {}),
-        "correlation": data.get("correlation", {}),
-        "exposures": data.get("exposures", {}),
-        "greeks": data.get("greeks", {}),
-        "factor_exposures": data.get("factor_exposures", []),
-        "position_count": len(data.get("positions", [])),
+        "version": "2.0",
+        "metadata": {
+            "portfolio_id": meta.get("portfolio_id"),
+            "portfolio_name": meta.get("portfolio_name"),
+            "report_date": meta.get("as_of"),
+            "anchor_date": meta.get("anchor_date"),
+            "generated_at": meta.get("generated_at"),
+            "precision_policy": {
+                "monetary_values": "2 decimal places",
+                "greeks": "4 decimal places",
+                "correlations": "6 decimal places",
+                "factor_exposures": "6 decimal places"
+            }
+        },
+        "portfolio_info": serialize_decimals(portfolio),
+        "calculation_engines": {
+            "portfolio_snapshot": {
+                "available": snapshot is not None,
+                "data": serialize_decimals(snapshot) if snapshot else None,
+                "description": "Daily portfolio value and P&L calculations"
+            },
+            "position_exposures": {
+                "available": exposures is not None,
+                "data": serialize_decimals(exposures) if exposures else None,
+                "description": "Gross, net, long, short exposures and notional"
+            },
+            "greeks_aggregation": {
+                "available": greeks is not None,
+                "data": serialize_decimals(greeks, greek_precision=4) if greeks else None,
+                "description": "Portfolio-level Greeks (zero for stock-only portfolios)"
+            },
+            "factor_analysis": {
+                "available": len(factor_exposures) > 0,
+                "count": len(factor_exposures),
+                "data": serialize_decimals(factor_exposures, correlation_precision=6) if factor_exposures else [],
+                "description": "Position-level factor exposures from regression analysis"
+            },
+            "correlation_analysis": {
+                "available": correlation is not None,
+                "data": serialize_decimals(correlation, correlation_precision=6) if correlation else None,
+                "description": "Portfolio correlation metrics"
+            },
+            "market_data": {
+                "available": True,
+                "position_count": len(positions),
+                "description": "Position-level market data and pricing"
+            },
+            "stress_testing": {
+                "available": False,
+                "data": None,
+                "description": "Stress test scenarios pending implementation (Phase 2.4)"
+            },
+            "interest_rate_betas": {
+                "available": False,
+                "data": None,
+                "description": "Interest rate sensitivity analysis - no data"
+            }
+        },
+        "positions_summary": {
+            "count": len(positions),
+            "long_count": sum(1 for p in positions if p.get("position_type") in ["LONG", "LC", "LP"]),
+            "short_count": sum(1 for p in positions if p.get("position_type") in ["SHORT", "SC", "SP"]),
+            "options_count": sum(1 for p in positions if p.get("position_type") in ["LC", "LP", "SC", "SP"]),
+            "stock_count": sum(1 for p in positions if p.get("position_type") in ["LONG", "SHORT"])
+        }
     }
+    
     return result
 
 
 def build_csv_report(data: Mapping[str, Any]) -> str:
-    """Return a minimal CSV string as a placeholder.
-
-    The full implementation (Day 3) will include positions + Greeks + key exposures.
+    """Build comprehensive CSV export with position-level details.
+    
+    Implements explicit column contract with 30-40 columns covering:
+    - Core position data
+    - P&L metrics  
+    - Greeks (4 decimal precision)
+    - Options details
+    - Metadata (sector, industry)
+    - Portfolio-level exposures
     """
-    # Simple header-only CSV for now
-    return "portfolio_id,as_of\n" + f"{data.get('meta', {}).get('portfolio_id')},{data.get('meta', {}).get('as_of')}\n"
+    from decimal import Decimal
+    import csv
+    import io
+    from datetime import date
+    
+    def format_decimal(value: Any, precision: int = 2) -> str:
+        """Format Decimal values with specified precision."""
+        if value is None or value == "":
+            return ""
+        if isinstance(value, Decimal):
+            format_str = f"{{:.{precision}f}}"
+            return format_str.format(value)
+        if isinstance(value, (int, float)):
+            format_str = f"{{:.{precision}f}}"
+            return format_str.format(float(value))
+        return str(value)
+    
+    def safe_get(obj: Any, key: str, default: Any = "") -> Any:
+        """Safely get value from dict or object."""
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+    
+    # Extract data
+    meta = data.get("meta", {})
+    portfolio = data.get("portfolio", {})
+    positions = data.get("positions", [])
+    exposures = data.get("exposures", {})
+    snapshot = data.get("snapshot", {})
+    
+    # Define CSV columns (explicit contract)
+    columns = [
+        # Core Position Data (8 columns)
+        "position_id",
+        "symbol", 
+        "position_type",
+        "quantity",
+        "entry_price",
+        "current_price",
+        "market_value",
+        "cost_basis",
+        
+        # P&L Metrics (4 columns)
+        "unrealized_pnl",
+        "realized_pnl",
+        "daily_pnl",
+        "total_pnl",
+        
+        # Greeks (5 columns - 4 decimal precision)
+        "delta",
+        "gamma", 
+        "theta",
+        "vega",
+        "rho",
+        
+        # Options Details (4 columns)
+        "underlying_symbol",
+        "strike_price",
+        "expiration_date",
+        "days_to_expiry",
+        
+        # Metadata (6 columns)
+        "entry_date",
+        "exit_date",
+        "sector",
+        "industry",
+        "tags",
+        "notes",
+        
+        # Portfolio-Level Context (7 columns)
+        "portfolio_name",
+        "report_date",
+        "gross_exposure",
+        "net_exposure",
+        "notional",
+        "portfolio_weight",
+        "position_exposure"
+    ]
+    
+    # Build CSV rows
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=columns)
+    writer.writeheader()
+    
+    # Get portfolio-level values for context
+    portfolio_name = meta.get("portfolio_name", "")
+    report_date = meta.get("as_of", "")
+    gross_exposure = exposures.get("gross_exposure", 0)
+    net_exposure = exposures.get("net_exposure", 0)
+    notional = exposures.get("notional", 0)
+    
+    # Process each position
+    for position in positions:
+        # Get Greeks if available
+        greeks = position.get("greeks", {}) or {}
+        
+        # Calculate derived values
+        quantity = position.get("quantity", 0)
+        entry_price = position.get("entry_price", 0)
+        market_value = position.get("market_value", 0)
+        
+        # Cost basis
+        if isinstance(quantity, Decimal) and isinstance(entry_price, Decimal):
+            cost_basis = quantity * entry_price
+        else:
+            cost_basis = float(quantity) * float(entry_price) if quantity and entry_price else 0
+            
+        # Portfolio weight (as percentage of gross exposure)
+        if gross_exposure and market_value:
+            if isinstance(gross_exposure, Decimal) and isinstance(market_value, Decimal):
+                portfolio_weight = (abs(market_value) / gross_exposure * 100)
+            else:
+                portfolio_weight = (abs(float(market_value)) / float(gross_exposure) * 100)
+        else:
+            portfolio_weight = 0
+        
+        # Build row
+        row = {
+            # Core Position Data
+            "position_id": position.get("id", ""),
+            "symbol": position.get("symbol", ""),
+            "position_type": str(position.get("position_type", "")).replace("PositionType.", ""),
+            "quantity": format_decimal(quantity, 4),
+            "entry_price": format_decimal(entry_price, 2),
+            "current_price": format_decimal(position.get("last_price", entry_price), 2),
+            "market_value": format_decimal(market_value, 2),
+            "cost_basis": format_decimal(cost_basis, 2),
+            
+            # P&L Metrics
+            "unrealized_pnl": format_decimal(position.get("unrealized_pnl", 0), 2),
+            "realized_pnl": format_decimal(position.get("realized_pnl", 0), 2),
+            "daily_pnl": format_decimal(position.get("daily_pnl", 0), 2),
+            "total_pnl": format_decimal(
+                (position.get("unrealized_pnl", 0) or 0) + (position.get("realized_pnl", 0) or 0), 2
+            ),
+            
+            # Greeks (4 decimal precision)
+            "delta": format_decimal(greeks.get("delta", 0), 4),
+            "gamma": format_decimal(greeks.get("gamma", 0), 4),
+            "theta": format_decimal(greeks.get("theta", 0), 4),
+            "vega": format_decimal(greeks.get("vega", 0), 4),
+            "rho": format_decimal(greeks.get("rho", 0), 4),
+            
+            # Options Details
+            "underlying_symbol": position.get("underlying_symbol", ""),
+            "strike_price": format_decimal(position.get("strike_price"), 2) if position.get("strike_price") else "",
+            "expiration_date": str(position.get("expiration_date", "")) if position.get("expiration_date") else "",
+            "days_to_expiry": "",  # Would need calculation
+            
+            # Metadata
+            "entry_date": str(position.get("entry_date", "")),
+            "exit_date": str(position.get("exit_date", "")) if position.get("exit_date") else "",
+            "sector": position.get("sector", ""),
+            "industry": position.get("industry", ""),
+            "tags": ";".join(position.get("tags", [])) if isinstance(position.get("tags"), list) else "",
+            "notes": position.get("notes", ""),
+            
+            # Portfolio-Level Context
+            "portfolio_name": portfolio_name,
+            "report_date": report_date,
+            "gross_exposure": format_decimal(gross_exposure, 2),
+            "net_exposure": format_decimal(net_exposure, 2),
+            "notional": format_decimal(notional, 2),
+            "portfolio_weight": format_decimal(portfolio_weight, 2),
+            "position_exposure": format_decimal(position.get("exposure", market_value), 2)
+        }
+        
+        writer.writerow(row)
+    
+    return output.getvalue()

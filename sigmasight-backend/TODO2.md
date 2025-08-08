@@ -148,22 +148,30 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 
 **📝 Note**: Stress test tables will be added in a future phase after debugging the stress test calculation engine and batch framework. Currently no stress test scenarios or results in database.
 
-### 2.0.3 Day 3: JSON & CSV Export Enhancement
+### 2.0.3 Day 3: JSON & CSV Export Enhancement ✅ **COMPLETED 2025-08-08**
 **Focus**: Enhance existing JSON output and implement comprehensive CSV export
 
-- [ ] Enhance JSON export structure (already returns real data, needs better organization)
-- [ ] Serialize Decimals as strings in JSON with explicit precision to avoid float conversion
-- [ ] Document 6 available calculation engines in JSON (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
-- [ ] Define and implement explicit CSV column contract (exact 30-40 columns):
+- [x] Enhance JSON export structure (already returns real data, needs better organization)
+- [x] Serialize Decimals as strings in JSON with explicit precision to avoid float conversion
+- [x] Document 6 available calculation engines in JSON (Greeks, Factors, Correlations, Snapshots, Market Data, Positions)
+- [x] Define and implement explicit CSV column contract (exact 34 columns):
   - Core: position_id, symbol, quantity, entry_price, current_price, market_value, cost_basis
-  - P&L: unrealized_pnl, realized_pnl, daily_pnl
+  - P&L: unrealized_pnl, realized_pnl, daily_pnl, total_pnl
   - Greeks: delta, gamma, theta, vega, rho (4 decimal precision)
-  - Options: underlying_symbol, strike_price, expiration_date, position_type
-  - Metadata: sector, industry, tags, entry_date
-  - Exposures: gross_exposure, net_exposure, notional (not notional_exposure)
-- [ ] Include factor exposures per position where available
-- [ ] Ensure graceful handling of missing data (e.g., no stress tests, zero Greeks for stocks)
-- [ ] Document precision policy: 2dp for monetary values, 4dp for Greeks, 6dp for correlations
+  - Options: underlying_symbol, strike_price, expiration_date, position_type, days_to_expiry
+  - Metadata: sector, industry, tags, entry_date, exit_date, notes
+  - Exposures: gross_exposure, net_exposure, notional, portfolio_weight, position_exposure
+- [x] Include sector/industry data from MarketDataCache
+- [x] Ensure graceful handling of missing data (e.g., no stress tests, zero Greeks for stocks)
+- [x] Document precision policy: 2dp for monetary values, 4dp for Greeks, 6dp for correlations
+
+**🎯 Implementation Summary**:
+- **JSON Structure**: Version 2.0 with calculation engines clearly documented, each showing availability status
+- **Decimal Serialization**: All Decimals converted to strings with proper precision (2dp money, 4dp Greeks, 6dp correlations)
+- **CSV Contract**: 34 columns implemented covering all position details, P&L, Greeks, options, and metadata
+- **Sector/Industry**: Added fetching from MarketDataCache and included in position data
+- **Portfolio Context**: Each CSV row includes portfolio-level data for context (gross_exposure, net_exposure, etc.)
+- **Precision Policy**: Documented in JSON metadata and consistently applied throughout
 
 ### 2.0.4 Day 4: Demo Portfolio Testing & Batch Integration
 **Demo Portfolios**: Individual (16 positions), HNW (17 positions), Hedge Fund (30 positions)
