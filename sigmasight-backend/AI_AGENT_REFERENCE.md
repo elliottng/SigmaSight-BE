@@ -4,7 +4,7 @@
 
 **Target Audience**: AI agents (Claude, ChatGPT, etc.) working on SigmaSight backend development
 
-**Last Updated**: 2025-01-16
+**Last Updated**: 2025-08-08
 
 ---
 
@@ -82,7 +82,11 @@ from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
 # Individual calculation engines
 from app.calculations.greeks import calculate_position_greeks
 from app.calculations.factors import calculate_factor_exposures
-from app.calculations.portfolio_aggregation import calculate_portfolio_exposures
+from app.calculations.portfolio import (
+    calculate_portfolio_exposures,
+    aggregate_portfolio_greeks,
+    calculate_delta_adjusted_exposure,
+)
 ```
 
 ### **Core Utilities**
@@ -372,6 +376,217 @@ print('✅ Environment configured')
 
 ---
 
+## 🔌 Data Contracts & Common Patterns
+
+### **Portfolio Aggregation Functions** ⚠️ **CRITICAL**
+Functions in `app/calculations/portfolio.py` have strict input requirements:
+
+**Input Contract:**
+- **Expected**: `List[Dict]` - a flat list of position dictionaries
+- **NOT**: The wrapper dict from `_prepare_position_data()` which returns `{"positions": [...], "warnings": [...]}`
+- **Common Error**: Passing the wrapper dict causes pandas "All arrays must be of the same length" error
+
+**Correct Usage:**
+```python
+# WRONG - causes array length error
+position_data = await _prepare_position_data(db, positions, date)
+aggregations = calculate_portfolio_exposures(position_data)  # ❌ Passes wrapper dict
+
+# RIGHT - extract the list first
+position_data = await _prepare_position_data(db, positions, date)
+positions_list = position_data.get("positions", [])  # ✅ Extract list
+aggregations = calculate_portfolio_exposures(positions_list)
+```
+
+**Required Fields per Position:**
+- `exposure`: Decimal (signed: negative for shorts)
+- `position_type`: String or Enum (will be normalized)
+- `market_value`: Decimal (always positive)
+- `greeks`: Dict or None (optional, for options only)
+
+**Output Fields:**
+- `gross_exposure`: Sum of absolute exposures
+- `net_exposure`: Sum of signed exposures  
+- `notional`: Total notional value (same as gross_exposure)
+- Note: "notional_exposure" is NOT used in code, only "notional"
+
+### **Position Type Handling** ⚠️ **IMPORTANT**
+Position types come in two forms and MUST be normalized:
+
+**The Problem:**
+- Database models use `PositionType` enum (e.g., `PositionType.LONG`)
+- Constants use string codes (e.g., `"LONG"`, `"SHORT"`)
+- Pandas masks require strings, not enums
+
+**The Solution:**
+```python
+# Always normalize to string before comparisons
+position_type_str = getattr(position_type, 'value', position_type)
+if position_type_str in OPTIONS_POSITION_TYPES:  # Now comparing strings
+    # Handle options
+```
+
+**Position Type Constants:**
+```python
+from app.constants.portfolio import (
+    OPTIONS_POSITION_TYPES,  # ["LC", "LP", "SC", "SP"]
+    STOCK_POSITION_TYPES,    # ["LONG", "SHORT"]
+)
+```
+
+### **Greeks Precision Policy** 📊
+Different precision at different layers:
+
+**Calculation Layer:**
+- Greeks calculated to 4 decimal places (0.0000)
+- Used internally for accuracy
+
+**Database Layer:**
+- `PortfolioSnapshot` stores as `Numeric(12,2)` - 2 decimal places
+- Individual `PositionGreeks` stores as `Numeric(12,4)` - 4 decimal places
+- **Rho**: Calculated but NOT stored in `PortfolioSnapshot` (no portfolio_rho field)
+
+**API/Display Layer:**
+- Apply final rounding as needed
+- Current practice: Round at calculation layer to match DB constraints
+
+**Quantization Points:**
+```python
+# In calculations (current practice)
+delta = delta.quantize(Decimal("0.0000"))  # 4 dp for calculations
+# When storing to PortfolioSnapshot
+portfolio_delta = delta.quantize(Decimal("0.00"))  # 2 dp for storage
+```
+
+### **Field Naming Conventions** 📝
+**Canonical Names (use these):**
+- `notional` - Total notional exposure (NOT "notional_exposure")
+- `gross_exposure` - Sum of absolute exposures
+- `net_exposure` - Sum of signed exposures
+- `market_value` - Always positive value
+- `exposure` - Signed value (negative for shorts)
+
+**Deprecated/Incorrect:**
+- ~~`notional_exposure`~~ - Use `notional` instead
+- ~~`portfolio_rho`~~ - Calculated but not stored in snapshots
+
+### **Library Dependencies** 📚
+**Current (as per pyproject.toml):**
+- **mibian** - Used for Greeks calculations ✅
+- ~~**py_vollib**~~ - REMOVED due to `_testcapi` import issues ❌
+
+### **Cache Implementation** 🔄
+**Current Status:**
+- `timed_lru_cache` decorator with 60-second TTL
+- `clear_portfolio_cache()` function exists in `app/calculations/portfolio.py`
+- Not fully implemented across all endpoints
+
+**Usage:**
+```python
+from app.calculations.portfolio import clear_portfolio_cache
+# Clear after data changes
+clear_portfolio_cache()
+```
+
+---
+
+## 🚨 Common Issues & Solutions
+
+### **Batch Processing Issues**
+
+**1. Array Length Mismatch Errors**
+```python
+# Error: "All arrays must be of the same length"
+# Cause: Aggregation functions receiving dict wrapper instead of list
+# Solution:
+positions_list = position_data.get("positions", [])  # Extract list from wrapper
+aggregations = calculate_portfolio_exposures(positions_list)
+```
+
+**2. Missing calculation_date Parameter**
+```python
+# Error: Correlation calculations showing 0 records
+# Solution: Add calculation_date parameter
+await correlation_service.calculate_portfolio_correlations(
+    portfolio_uuid,
+    calculation_date=datetime.now()  # Add this parameter
+)
+```
+
+**3. Greenlet/Async Errors**
+```python
+# Error: "greenlet_spawn has not been called"
+# Solution: Use proper async context manager
+async with get_async_session() as db:
+    # All database operations here
+```
+
+### **Database Issues**
+
+**1. Missing Tables**
+```bash
+# Error: "relation does not exist"
+# Solution: Apply migrations
+uv run alembic upgrade head
+```
+
+**2. UUID Type Handling**
+```python
+# Always convert string UUIDs when needed
+from app.utils.uuid_utils import ensure_uuid
+portfolio_uuid = ensure_uuid(portfolio_id)
+```
+
+**3. Duplicate Key Violations**
+```python
+# Use merge() for upsert operations
+existing = await db.get(Model, primary_key)
+if existing:
+    for key, value in new_data.items():
+        setattr(existing, key, value)
+else:
+    db.add(Model(**new_data))
+```
+
+### **Data Type Issues**
+
+**1. Position Type Handling**
+```python
+# Convert enum to string for comparisons
+position_type_str = getattr(position_type, 'value', position_type)
+if position_type_str in OPTIONS_POSITION_TYPES:
+    # Handle options
+```
+
+**2. Decimal Precision**
+```python
+# Apply correct precision for different fields
+money_value = value.quantize(Decimal("0.00"))  # 2 decimal places
+greek_value = value.quantize(Decimal("0.0000"))  # 4 decimal places
+```
+
+### **Import Issues**
+
+**1. Circular Import Prevention**
+```python
+# Use late imports inside functions
+def calculate_something():
+    from app.models.market_data import MarketDataCache  # Import here
+    # Use MarketDataCache
+```
+
+**2. Missing Dependencies**
+```python
+# Check if library exists before using
+import importlib.util
+if importlib.util.find_spec("library_name"):
+    import library_name
+else:
+    # Use fallback or raise clear error
+```
+
+---
+
 ## 📋 Common Development Tasks
 
 ### **Adding New Models**
@@ -391,6 +606,99 @@ print('✅ Environment configured')
 2. Use existing calculation data (even if incomplete)
 3. Implement graceful degradation for missing calculation engines
 4. Target 3 demo portfolios initially
+
+---
+
+## 🧪 Testing Framework
+
+### **Installation** ⚠️ **IMPORTANT**
+Testing dependencies are in optional dev group:
+```bash
+# Install with dev dependencies
+pip install -e ".[dev]"
+# OR with uv
+uv pip install -e ".[dev]"
+```
+
+### **Pytest Setup** ✅ **READY**
+- **Framework**: pytest >= 7.4.0 with async support
+- **Dependencies**: `pytest-asyncio>=0.21.0`, `pytest-cov>=4.1.0`
+- **Test Location**: `tests/` directory with proper structure
+- **Config**: See `pyproject.toml` for test configuration
+
+### **Key Test Files**
+```
+tests/
+├── test_snapshot_generation.py    - Portfolio snapshots
+├── test_portfolio_aggregation.py  - Portfolio calculations  
+├── test_greeks_calculations.py    - Options Greeks
+├── test_market_data_service.py    - Market data integration
+├── test_correlation_service.py    - Position correlations
+└── fixtures/                      - Shared test fixtures
+```
+
+### **Running Tests**
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test file
+uv run pytest tests/test_snapshot_generation.py
+
+# Run with coverage
+uv run pytest --cov=app
+
+# Run with verbose output
+uv run pytest -v
+
+# Run async tests specifically
+uv run pytest -m asyncio
+```
+
+### **Test Gotchas**
+- **Greeks Precision**: Tests should expect 2dp for snapshot Greeks (DB constraint)
+- **Field Names**: Use `notional` not `notional_exposure` in assertions
+- **Position Types**: Test data may use enums - normalize to strings in tests
+- **Async Tests**: Use `@pytest.mark.asyncio` decorator for async test functions
+
+**Note**: Tests use async patterns (`pytest-asyncio`) and proper database mocking. Existing tests cover core calculation engines and batch processing workflows.
+
+---
+
+## 📐 Design Decisions & Policies
+
+### **Input Validation Philosophy**
+- **Current**: Permissive with logging - accept wrapper dicts and extract data
+- **Rationale**: Resilience over strictness during development phase
+- **Future**: May switch to fail-fast with clear exceptions in production
+
+### **Precision & Rounding Policy**
+- **Calculations**: Maintain full precision (4dp for Greeks)
+- **Database Storage**: Round to match column constraints at write time
+- **API Response**: Final rounding at serialization layer
+- **Current Practice**: Round in calculations to match DB (may change)
+
+### **Field Naming Standards**
+- **Canonical**: Use `notional` (not `notional_exposure`)
+- **Backward Compatibility**: Not required for internal APIs
+- **Documentation**: Update all references to canonical names
+
+### **Rho Handling**
+- **Policy**: Calculate rho but do NOT store in PortfolioSnapshot
+- **Rationale**: Rarely used metric, saves storage
+- **Access**: Available in PositionGreeks, can aggregate if needed
+
+### **Trading Calendar Gating**
+- **Snapshots**: Check `trading_calendar.is_trading_day()` before creation
+- **Batch Jobs**: Run regardless, handle non-trading days gracefully
+- **Tests**: Mock calendar or use known trading dates
+
+### **Aggregation Function Status**
+- ✅ `calculate_portfolio_exposures` - Fully implemented
+- ✅ `aggregate_portfolio_greeks` - Fully implemented  
+- ✅ `calculate_delta_adjusted_exposure` - Fully implemented
+- ✅ `aggregate_by_tags` - Fully implemented
+- ✅ `aggregate_by_underlying` - Fully implemented
 
 ---
 

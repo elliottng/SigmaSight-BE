@@ -70,10 +70,15 @@ async def create_portfolio_snapshot(
         position_data = await _prepare_position_data(db, active_positions, calculation_date)
         
         # Step 3: Calculate portfolio aggregations
-        aggregations = calculate_portfolio_exposures(position_data)
+        positions_list = position_data.get("positions", [])
+        logger.info(
+            f"Prepared {len(positions_list)} positions for aggregation; "
+            f"warnings={len(position_data.get('warnings', []))}"
+        )
+        aggregations = calculate_portfolio_exposures(positions_list)
         
         # Step 4: Aggregate Greeks
-        greeks = aggregate_portfolio_greeks(position_data)
+        greeks = aggregate_portfolio_greeks(positions_list)
         
         # Step 5: Calculate P&L
         pnl_data = await _calculate_pnl(db, portfolio_id, calculation_date, aggregations['gross_exposure'])

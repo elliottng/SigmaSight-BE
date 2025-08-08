@@ -125,8 +125,21 @@ def calculate_portfolio_exposures(positions: List[Dict]) -> Dict[str, Any]:
             }
         }
     
+    # If passed a dict (e.g., {"positions": [...], "warnings": [...]}) use the list under 'positions'
+    if isinstance(positions, dict):
+        logger.error(
+            "calculate_portfolio_exposures received a dict instead of a list; "
+            "falling back to positions=list under 'positions' key"
+        )
+        positions = positions.get("positions", [])
+    
     # Convert to DataFrame for efficient calculations
     df = pd.DataFrame(positions)
+    logger.debug(f"Exposure DF constructed with columns={list(df.columns)} and rows={len(df)}")
+    
+    # Normalize position_type to string code (handles Enum values like PositionType.LC)
+    if 'position_type' in df.columns:
+        df['position_type'] = df['position_type'].apply(lambda x: getattr(x, 'value', x))
     
     # Ensure numeric types and handle missing columns
     df['exposure'] = df['exposure'].apply(lambda x: Decimal(str(x)) if x is not None else Decimal("0"))
@@ -210,6 +223,14 @@ def aggregate_portfolio_greeks(positions: List[Dict]) -> Dict[str, Decimal]:
         >>> aggregate_portfolio_greeks(positions)
         {"delta": Decimal("0.5000"), "gamma": Decimal("0.1000"), ...}
     """
+    # If passed a dict (e.g., {"positions": [...], "warnings": [...]}) use the list under 'positions'
+    if isinstance(positions, dict):
+        logger.error(
+            "aggregate_portfolio_greeks received a dict instead of a list; "
+            "falling back to positions=list under 'positions' key"
+        )
+        positions = positions.get("positions", [])
+
     # Initialize totals
     total_greeks = {
         "delta": Decimal("0"),
