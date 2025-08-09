@@ -1174,6 +1174,118 @@ if total_direct_pnl < max_loss:
 
 ---
 
+## Phase 2.7: Portfolio Exposure Database Storage Enhancement
+*Store calculated portfolio exposures in database for performance and consistency*
+
+**Status**: NOT STARTED - Future Enhancement  
+**Priority**: Low (Current on-the-fly calculation works)  
+**Dependencies**: Phase 2.6 completion (fix calculation logic first)
+
+### Motivation
+Currently, portfolio exposures (long, short, gross, net, delta-adjusted) are calculated on-the-fly during report generation. This enhancement will:
+- Store these values in the database during batch processing
+- Improve report generation performance
+- Ensure consistency across all reports and APIs
+- Enable historical exposure tracking
+
+### 2.7.1 Database Schema Changes
+- [ ] Create new `portfolio_exposures` table:
+  ```sql
+  CREATE TABLE portfolio_exposures (
+      id UUID PRIMARY KEY,
+      portfolio_id UUID REFERENCES portfolios(id),
+      calculation_date DATE NOT NULL,
+      -- Dollar exposures
+      gross_exposure DECIMAL(20,2),
+      net_exposure DECIMAL(20,2),
+      long_exposure DECIMAL(20,2),
+      short_exposure DECIMAL(20,2),
+      -- Delta-adjusted exposures
+      delta_adjusted_gross DECIMAL(20,2),
+      delta_adjusted_net DECIMAL(20,2),
+      delta_adjusted_long DECIMAL(20,2),
+      delta_adjusted_short DECIMAL(20,2),
+      -- Asset class breakdowns
+      options_exposure DECIMAL(20,2),
+      stock_exposure DECIMAL(20,2),
+      -- Position counts
+      long_count INTEGER,
+      short_count INTEGER,
+      total_positions INTEGER,
+      -- Metadata
+      calculation_metadata JSONB,
+      created_at TIMESTAMP WITH TIME ZONE,
+      updated_at TIMESTAMP WITH TIME ZONE,
+      UNIQUE(portfolio_id, calculation_date)
+  );
+  ```
+- [ ] Add indexes for query performance
+- [ ] Create Alembic migration
+
+### 2.7.2 Calculation Engine Updates
+- [ ] Create `calculate_and_store_portfolio_exposures()` in `app/calculations/portfolio.py`:
+  - Calculate all exposure metrics with correct signs
+  - Include delta-adjusted exposures using Greeks
+  - Store results in new `portfolio_exposures` table
+- [ ] Integrate into batch processing framework:
+  - Add to `batch_orchestrator_v2.py` daily calculations
+  - Run after position snapshots but before factor calculations
+  - Include in calculation dependencies
+
+### 2.7.3 Report Generator Refactoring
+- [ ] Refactor `portfolio_report_generator.py`:
+  - Remove on-the-fly `calculate_portfolio_exposures()` calls
+  - Fetch exposures from `portfolio_exposures` table
+  - Add fallback to on-the-fly calculation if DB data missing
+- [ ] Update report sections:
+  - Add delta-adjusted exposures to reports
+  - Show exposure trends over time
+  - Add exposure attribution by asset class
+
+### 2.7.4 Historical Data Backfill
+- [ ] Create backfill script:
+  - Process all historical snapshots
+  - Calculate exposures for each date
+  - Store in `portfolio_exposures` table
+- [ ] Validate backfilled data against current calculations
+
+### 2.7.5 API Enhancements
+- [ ] Create exposure history endpoints:
+  - `GET /api/v1/portfolio/{id}/exposures/history`
+  - `GET /api/v1/portfolio/{id}/exposures/trends`
+- [ ] Add exposure time series to existing endpoints
+
+### Benefits
+1. **Performance**: ~10x faster report generation (no calculation needed)
+2. **Consistency**: All reports use same pre-calculated values
+3. **History**: Track exposure changes over time
+4. **Reliability**: Reduced computation during report generation
+5. **Features**: Enable new analytics on exposure trends
+
+### Implementation Notes
+- Design for incremental calculation (only new dates)
+- Handle position updates that affect historical exposures
+- Consider caching strategy for frequently accessed data
+- Ensure proper handling of currency and precision
+
+### Success Criteria
+- [ ] All exposures stored daily during batch processing
+- [ ] Report generation pulls from database (with fallback)
+- [ ] Historical exposure data available via API
+- [ ] Performance improvement measured and documented
+- [ ] Delta-adjusted exposures included in all reports
+
+### Estimated Timeline
+- Database schema: 0.5 days
+- Calculation engine: 1 day
+- Batch integration: 0.5 days
+- Report refactoring: 1 day
+- Historical backfill: 0.5 days
+- Testing & validation: 1 day
+- **Total: 4.5 days**
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 

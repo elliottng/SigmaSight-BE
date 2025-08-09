@@ -272,6 +272,41 @@ Portfolio Factor Exposures:
 
 ---
 
+## Current Database State Assessment
+
+### What We Already Have
+Based on database analysis, we already store most of the data needed:
+
+1. **Position-Level Factor Betas** ✅
+   - Table: `PositionFactorExposure`
+   - Field: `exposure_value` (beta coefficient for each position-factor pair)
+   - Coverage: 1,348 records across all positions and factors
+   - Quality tracking: `quality_flag` field indicates data reliability
+
+2. **Portfolio-Level Factor Exposures** ✅
+   - Table: `FactorExposure` 
+   - Fields: `exposure_value` (portfolio beta), `exposure_dollar` (currently flawed)
+   - Coverage: 83 records across portfolios and dates
+
+3. **Position Market Values** ✅
+   - Table: `Position`
+   - Field: `market_value` (quantity × price × multiplier)
+   - Always positive, even for short positions
+
+### What We DON'T Have
+- **Position signed exposures**: Market values don't reflect short position signs
+- **Delta-adjusted exposures**: Would require Greeks integration
+- **Position factor dollar contributions**: Not stored (position_exposure × beta)
+
+### Implementation Without Schema Changes
+**Option B can be implemented with NO schema changes:**
+1. Calculate signed exposure: `market_value × (-1 if SHORT/SC/SP else 1)`
+2. Calculate contribution: `signed_exposure × position_beta`
+3. Sum contributions by factor for portfolio dollar exposure
+4. Update `FactorExposure.exposure_dollar` calculation logic
+
+---
+
 ## Recommendation
 
 **We recommend Option B: Position-Level Attribution** for the following reasons:
@@ -294,25 +329,28 @@ While the legacy approach was conceptually correct, Option B improves upon it by
 
 ## Implementation Plan
 
-### Phase 1: Data Model Changes
-1. Add `position_factor_contribution` table
-2. Update `FactorExposure` to include both dollar and beta
-3. Add migration scripts
+### Phase 1: Fix Calculation Logic (NO SCHEMA CHANGES)
+1. Update `aggregate_portfolio_factor_exposures()` in `factors.py`:
+   - Calculate signed position exposures
+   - Multiply by position betas from `PositionFactorExposure`
+   - Sum contributions for portfolio dollar exposure
+2. Fix sign handling in position exposure calculations
+3. Update stress test to use corrected logic
 
-### Phase 2: Calculation Engine Updates
-1. Modify `calculate_position_factor_betas()` to store position-level data
-2. Implement new `aggregate_portfolio_factor_exposures()` 
-3. Update stress test to use corrected exposures
-
-### Phase 3: Report Updates
-1. Update report generator to use new fields
+### Phase 2: Report Updates
+1. Update report generator to handle signed exposures correctly
 2. Add position-level factor attribution section
 3. Update documentation and tooltips
 
-### Phase 4: Migration
-1. Backfill historical data with new calculation
+### Phase 3: Optional Schema Enhancements (Future)
+1. Add `PositionFactorExposure.dollar_contribution` field (optional)
+2. Add `Position.signed_exposure` field for clarity (optional)
+3. Migration scripts if schema changes are approved
+
+### Phase 4: Validation & Migration
+1. Recalculate historical data with new logic
 2. Provide comparison reports (old vs new)
-3. Deprecate old fields after validation
+3. Verify stress test scenarios show differentiation
 
 ---
 
