@@ -630,6 +630,142 @@ ls -la app/config/stress_scenarios.json
 
 ---
 
+## Phase 2.5: Critical Bug Fixes - Report Data Integrity Issues
+*Emergency fixes for calculation engine and report generation bugs discovered through portfolio report analysis*
+
+**Timeline**: 2-3 Days | **Status**: 🟢 **PARTIALLY COMPLETE** | **Priority**: HIGHEST | **Created**: 2025-08-08 | **Updated**: 2025-08-09
+
+### **Executive Summary**
+Analysis of the three demo portfolio reports revealed **systematic calculation engine failures** affecting data integrity:
+- Position classification returning all zeros
+- Factor exposures showing duplicates  
+- Stress test losses exceeding portfolio values by 4-5X
+- Daily P&L showing $0.00 for all portfolios
+- JSON/Markdown data source mismatches
+
+### **Critical Issues Found Across All Portfolios**
+
+#### 1. **Position Classification Completely Broken** 🔴
+**Evidence**: All portfolios show `long_count=0, stock_count=0, options_count=0` despite having 16-30 positions
+**Root Cause (CONFIRMED)**: Lines 893-896 in `portfolio_report_generator.py` check `p.get("position_type")` as strings, but line 431 stores the raw Enum object
+```python
+# Line 431: stores Enum
+"position_type": position.position_type,  # This is PositionType.LONG, not "LONG"
+# Line 893: checks string
+"long_count": sum(1 for p in positions if p.get("position_type") in ["LONG", "LC", "LP"])
+```
+
+#### 2. **Factor Exposures Duplicated** 🔴
+**Evidence**: TSLA-Value appears twice (2.3744 vs 2.3717), ~0.1% difference across all factors
+**Root Cause (CONFIRMED)**: Lines 464-472 in `portfolio_report_generator.py` missing GROUP BY:
+```python
+# Current query (WRONG - no grouping):
+.where(
+    PositionFactorExposure.calculation_date <= anchor_date
+)
+.order_by(func.abs(PositionFactorExposure.exposure_value).desc())
+.limit(15)
+
+# Compare to Greeks query (CORRECT - has grouping):
+.group_by(PositionGreeks.position_id)  # This line is missing in factor query!
+```
+
+#### 3. **Stress Test Losses Impossible** 🔴
+**Evidence**: 
+- Individual ($529K): -$2.1M loss (397% of value)
+- HNW ($1.57M): -$6.5M loss (414% of value)  
+- Hedge Fund ($6.3M): -$32M loss (507% of value)
+
+**Hypothesis**: The `exposure_dollar` in FactorExposure might be storing total portfolio exposure to that factor (e.g., $6M to Market Beta), making losses realistic in absolute terms but being compared to wrong base.
+
+#### 4. **Daily P&L Always Zero** 🟡
+**Evidence**: All portfolios show exactly $0.00 P&L
+**Root Cause (CONFIRMED)**: Lines 261-262 in `snapshots.py`:
+```python
+# If no previous snapshot exists, P&L is zero
+daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
+```
+
+#### 5. **JSON/Markdown Data Mismatch** 🔴
+**Evidence**: JSON says `stress_testing.available = false` but Markdown shows 18 scenarios
+**Root Cause**: Lines 884-888 hardcode `available: false` while Markdown checks actual data
+
+### **Investigation Plan**
+
+#### **Phase 1: Quick Fixes (Day 1)** ✅ **COMPLETED 2025-08-09**
+1. **Fix Position Classification** ✅ **FIXED**
+   - Changed line 431 to: `"position_type": position.position_type.value if hasattr(position.position_type, 'value') else str(position.position_type)`
+   - Now correctly converts Enum to string value
+   - Verified: All portfolios now show correct position counts
+
+2. **Fix Factor Duplication** ✅ **FIXED**
+   - Changed query to aggregate by factor with GROUP BY
+   - Now shows aggregated exposure per factor across all positions
+   - Added total_exposure, avg_exposure, and position_count fields
+   - Verified: No more duplicate factors in reports
+
+3. **Fix JSON/Markdown Consistency**
+   - Line 885: Change to `"available": len(stress_test_results) > 0`
+
+#### **Phase 2: Complex Fixes (Day 2)**
+4. **Investigate Stress Test Scaling**
+   - Check actual values in `factor_exposures` table
+   - Verify if `exposure_dollar` is position-level or portfolio-level
+   - Check if shocks are being applied correctly (percentage vs absolute)
+   - Add validation: losses cannot exceed gross exposure for unlevered portfolios
+
+5. **Fix P&L Calculation**
+   - Handle first-day snapshot creation
+   - Consider using entry prices for initial P&L baseline
+   - Add flag for "first snapshot" vs "stale data"
+
+#### **Phase 3: Validation & Testing (Day 3)**
+6. **Add Pre-Publish Validation**
+   ```python
+   assert sum(position_counts) == total_positions
+   assert stress_loss <= gross_exposure  # for unlevered
+   assert no_duplicate_factor_position_pairs
+   assert json.available == markdown.has_section
+   ```
+
+7. **Create Test Suite**
+   - Unit tests for each fix
+   - Integration test with known portfolio data
+   - Regression test for report generation
+
+### **Files to Modify**
+
+1. **app/reports/portfolio_report_generator.py**
+   - Line 431: Fix position_type storage
+   - Lines 464-472: Add GROUP BY to factor query
+   - Lines 893-896: Fix position classification logic
+   - Line 885: Fix stress test availability flag
+
+2. **app/calculations/snapshots.py**
+   - Lines 261-262: Handle first snapshot P&L
+
+3. **app/calculations/stress_testing.py**
+   - Investigate exposure_dollar calculation
+   - Add loss validation
+
+### **Success Criteria**
+- [x] Position counts show correct values (not zeros) ✅ **FIXED 2025-08-09**
+- [x] No duplicate factor exposures ✅ **FIXED 2025-08-09**
+- [ ] Stress losses ≤ 100% for unlevered portfolios
+- [ ] P&L shows non-zero values or explains why
+- [ ] JSON and Markdown data sources agree
+- [ ] All tests pass
+
+### **Monitoring**
+After fixes, regenerate all three portfolio reports and verify:
+1. Position summary totals match actual positions
+2. Factor exposures have no duplicates
+3. Stress test losses are realistic
+4. P&L calculations work (or show clear reason if zero)
+5. Data consistency between formats
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 

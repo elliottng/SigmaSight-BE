@@ -428,7 +428,7 @@ async def _collect_report_data(
             "entry_price": position.entry_price,  # Keep as Decimal
             "market_value": market_val,  # Keep as Decimal
             "exposure": market_val,  # Keep as Decimal
-            "position_type": position.position_type,
+            "position_type": position.position_type.value if hasattr(position.position_type, 'value') else str(position.position_type),
             "greeks": greeks,
             # Additional fields for CSV
             "last_price": position.last_price,
@@ -457,9 +457,14 @@ async def _collect_report_data(
     if positions:
         position_ids = [p.id for p in positions]
         
-        # Get latest factor exposures for each position at anchor date
+        # Get latest factor exposures aggregated by factor
         factors_result = await db.execute(
-            select(PositionFactorExposure, FactorDefinition)
+            select(
+                FactorDefinition,
+                func.sum(PositionFactorExposure.exposure_value).label('total_exposure'),
+                func.avg(PositionFactorExposure.exposure_value).label('avg_exposure'),
+                func.count(PositionFactorExposure.position_id).label('position_count')
+            )
             .join(FactorDefinition, PositionFactorExposure.factor_id == FactorDefinition.id)
             .where(
                 and_(
@@ -467,7 +472,8 @@ async def _collect_report_data(
                     PositionFactorExposure.calculation_date <= anchor_date
                 )
             )
-            .order_by(func.abs(PositionFactorExposure.exposure_value).desc())
+            .group_by(FactorDefinition.id, FactorDefinition.name, FactorDefinition.factor_type)
+            .order_by(func.abs(func.sum(PositionFactorExposure.exposure_value)).desc())
             .limit(15)  # Top exposures across all factors
         )
         factor_exposures = list(factors_result.all())
@@ -536,11 +542,13 @@ async def _collect_report_data(
         "positions": position_data,  # Contains Decimals
         "factor_exposures": [
             {
-                "position_symbol": next((p.symbol for p in positions if p.id == fe.position_id), "Unknown"),
-                "factor_name": factor_def.name,
-                "exposure_value": fe.exposure_value,  # Keep as Decimal
+                "factor_name": row[0].name,  # FactorDefinition object
+                "category": row[0].factor_type,
+                "total_exposure": row[1],  # total_exposure
+                "avg_exposure": row[2],  # avg_exposure
+                "position_count": row[3]  # position_count
             }
-            for fe, factor_def in factor_exposures
+            for row in factor_exposures
         ] if factor_exposures else [],
         "stress_test_results": stress_test_results
     }
@@ -689,21 +697,23 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
         lines.extend([
             "### Factor Analysis",
             "",
-            "**Top Factor Exposures** (by absolute value):",
+            "**Top Factor Exposures** (aggregated across portfolio):",
             "",
-            "| Position | Factor | Exposure |",
-            "|----------|--------|----------|",
+            "| Factor | Category | Total Exposure | Avg Exposure | Positions |",
+            "|--------|----------|----------------|--------------|-----------|",
         ])
         
         # Show top 10 factor exposures
         for fe in factor_exposures[:10]:
-            symbol = fe.get('position_symbol', 'Unknown')
             factor = fe.get('factor_name', 'Unknown')
-            exposure = fe.get('exposure_value', 0)
-            lines.append(f"| {symbol} | {factor} | {format_correlation(exposure)} |")
+            category = fe.get('category', 'Unknown')
+            total_exp = fe.get('total_exposure', 0)
+            avg_exp = fe.get('avg_exposure', 0)
+            pos_count = fe.get('position_count', 0)
+            lines.append(f"| {factor} | {category} | {format_correlation(total_exp)} | {format_correlation(avg_exp)} | {pos_count} |")
         
         if len(factor_exposures) > 10:
-            lines.append(f"| *...and {len(factor_exposures) - 10} more* | | |")
+            lines.append(f"| *...and {len(factor_exposures) - 10} more* | | | | |")
         
         lines.append("")
     else:
