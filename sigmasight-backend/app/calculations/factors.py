@@ -618,6 +618,11 @@ async def aggregate_portfolio_factor_exposures(
     """
     Aggregate position-level factor exposures to portfolio level and store
     
+    OPTION B IMPLEMENTATION: Position-level attribution
+    - Calculate each position's contribution to factor exposure
+    - Sum contributions for portfolio-level dollar exposure
+    - Store both signed and magnitude portfolio betas
+    
     Args:
         db: Database session
         position_betas: Position-level factor betas
@@ -630,14 +635,12 @@ async def aggregate_portfolio_factor_exposures(
     """
     logger.info(f"Aggregating portfolio factor exposures for portfolio {portfolio_id}")
     
+    # Check feature flag
+    from app.config import Settings
+    settings = Settings()
+    use_new_attribution = settings.USE_NEW_FACTOR_ATTRIBUTION
+    
     try:
-        # Calculate portfolio-level betas (reuse existing function)
-        portfolio_betas = await _aggregate_portfolio_betas(
-            db=db,
-            portfolio_id=portfolio_id,
-            position_betas=position_betas
-        )
-        
         # Get factor definitions
         stmt = select(FactorDefinition).where(FactorDefinition.is_active == True)
         result = await db.execute(stmt)
@@ -645,7 +648,7 @@ async def aggregate_portfolio_factor_exposures(
         
         factor_name_to_id = {fd.name: fd.id for fd in factor_definitions}
         
-        # Add mapping for factor name differences (same as position-level)
+        # Add mapping for factor name differences
         factor_name_mapping = {
             'Market': 'Market Beta',
             'Value': 'Value',
@@ -655,6 +658,99 @@ async def aggregate_portfolio_factor_exposures(
             'Size': 'Size',
             'Low Volatility': 'Low Volatility'
         }
+        
+        # Initialize factor dollar exposures
+        factor_dollar_exposures = {}
+        signed_portfolio_betas = {}
+        magnitude_portfolio_betas = {}
+        
+        if use_new_attribution:
+            logger.info("Using NEW Option B factor attribution (position-level)")
+            
+            # Get positions with their market values and types
+            from app.models.positions import Position, PositionType
+            pos_stmt = select(Position).where(
+                and_(
+                    Position.portfolio_id == portfolio_id,
+                    Position.deleted_at.is_(None)
+                )
+            )
+            pos_result = await db.execute(pos_stmt)
+            positions = pos_result.scalars().all()
+            
+            # Build position exposure map with correct signs
+            position_exposures = {}
+            for position in positions:
+                pos_id_str = str(position.id)
+                market_val = float(position.market_value) if position.market_value else 0
+                
+                # Apply sign based on position type
+                if position.position_type in [PositionType.SHORT, PositionType.SC, PositionType.SP]:
+                    signed_exposure = -abs(market_val)
+                else:
+                    signed_exposure = abs(market_val)
+                
+                position_exposures[pos_id_str] = signed_exposure
+            
+            # Calculate factor dollar exposures using position-level attribution
+            gross_exposure = portfolio_exposures.get("gross_exposure", Decimal('0'))
+            
+            for factor_name in factor_name_mapping.keys():
+                factor_dollar_exposure = 0.0
+                signed_weighted_beta = 0.0
+                magnitude_weighted_beta = 0.0
+                
+                # Sum position contributions for this factor
+                for pos_id_str, pos_betas in position_betas.items():
+                    if factor_name in pos_betas and pos_id_str in position_exposures:
+                        position_beta = pos_betas[factor_name]
+                        position_exposure = position_exposures[pos_id_str]
+                        
+                        # Position's contribution to factor exposure
+                        contribution = position_exposure * position_beta
+                        factor_dollar_exposure += contribution
+                        
+                        # For portfolio beta calculations
+                        signed_weighted_beta += position_exposure * position_beta
+                        magnitude_weighted_beta += abs(position_exposure) * abs(position_beta)
+                
+                # Store calculated values
+                factor_dollar_exposures[factor_name] = factor_dollar_exposure
+                
+                # Calculate portfolio betas (if gross exposure > 0)
+                if gross_exposure > 0:
+                    signed_portfolio_betas[factor_name] = signed_weighted_beta / float(gross_exposure)
+                    magnitude_portfolio_betas[factor_name] = magnitude_weighted_beta / float(gross_exposure)
+                else:
+                    signed_portfolio_betas[factor_name] = 0.0
+                    magnitude_portfolio_betas[factor_name] = 0.0
+            
+            # Use signed betas as the primary portfolio betas
+            portfolio_betas = signed_portfolio_betas
+            
+        else:
+            logger.info("Using LEGACY factor attribution (flawed)")
+            
+            # Calculate portfolio-level betas (old method)
+            portfolio_betas = await _aggregate_portfolio_betas(
+                db=db,
+                portfolio_id=portfolio_id,
+                position_betas=position_betas
+            )
+            
+            # OLD FLAWED METHOD: Each factor gets entire portfolio value
+            portfolio_value = portfolio_exposures.get("gross_exposure", Decimal('0'))
+            for factor_name, beta_value in portfolio_betas.items():
+                factor_dollar_exposures[factor_name] = float(beta_value) * float(portfolio_value) if portfolio_value else 0
+        
+        # Log comparison if using new method
+        if use_new_attribution:
+            logger.info("Factor exposure comparison (NEW vs OLD):")
+            for factor_name in factor_dollar_exposures.keys():
+                new_value = factor_dollar_exposures[factor_name]
+                old_value = float(portfolio_betas.get(factor_name, 0)) * float(portfolio_exposures.get("gross_exposure", 0))
+                diff_pct = ((new_value - old_value) / old_value * 100) if old_value != 0 else 0
+                logger.info(f"  {factor_name}: NEW=${new_value:,.2f} OLD=${old_value:,.2f} DIFF={diff_pct:+.1f}%")
         
         # Store portfolio-level factor exposures
         from app.models.market_data import FactorExposure
@@ -670,9 +766,8 @@ async def aggregate_portfolio_factor_exposures(
             
             factor_id = factor_name_to_id[mapped_name]
             
-            # Calculate dollar exposure (beta * portfolio value)
-            portfolio_value = portfolio_exposures.get("gross_exposure", Decimal('0'))
-            exposure_dollar = float(beta_value) * float(portfolio_value) if portfolio_value else None
+            # Use the corrected dollar exposure
+            exposure_dollar = factor_dollar_exposures.get(factor_name, 0)
             
             # Check if record exists
             existing = await db.execute(
@@ -708,9 +803,13 @@ async def aggregate_portfolio_factor_exposures(
         results = {
             "success": True,
             "portfolio_betas": portfolio_betas,
+            "factor_dollar_exposures": factor_dollar_exposures if use_new_attribution else None,
+            "signed_portfolio_betas": signed_portfolio_betas if use_new_attribution else None,
+            "magnitude_portfolio_betas": magnitude_portfolio_betas if use_new_attribution else None,
             "records_stored": records_stored,
             "calculation_date": calculation_date,
-            "portfolio_id": str(portfolio_id)
+            "portfolio_id": str(portfolio_id),
+            "attribution_method": "Option B (position-level)" if use_new_attribution else "Legacy (flawed)"
         }
         
         logger.info(f"Portfolio factor exposures aggregated and stored: {records_stored} records")

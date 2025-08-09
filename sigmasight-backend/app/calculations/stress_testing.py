@@ -353,23 +353,23 @@ async def calculate_direct_stress_impact(
                     'factor_pnl': 0.0
                 }
         
-        # TEMPORARY FIX: Cap losses at 99% of portfolio value (matching correlated calculation)
+        # FIX: Cap losses at 99% of portfolio value using simple clipping (not scaling)
         max_loss = -portfolio_market_value * 0.99
-        scaling_applied = False
-        scaling_factor = 1.0
+        loss_cap_applied = False
+        original_total_pnl = total_direct_pnl
         
         if total_direct_pnl < max_loss:
             logger.warning(f"Direct stress loss of ${total_direct_pnl:,.0f} exceeds 99% of portfolio. "
-                         f"Capping at ${max_loss:,.0f}")
-            scaling_factor = max_loss / total_direct_pnl if total_direct_pnl != 0 else 1.0
-            total_direct_pnl = max_loss
-            scaling_applied = True
+                         f"Clipping at ${max_loss:,.0f} (not scaling factors)")
+            total_direct_pnl = max_loss  # Simple clip - preserve factor structure
+            loss_cap_applied = True
             
-            # Scale individual factor impacts
+            # DO NOT scale individual factor impacts - preserve their relative contributions
+            # This allows us to see which factors contribute most to the extreme scenario
             for factor_name in direct_impacts:
-                original_pnl = direct_impacts[factor_name]['factor_pnl']
-                direct_impacts[factor_name]['factor_pnl'] = original_pnl * scaling_factor
-                direct_impacts[factor_name]['scaling_applied'] = True
+                direct_impacts[factor_name]['original_total'] = original_total_pnl
+                direct_impacts[factor_name]['clipped_total'] = total_direct_pnl
+                direct_impacts[factor_name]['cap_applied'] = True
         
         results = {
             'scenario_name': scenario_config.get('name'),
@@ -381,8 +381,8 @@ async def calculate_direct_stress_impact(
             'total_direct_pnl': total_direct_pnl,
             'calculation_method': 'direct',
             'factor_exposures_date': max([exp['calculation_date'] for exp in latest_exposures.values()]) if latest_exposures else calculation_date,
-            'loss_cap_applied': scaling_applied,
-            'scaling_factor': scaling_factor if scaling_applied else None
+            'loss_cap_applied': loss_cap_applied,
+            'original_total_pnl': original_total_pnl if loss_cap_applied else None
         }
         
         logger.info(f"Direct stress impact calculated: ${total_direct_pnl:,.0f} total P&L")
@@ -512,25 +512,23 @@ async def calculate_correlated_stress_impact(
             
             total_correlated_pnl += factor_impact
         
-        # TEMPORARY FIX: Cap losses at 99% of portfolio value to prevent impossible results
-        # This is a pragmatic fix until proper stress test model is implemented (see TODO2.md 4.1.2)
+        # FIX: Cap losses at 99% of portfolio value using simple clipping (not scaling)
         max_loss = -portfolio_market_value * 0.99  # Maximum 99% loss
-        scaling_applied = False
-        scaling_factor = 1.0
+        loss_cap_applied = False
+        original_total_pnl = total_correlated_pnl
         
         if total_correlated_pnl < max_loss:
-            logger.warning(f"Stress test loss of ${total_correlated_pnl:,.0f} exceeds 99% of portfolio value "
-                         f"${portfolio_market_value:,.0f}. Capping at ${max_loss:,.0f}")
-            scaling_factor = max_loss / total_correlated_pnl if total_correlated_pnl != 0 else 1.0
-            total_correlated_pnl = max_loss
-            scaling_applied = True
+            logger.warning(f"Correlated stress loss of ${total_correlated_pnl:,.0f} exceeds 99% of portfolio. "
+                         f"Clipping at ${max_loss:,.0f} (not scaling factors)")
+            total_correlated_pnl = max_loss  # Simple clip - preserve factor structure
+            loss_cap_applied = True
             
-            # Scale individual factor impacts proportionally
+            # DO NOT scale individual factor impacts - preserve their relative contributions
+            # This allows us to see which factors contribute most to the extreme scenario
             for factor_name in correlated_impacts:
-                original_impact = correlated_impacts[factor_name]['total_factor_impact']
-                correlated_impacts[factor_name]['total_factor_impact'] = original_impact * scaling_factor
-                correlated_impacts[factor_name]['scaling_applied'] = True
-                correlated_impacts[factor_name]['scaling_factor'] = scaling_factor
+                correlated_impacts[factor_name]['original_total'] = original_total_pnl
+                correlated_impacts[factor_name]['clipped_total'] = total_correlated_pnl
+                correlated_impacts[factor_name]['cap_applied'] = True
         
         results = {
             'scenario_name': scenario_config.get('name'),
@@ -547,8 +545,8 @@ async def calculate_correlated_stress_impact(
                 'factors_used': len(correlation_matrix),
                 'shocked_factors': list(shocked_factors.keys())
             },
-            'loss_cap_applied': scaling_applied,
-            'scaling_factor': scaling_factor if scaling_applied else None
+            'loss_cap_applied': loss_cap_applied,
+            'original_total_pnl': original_total_pnl if loss_cap_applied else None
         }
         
         logger.info(f"Correlated stress impact calculated: ${total_correlated_pnl:,.0f} total P&L "

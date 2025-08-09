@@ -421,14 +421,22 @@ async def _collect_report_data(
         # Maintain Decimal precision - DO NOT convert to float yet
         market_val = position.market_value if position.market_value else (position.quantity * position.entry_price)
         
+        # FIX: Calculate signed exposure based on position type
+        # Short positions (SHORT, SC, SP) should have negative exposure
+        position_type_str = position.position_type.value if hasattr(position.position_type, 'value') else str(position.position_type)
+        if position_type_str in ['SHORT', 'SC', 'SP']:
+            signed_exposure = -abs(market_val)  # Ensure negative for shorts
+        else:
+            signed_exposure = abs(market_val)  # Positive for longs
+        
         position_dict = {
             "id": str(position.id),
             "symbol": position.symbol,
             "quantity": position.quantity,  # Keep as Decimal
             "entry_price": position.entry_price,  # Keep as Decimal
-            "market_value": market_val,  # Keep as Decimal
-            "exposure": market_val,  # Keep as Decimal
-            "position_type": position.position_type.value if hasattr(position.position_type, 'value') else str(position.position_type),
+            "market_value": market_val,  # Keep as Decimal (always positive)
+            "exposure": signed_exposure,  # Keep as Decimal (signed based on position type)
+            "position_type": position_type_str,
             "greeks": greeks,
             # Additional fields for CSV
             "last_price": position.last_price,
