@@ -1111,8 +1111,7 @@ if total_direct_pnl < max_loss:
      # Step 4: factor_dollar_exposure[f] = Σ(contributions)
      # Step 5: Calculate both signed and magnitude portfolio betas
      ```
-   - **Added feature flag**: `USE_NEW_FACTOR_ATTRIBUTION` for safe rollout ✅
-   - **Logs differences** between old and new calculations ✅
+   - **Update 2025-08-09**: Removed feature flag per user request - direct implementation only
 
 3. **Fix Interest Rate Beta Units** ⏳ **DEFERRED**
    - **File**: `app/calculations/market_risk.py`
@@ -1129,10 +1128,9 @@ if total_direct_pnl < max_loss:
      ```
    - Removed scaling of individual factor impacts ✅
 
-5. **Add Fallback Behavior** ✅ **COMPLETED**
-   - When feature flag disabled, uses Option A (proportional) ✅
-   - Logs attribution method clearly ✅
-   - Tracks coverage metrics ✅
+5. **Add Fallback Behavior** ✅ **REMOVED**
+   - Removed per user request - no feature flag needed
+   - Direct implementation only
 
 #### 2.6.4.3 Testing & Validation ⏳ **PENDING**
 
@@ -1151,7 +1149,6 @@ if total_direct_pnl < max_loss:
 
 **Created Scripts**:
 - `scripts/analyze_exposure_dependencies.py` - Validates Option B safety
-- `scripts/test_option_b_fix.py` - Tests feature flag behavior
 
 8. **Validation Metrics**
    - Beta coverage: % positions with valid betas

@@ -57,6 +57,7 @@
 - Assume tables exist without checking (see stress_test_results issue)
 - Mix async/sync database operations (causes greenlet errors)
 - Ignore batch processing issues documented in TODO1.md 1.6.14
+- **Add feature flags without explicit approval** - We prefer simple, correct implementations over complex toggles
 
 ### **3. Code Quality Standards**
 

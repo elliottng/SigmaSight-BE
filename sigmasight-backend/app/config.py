@@ -40,8 +40,6 @@ class Settings(BaseSettings):
     TRADEFEEDS_MAX_RETRIES: int = Field(default=3, env="TRADEFEEDS_MAX_RETRIES")
     TRADEFEEDS_RATE_LIMIT: int = Field(default=30, env="TRADEFEEDS_RATE_LIMIT")  # calls per minute
     
-    # Feature flags for calculation engine fixes
-    USE_NEW_FACTOR_ATTRIBUTION: bool = Field(default=False, env="USE_NEW_FACTOR_ATTRIBUTION")  # Option B fix
     
     # JWT settings
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
