@@ -176,16 +176,16 @@ This document contains Phase 2 and beyond development planning for the SigmaSigh
 ### 2.0.4 Day 4: Demo Portfolio Testing & Batch Integration ✅ **COMPLETED 2025-08-08**
 **Demo Portfolios**: Individual (16 positions), HNW (17 positions), Hedge Fund (30 positions)
 
-- [ ] Implement idempotent report writes: Define overwrite behavior for portfolio_id+date combinations
-- [ ] Generate all 3 files for Demo Individual Investor Portfolio (16 stocks, no options)
-- [ ] Generate all 3 files for Demo High Net Worth Portfolio (17 positions)
-- [ ] Generate all 3 files for Demo Hedge Fund Style Portfolio (30 positions, most complex)
-- [ ] Verify anchor date consistency across all report sections (snapshot/correlation/exposures)
-- [ ] Add report generation as final step in batch_orchestrator_v2.py (ensure async context compatibility)
-- [ ] Ensure thread-safe writes to reports/ directory for concurrent portfolio processing
-- [ ] Test end-to-end: batch processing → report generation
-- [ ] Validate markdown reports are clean, readable, and highlight factor exposures (our richest data)
-- [ ] Document report overwrite policy in logs (e.g., "Overwriting existing report for portfolio X")
+- [x] Implement idempotent report writes: Define overwrite behavior for portfolio_id+date combinations ✅
+- [x] Generate all 3 files for Demo Individual Investor Portfolio (16 stocks, no options) ✅
+- [x] Generate all 3 files for Demo High Net Worth Portfolio (17 positions) ✅
+- [x] Generate all 3 files for Demo Hedge Fund Style Portfolio (30 positions, most complex) ✅
+- [x] Verify anchor date consistency across all report sections (snapshot/correlation/exposures) ✅
+- [x] Add report generation as final step in batch_orchestrator_v2.py (ensure async context compatibility) ✅
+- [x] Ensure thread-safe writes to reports/ directory for concurrent portfolio processing ✅
+- [x] Test end-to-end: batch processing → report generation ✅
+- [x] Validate markdown reports are clean, readable, and highlight factor exposures (our richest data) ✅
+- [x] Document report overwrite policy in logs (e.g., "Overwriting existing report for portfolio X") ✅
 
 ### 2.0.5 Day 5: CLI Interface & Production Readiness ✅ **COMPLETED 2025-08-08**
 **Goal**: Production-ready CLI with comprehensive error handling and testing
