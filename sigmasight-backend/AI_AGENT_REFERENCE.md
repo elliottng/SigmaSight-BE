@@ -4,7 +4,7 @@
 
 **Target Audience**: AI agents (Claude, ChatGPT, etc.) working on SigmaSight backend development
 
-**Last Updated**: 2025-08-08
+**Last Updated**: 2025-08-09
 
 ---
 
@@ -772,10 +772,25 @@ uv run pytest -m asyncio
   - Snapshot write path ignores rho when storing aggregated Greeks
 - **Access**: Available in PositionGreeks table, can aggregate if needed
 
-### **Trading Calendar Gating**
-- **Snapshots**: Check `trading_calendar.is_trading_day()` before creation
-- **Batch Jobs**: Run regardless, handle non-trading days gracefully
-- **Tests**: Mock calendar or use known trading dates
+### **Trading Calendar Gating & Weekend Behavior** 📅 **IMPORTANT**
+**Verified 2025-08-09**: Batch framework behavior on weekends/non-market days:
+
+**What RUNS on weekends:**
+- ✅ All calculation engines (Greeks, Factors, Correlations, Stress Tests, etc.)
+- ✅ Report generation (MD, JSON, CSV)
+- ✅ Market data sync (uses most recent available data)
+- ✅ All batch jobs via `scripts/run_batch_with_reports.py`
+
+**What SKIPS weekends:**
+- ❌ Portfolio snapshots - Message: "2025-08-09 is not a trading day, skipping snapshot"
+- ❌ Daily P&L calculation (requires two snapshots to compare)
+
+**P&L Behavior:**
+- First snapshot: P&L = $0.00 (no previous snapshot for comparison)
+- Weekends: P&L remains $0.00 (no new snapshot created)
+- Next trading day: P&L will show actual change from last trading day
+
+**Key Insight:** The batch framework has NO market day restrictions except for snapshot creation. This is intentional - calculations can run anytime using the most recent market data, but snapshots only capture end-of-day values on actual trading days.
 
 ### **Aggregation Function Status**
 All functions in `app/calculations/portfolio.py`:
