@@ -633,17 +633,19 @@ ls -la app/config/stress_scenarios.json
 ## Phase 2.5: Critical Bug Fixes - Report Data Integrity Issues
 *Emergency fixes for calculation engine and report generation bugs discovered through portfolio report analysis*
 
-**Timeline**: 2-3 Days | **Status**: 🟢 **80% COMPLETE** | **Priority**: HIGHEST | **Created**: 2025-08-08 | **Updated**: 2025-08-09
+**Timeline**: 2-3 Days | **Status**: 🟢 **90% COMPLETE** | **Priority**: HIGHEST | **Created**: 2025-08-08 | **Updated**: 2025-08-09
 
 ### **Executive Summary**
 Analysis of the three demo portfolio reports revealed **systematic calculation engine failures** affecting data integrity:
 - ✅ Position classification returning all zeros **FIXED**
 - ✅ Factor exposures showing duplicates **FIXED**
+- ✅ Factor exposure architecture corrected **FIXED 2025-08-09**
 - ✅ JSON/Markdown data source mismatches **FIXED**
 - ✅ Stress test losses exceeding portfolio values by 4-5X **TEMPORARY FIX APPLIED**
+- ✅ Options multiplier bug (100x understatement) **FIXED**
 - ❌ Daily P&L showing $0.00 for all portfolios
 
-**Progress**: 4 of 5 critical issues fixed (80% complete)
+**Progress**: 6 of 7 critical issues fixed (90% complete)
 
 ### **Critical Issues Found Across All Portfolios**
 
@@ -875,6 +877,44 @@ def calculate_portfolio_market_value(positions):
 - Options positions were understated by 100x (e.g., SPY call: was $1,500, actually $150,000)
 - Stress test losses now correctly scaled to actual portfolio values
 - All portfolios recalculated with corrected values
+
+#### 6. **Factor Exposure Architecture Corrected** ✅ **FIXED 2025-08-09**
+
+**Problem Identified**: Report layer was aggregating position-level `PositionFactorExposure` data instead of using pre-calculated portfolio-level data
+
+**Root Cause**: Architectural misunderstanding - the report generator was trying to aggregate position-level factor exposures on the fly, when portfolio-level exposures were already calculated and stored in the `FactorExposure` table during batch processing
+
+**Fix Implemented**:
+- Replaced aggregation query in `portfolio_report_generator.py` lines 455-490
+- Changed from aggregating `PositionFactorExposure` with SUM/AVG/COUNT
+- Now directly queries `FactorExposure` table for portfolio-level data
+- Updated data structure handling in lines 552-561 and markdown generation in lines 711-724
+
+**Before (Wrong)**:
+```python
+# Aggregating position-level data at report time
+select(
+    FactorDefinition,
+    func.sum(PositionFactorExposure.exposure_value).label('total_exposure'),
+    func.avg(PositionFactorExposure.exposure_value).label('avg_exposure'),
+    func.count(PositionFactorExposure.position_id).label('position_count')
+)
+.group_by(FactorDefinition.id)
+```
+
+**After (Correct)**:
+```python
+# Using pre-calculated portfolio-level data
+select(FactorExposure, FactorDefinition)
+.join(FactorDefinition, FactorExposure.factor_id == FactorDefinition.id)
+.where(FactorExposure.portfolio_id == portfolio_id)
+```
+
+**Impact**:
+- Reports now show correct portfolio-level betas and dollar exposures
+- Proper separation of concerns between calculation and presentation layers
+- Factor exposures now consistent with batch calculation results
+- No more incorrect aggregation at report generation time
 
 ---
 

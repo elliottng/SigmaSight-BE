@@ -453,32 +453,41 @@ async def _collect_report_data(
         greeks_aggregated = aggregate_portfolio_greeks(position_data)
     
     # 7. Fetch Factor Exposures (using anchor date)
-    from app.models.market_data import FactorDefinition
-    if positions:
-        position_ids = [p.id for p in positions]
-        
-        # Get latest factor exposures aggregated by factor
-        factors_result = await db.execute(
-            select(
-                FactorDefinition,
-                func.sum(PositionFactorExposure.exposure_value).label('total_exposure'),
-                func.avg(PositionFactorExposure.exposure_value).label('avg_exposure'),
-                func.count(PositionFactorExposure.position_id).label('position_count')
-            )
-            .join(FactorDefinition, PositionFactorExposure.factor_id == FactorDefinition.id)
-            .where(
-                and_(
-                    PositionFactorExposure.position_id.in_(position_ids),
-                    PositionFactorExposure.calculation_date <= anchor_date
-                )
-            )
-            .group_by(FactorDefinition.id, FactorDefinition.name, FactorDefinition.factor_type)
-            .order_by(func.abs(func.sum(PositionFactorExposure.exposure_value)).desc())
-            .limit(15)  # Top exposures across all factors
+    from app.models.market_data import FactorDefinition, FactorExposure
+    
+    # Get portfolio-level factor exposures directly from FactorExposure table
+    # This is the correct approach - we calculate at portfolio level during batch processing
+    factors_result = await db.execute(
+        select(
+            FactorExposure,
+            FactorDefinition
         )
-        factor_exposures = list(factors_result.all())
-    else:
-        factor_exposures = []
+        .join(FactorDefinition, FactorExposure.factor_id == FactorDefinition.id)
+        .where(
+            and_(
+                FactorExposure.portfolio_id == portfolio_id,
+                FactorExposure.calculation_date <= anchor_date
+            )
+        )
+        .order_by(
+            FactorExposure.calculation_date.desc(),
+            func.abs(FactorExposure.exposure_value).desc()
+        )
+    )
+    all_factor_records = list(factors_result.all())
+    
+    # Get the most recent exposure for each factor
+    latest_factors = {}
+    for exposure, factor in all_factor_records:
+        if factor.id not in latest_factors:
+            latest_factors[factor.id] = (exposure, factor)
+    
+    # Sort by exposure magnitude and take top 15
+    factor_exposures = sorted(
+        latest_factors.values(),
+        key=lambda x: abs(x[0].exposure_value) if x[0].exposure_value else 0,
+        reverse=True
+    )[:15]
     
     # 8. Fetch stress test results if available
     from app.models.market_data import StressTestResult, StressTestScenario
@@ -542,13 +551,13 @@ async def _collect_report_data(
         "positions": position_data,  # Contains Decimals
         "factor_exposures": [
             {
-                "factor_name": row[0].name,  # FactorDefinition object
-                "category": row[0].factor_type,
-                "total_exposure": row[1],  # total_exposure
-                "avg_exposure": row[2],  # avg_exposure
-                "position_count": row[3]  # position_count
+                "factor_name": factor.name,  # FactorDefinition object
+                "category": factor.factor_type,
+                "exposure_value": exposure.exposure_value,  # Portfolio-level beta
+                "exposure_dollar": exposure.exposure_dollar,  # Portfolio-level dollar exposure
+                "calculation_date": exposure.calculation_date.isoformat() if exposure.calculation_date else None
             }
-            for row in factor_exposures
+            for exposure, factor in factor_exposures
         ] if factor_exposures else [],
         "stress_test_results": stress_test_results
     }
@@ -697,20 +706,22 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
         lines.extend([
             "### Factor Analysis",
             "",
-            "**Top Factor Exposures** (aggregated across portfolio):",
+            "**Top Factor Exposures** (portfolio-level):",
             "",
-            "| Factor | Category | Total Exposure | Avg Exposure | Positions |",
-            "|--------|----------|----------------|--------------|-----------|",
+            "| Factor | Category | Beta | Dollar Exposure | Calc Date |",
+            "|--------|----------|------|-----------------|-----------|",
         ])
         
         # Show top 10 factor exposures
         for fe in factor_exposures[:10]:
             factor = fe.get('factor_name', 'Unknown')
             category = fe.get('category', 'Unknown')
-            total_exp = fe.get('total_exposure', 0)
-            avg_exp = fe.get('avg_exposure', 0)
-            pos_count = fe.get('position_count', 0)
-            lines.append(f"| {factor} | {category} | {format_correlation(total_exp)} | {format_correlation(avg_exp)} | {pos_count} |")
+            beta = fe.get('exposure_value', 0)
+            dollar_exp = fe.get('exposure_dollar', 0)
+            calc_date = fe.get('calculation_date', 'N/A')
+            if isinstance(calc_date, str) and 'T' in calc_date:
+                calc_date = calc_date.split('T')[0]  # Just the date part
+            lines.append(f"| {factor} | {category} | {format_correlation(beta)} | {format_money(dollar_exp)} | {calc_date} |")
         
         if len(factor_exposures) > 10:
             lines.append(f"| *...and {len(factor_exposures) - 10} more* | | | | |")
