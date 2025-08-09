@@ -161,9 +161,15 @@ exposure_dollar = float(beta_value) * float(portfolio_value)
 
 ---
 
-## Proposed Solutions
+## Decision: Option B Selected
 
-### Option A: Weighted Allocation (Simple)
+After careful analysis and independent review, **Option B: Position-Level Attribution has been selected** as the solution. Options A and C have been rejected for the reasons outlined below.
+
+---
+
+## Rejected Solutions
+
+### Option A: Weighted Allocation (REJECTED)
 
 **Concept**: Allocate portfolio proportionally based on relative beta magnitudes
 
@@ -188,28 +194,43 @@ for factor in factors:
 - Factor exposures sum to gross exposure
 - Easy to explain
 
-**Cons**:
+**Why Rejected**:
 - Loses sign information (all positive)
 - Not based on actual position contributions
 - Arbitrary weighting scheme
+- Only suitable as temporary fallback with clear labeling
 
 ---
 
-### Option B: Position-Level Attribution (Recommended)
+## Selected Solution: Position-Level Attribution
 
 **Concept**: Calculate each position's contribution to each factor exposure
 
-**Formula**:
+**Core Formula**:
 ```python
 # For each factor f and position p:
-position_factor_contribution[f][p] = position_exposure[p] * position_beta[p][f]
+signed_exposure[p] = market_value[p] × (-1 if SHORT/SC/SP else 1)
+position_factor_contribution[f][p] = signed_exposure[p] × position_beta[p][f]
 
 # Aggregate to portfolio level
-factor_dollar_exposure[f] = sum(position_factor_contribution[f])
-
-# Portfolio beta (for reporting)
-portfolio_beta[f] = factor_dollar_exposure[f] / gross_exposure
+factor_dollar_exposure[f] = Σ(position_factor_contribution[f][p])
 ```
+
+**Portfolio Beta Definitions** (addressing feedback):
+```python
+# Two distinct portfolio betas for different purposes:
+
+# 1. Signed Beta (for directional exposure)
+signed_portfolio_beta[f] = Σ(signed_exposure[p] × beta[p,f]) / gross_exposure
+
+# 2. Magnitude Beta (for absolute size)
+magnitude_portfolio_beta[f] = Σ(|exposure[p]| × |beta[p,f]|) / gross_exposure
+```
+
+**Important Distinctions**:
+- **Dollar Exposure**: Attribution metric showing position contributions (does NOT sum to gross exposure)
+- **Risk Contribution**: Requires covariance matrix calculation (see legacy approach)
+- These are different concepts and should not be conflated
 
 **Implementation Steps**:
 1. Calculate position-level betas for each factor
@@ -247,9 +268,14 @@ Portfolio Factor Exposures:
 - Requires position-level factor betas
 - Factor exposures won't sum to gross (but shouldn't)
 
+**Fallback Behavior** (when position betas missing):
+- Use Option A (proportional allocation) as temporary fallback
+- Clearly label as "estimated - non-attributable"
+- Log coverage statistics for monitoring
+
 ---
 
-### Option C: Document as "Notional Exposure" (Minimal Change)
+### Option C: Document as "Notional Exposure" (REJECTED)
 
 **Concept**: Keep current calculation but rebrand as "notional" or "beta-adjusted" exposure
 
@@ -264,11 +290,12 @@ Portfolio Factor Exposures:
 - Preserves existing data
 - Quick to implement
 
-**Cons**:
-- Doesn't fix underlying issue
+**Why Rejected**:
+- Doesn't fix underlying mathematical flaw
 - Still causes stress test problems
 - May not satisfy regulatory requirements
 - Confusing to users
+- Only acceptable as interim documentation if timelines slip
 
 ---
 
@@ -327,30 +354,97 @@ While the legacy approach was conceptually correct, Option B improves upon it by
 
 ---
 
-## Implementation Plan
+## Implementation Plan (Option B)
 
-### Phase 1: Fix Calculation Logic (NO SCHEMA CHANGES)
-1. Update `aggregate_portfolio_factor_exposures()` in `factors.py`:
-   - Calculate signed position exposures
-   - Multiply by position betas from `PositionFactorExposure`
-   - Sum contributions for portfolio dollar exposure
-2. Fix sign handling in position exposure calculations
-3. Update stress test to use corrected logic
+### Phase 1: Core Calculation Logic Fix (NO SCHEMA CHANGES)
 
-### Phase 2: Report Updates
-1. Update report generator to handle signed exposures correctly
-2. Add position-level factor attribution section
-3. Update documentation and tooltips
+#### 1.1 Update `aggregate_portfolio_factor_exposures()` in `app/calculations/factors.py`
+```python
+# Pseudocode for the fix:
+async def aggregate_portfolio_factor_exposures(...):
+    # Step 1: Get position-level betas from PositionFactorExposure
+    position_betas = fetch_position_factor_betas(portfolio_id, calculation_date)
+    
+    # Step 2: Calculate signed exposures for each position
+    for position in positions:
+        signed_exposure = position.market_value * (
+            -1 if position.position_type in ['SHORT', 'SC', 'SP'] else 1
+        )
+        
+        # Step 3: Calculate contribution for each factor
+        for factor in factors:
+            contribution[position][factor] = signed_exposure * position_betas[position][factor]
+    
+    # Step 4: Aggregate to portfolio level
+    for factor in factors:
+        factor_dollar_exposure[factor] = sum(contribution[p][factor] for p in positions)
+        signed_portfolio_beta[factor] = sum(signed_exposure[p] * beta[p,f]) / gross_exposure
+        magnitude_portfolio_beta[factor] = sum(abs(exposure[p]) * abs(beta[p,f])) / gross_exposure
+```
 
-### Phase 3: Optional Schema Enhancements (Future)
-1. Add `PositionFactorExposure.dollar_contribution` field (optional)
-2. Add `Position.signed_exposure` field for clarity (optional)
-3. Migration scripts if schema changes are approved
+#### 1.2 Edge Case Handling
+- **Zero gross exposure**: Return zeros with warning
+- **Missing betas**: Use Option A fallback with "estimated" label
+- **Decimal precision**: Maintain 2dp for dollars, 6dp for betas
 
-### Phase 4: Validation & Migration
-1. Recalculate historical data with new logic
-2. Provide comparison reports (old vs new)
-3. Verify stress test scenarios show differentiation
+#### 1.3 Feature Flag Implementation
+```python
+if settings.USE_NEW_FACTOR_ATTRIBUTION:
+    # New Option B logic
+    result = calculate_position_attribution()
+else:
+    # Current flawed logic (for comparison)
+    result = calculate_legacy_exposure()
+    
+# Log differences for validation
+log_attribution_comparison(result, legacy_result)
+```
+
+### Phase 2: Stress Test Integration
+
+#### 2.1 Update `calculate_direct_stress_impact()` in `app/calculations/stress_testing.py`
+- Use corrected factor dollar exposures
+- Apply shocks: `ΔP ≈ factor_dollar_exposure[f] × shock[f]`
+- Cap ONLY final total loss, not individual factors:
+```python
+if total_pnl < max_loss:
+    total_pnl = max_loss  # Clip only, don't scale factors
+```
+
+### Phase 3: Testing & Validation
+
+#### 3.1 Unit Tests Required
+- [ ] Short positions produce negative contributions
+- [ ] Fallback path when betas missing
+- [ ] Extreme cases (zero exposures, high betas)
+- [ ] Portfolio beta calculations match contributions
+
+#### 3.2 Integration Tests
+- [ ] Stress scenarios show differentiation (not all at 99%)
+- [ ] Factor exposures are interpretable
+- [ ] Report generation with new values
+
+#### 3.3 Validation Metrics
+- Coverage: % of positions with valid betas
+- Comparison: Old vs new exposure differences
+- Sign checks: Shorts have negative contributions
+
+### Phase 4: Migration & Rollout
+
+#### 4.1 Dual-Run Period (1 week)
+- Run both calculations in parallel
+- Log differences to monitoring system
+- Alert on significant deviations
+
+#### 4.2 Backfill Strategy
+- Recalculate last 30 days for demo portfolios
+- Store comparison reports
+- Validate stress test improvements
+
+#### 4.3 Documentation Updates
+- API field semantics (signed vs magnitude beta)
+- Non-additivity of factor dollars explanation
+- Client communication about attribution changes
 
 ---
 

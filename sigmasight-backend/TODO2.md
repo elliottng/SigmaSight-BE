@@ -926,12 +926,12 @@ select(FactorExposure, FactorDefinition)
 
 **Timeline**: 3-4 Days | **Status**: 🔴 **NOT STARTED** | **Priority**: HIGH | **Created**: 2025-08-09
 
-### **Executive Summary**
+### 2.6.1 Executive Summary
 Detailed analysis of the three demo portfolio reports revealed deeper calculation issues beyond the surface-level fixes in Phase 2.5. These issues affect the mathematical correctness and risk assessment accuracy of the reports.
 
-### **Issue Categories**
+### 2.6.2 Issues
 
-#### **A. VALIDATED ISSUES - Confirmed with Data** ✅
+#### 2.6.2.1 Validated Issues - Confirmed with Data ✅
 
 ##### 1. **Short Position Exposure Calculation** 🔴 **CRITICAL**
 **Evidence**: 
@@ -1022,7 +1022,7 @@ if total_direct_pnl < max_loss:
 **Impact**: All historical scenarios show identical -99% loss, no risk differentiation
 **Status**: VALIDATED - Direct consequence of factor exposure overlap issue
 
-#### **B. MISSING FEATURES - Never Implemented** ⚠️
+#### 2.6.2.2 Missing Features - Never Implemented ⚠️
 
 ##### 4. **Interest Rate Beta Calculation** 🟡
 **Evidence**: All rate scenarios show $0.00 impact across all portfolios
@@ -1055,7 +1055,7 @@ if total_direct_pnl < max_loss:
 **Root Cause**: Need options chain data for proper attribution
 **Status**: DEFERRED - Requires options data provider
 
-#### **D. EXPECTED BEHAVIOR - No Fix Needed** ✅
+#### 2.6.2.3 Expected Behavior - No Fix Needed ✅
 
 ##### 9. **Daily P&L Shows $0.00** ✅
 **Evidence**: All portfolios show zero P&L
@@ -1065,7 +1065,7 @@ if total_direct_pnl < max_loss:
 - Monday 8/11: Will show P&L when comparing to Friday
 **Status**: EXPECTED BEHAVIOR - No fix needed
 
-### **Code Analysis Summary (Combined from Two Independent Analyses)**
+### 2.6.3 Code Analysis Summary (Combined from Two Independent Analyses)
 
 **Two independent deep code analyses revealed complementary findings:**
 
@@ -1086,71 +1086,94 @@ if total_direct_pnl < max_loss:
 - **Interest Rates**: Not "missing" but implemented with wrong units (Analysis 2 insight)
 - **Stress Tests**: Cap should clip total only, not scale factors (Analysis 2 insight)
 
-### **Implementation Plan (Revised with Combined Insights)**
+### 2.6.4 Implementation Plan - Option B Selected
 
-#### **Phase 1: Quick Fixes & Validation (Day 1)**
+**Decision**: After review, **Option B (Position-Level Attribution)** has been selected. See FACTOR_EXPOSURE_REDESIGN.md for full details.
 
-1. **Fix Short Exposure Calculation** (Multi-layer fix)
-   a. **Report Layer** (portfolio_report_generator.py line 430):
-      ```python
-      "exposure": market_val if position.quantity >= 0 else -market_val,
-      ```
-   b. **Snapshot Layer** (snapshots._prepare_position_data):
-      - Add sign normalization by position_type
-      - If exposure == 0 but quantity != 0, derive exposure from position_type
-      - Log warnings for any normalization
-   c. **Data Import Layer**:
-      - Add validation for quantity signs vs position_type in CSV import
-      - Ensure SHORT, SC, SP have negative quantities
+#### 2.6.4.1 Core Calculation Logic Fix (Day 1-2)
 
-2. **Fix Interest Rate Beta Units** (market_risk.py)
-   - Replace `pct_change() * 10000` with proper yield handling:
-   ```python
-   # Auto-detect units
-   if max(yields) <= 1.0:  # Decimals (0.043)
-       yield_changes_bp = yields.diff() * 10000
-   else:  # Percent (4.3)
-       yield_changes_bp = yields.diff() * 100
-   ```
+1. **Fix Short Exposure Calculation** ✅ **IMMEDIATE**
+   - **Report Layer** (portfolio_report_generator.py line 430):
+     ```python
+     "exposure": market_val * (-1 if position.position_type in ['SHORT', 'SC', 'SP'] else 1)
+     ```
+   - **Validation**: Add position type checks in calculate_portfolio_exposures()
 
-#### **Phase 2: Factor Model Redesign (Day 2-3)**
+2. **Fix Factor Exposure Model** 🔴 **CRITICAL**
+   - **File**: `app/calculations/factors.py::aggregate_portfolio_factor_exposures()`
+   - **Implementation**:
+     ```python
+     # Step 1: Fetch position-level betas from PositionFactorExposure
+     # Step 2: Calculate signed_exposure = market_value × sign
+     # Step 3: contribution[p,f] = signed_exposure[p] × beta[p,f]
+     # Step 4: factor_dollar_exposure[f] = Σ(contributions)
+     # Step 5: Calculate both signed and magnitude portfolio betas
+     ```
+   - **Add feature flag**: `USE_NEW_FACTOR_ATTRIBUTION` for safe rollout
+   - **Log differences** between old and new calculations
 
-3. **Factor Exposure Redesign** (See separate design document: FACTOR_EXPOSURE_REDESIGN.md)
-   - Implement position-level factor attribution
-   - Calculate true dollar contributions per factor
-   - Maintain portfolio betas separately for reporting
-   - Document breaking changes and migration path
+3. **Fix Interest Rate Beta Units**
+   - **File**: `app/calculations/market_risk.py`
+   - Auto-detect yield units (decimal vs percent)
+   - Correct basis point calculation
 
-4. **Fix Stress Test Capping**
-   - Change cap to clip total only, not scale individual factors:
-   ```python
-   if total_pnl < max_loss:
-       total_pnl = max_loss  # Clip only
-       # Don't scale factor_impacts - preserve structure
-   ```
-   - Add configuration toggles for cap level and enable/disable
+#### 2.6.4.2 Stress Test & Risk Updates (Day 2-3)
 
-#### **Phase 3: Comprehensive Testing (Day 4)**
+4. **Fix Stress Test Capping Logic**
+   - **File**: `app/calculations/stress_testing.py`
+   - Change from proportional scaling to simple clipping:
+     ```python
+     if total_pnl < max_loss:
+         total_pnl = max_loss  # Clip only, preserve factor structure
+     ```
+   - Remove scaling of individual factor impacts
 
-5. **Validation Test Suite**
-   - **Exposures**: Assert short_exposure <= 0, gross = sum(|exposure_i|)
-   - **Factor Dollars**: Compare legacy vs new, ensure interpretable
-   - **Stress Tests**: Verify scenarios produce different results
-   - **Rate Betas**: Test decimal vs percent detection, non-zero impacts
+5. **Add Fallback Behavior**
+   - When position betas missing, use Option A (proportional)
+   - Label clearly as "estimated - non-attributable"
+   - Track coverage metrics
 
-6. **End-to-End Testing**
-   - Re-run batch for all 3 demo portfolios
-   - Verify reports show correct short exposures
-   - Confirm factor exposures sum to reasonable values
-   - Check stress scenarios show differentiation
+#### 2.6.4.3 Testing & Validation (Day 3-4)
 
-#### **Phase 3: Deferred - Awaiting Options Data**
+6. **Unit Tests**
+   - [ ] Short positions → negative contributions
+   - [ ] Zero gross exposure → handled gracefully
+   - [ ] Missing betas → fallback works
+   - [ ] Portfolio betas match position contributions
+   - [ ] Extreme values handled correctly
+
+7. **Integration Tests**
+   - [ ] Stress scenarios show differentiation
+   - [ ] Factor exposures interpretable
+   - [ ] Reports generate with new values
+   - [ ] Sign consistency throughout pipeline
+
+8. **Validation Metrics**
+   - Beta coverage: % positions with valid betas
+   - Exposure comparison: old vs new differences
+   - Stress test improvements: scenarios no longer all at 99%
+
+#### 2.6.4.4 Migration & Rollout (Day 4-5)
+
+9. **Dual-Run Validation**
+   - Enable feature flag for test portfolios
+   - Run both calculations in parallel for 1 week
+   - Log and monitor differences
+   - Alert on significant deviations (>10%)
+
+10. **Backfill & Documentation**
+    - Recalculate last 30 days for demo portfolios
+    - Generate comparison reports
+    - Update API documentation
+    - Communicate changes to stakeholders
+
+#### 2.6.4.5 Deferred - Awaiting Options Data
 - Greeks calculation
 - Non-linear stress testing
 - Options P&L attribution
 - *Timeline: After securing options data provider*
 
-### **Success Criteria**
+### 2.6.5 Success Criteria
 - [ ] Short exposures show correct negative values (Demo Hedge Fund: ~$1.5M)
 - [ ] Factor dollar exposures are interpretable and documented
 - [ ] Stress scenarios show differentiated impacts (not all at 99% cap)
@@ -1158,14 +1181,14 @@ if total_direct_pnl < max_loss:
 - [ ] Data validation prevents quantity sign mismatches
 - [ ] All fixes have comprehensive test coverage
 
-### **Testing Requirements**
+### 2.6.6 Testing Requirements
 - Validate with Demo Hedge Fund (13 shorts, 8 options)
 - Compare factor exposures before/after redesign
 - Verify stress test scenarios produce unique results
 - Test interest rate beta with both decimal and percent yields
 - Document breaking changes and migration guide
 
-### **Deliverables**
+### 2.6.7 Deliverables
 1. Fixed code with multi-layer validation
 2. FACTOR_EXPOSURE_REDESIGN.md design document
 3. Comprehensive test suite
