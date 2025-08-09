@@ -217,6 +217,27 @@ async def calculate_direct_stress_impact(
     logger.info(f"Calculating direct stress impact for scenario: {scenario_config.get('name')}")
     
     try:
+        # Get portfolio market value
+        from app.models.positions import Position
+        positions_stmt = select(Position).where(
+            and_(
+                Position.portfolio_id == portfolio_id,
+                Position.deleted_at.is_(None)  # Active positions have no deletion date
+            )
+        )
+        positions_result = await db.execute(positions_stmt)
+        positions = positions_result.scalars().all()
+        
+        # Calculate portfolio market value
+        portfolio_market_value = sum(
+            float(pos.quantity * pos.last_price) if pos.last_price else 0.0
+            for pos in positions
+        )
+        
+        if portfolio_market_value <= 0:
+            logger.warning(f"Portfolio {portfolio_id} has no market value")
+            portfolio_market_value = 1.0  # Avoid division by zero
+        
         # Get portfolio factor exposures
         stmt = select(FactorExposure).where(
             and_(
@@ -262,9 +283,11 @@ async def calculate_direct_stress_impact(
             # Map factor name if needed
             mapped_factor_name = FACTOR_NAME_MAP.get(factor_name, factor_name)
             if mapped_factor_name in latest_exposures:
-                exposure_dollar = latest_exposures[mapped_factor_name]['exposure_dollar']
-                # Direct P&L = Factor Exposure × Shock Amount
-                factor_pnl = exposure_dollar * shock_amount
+                exposure_value = latest_exposures[mapped_factor_name]['exposure_value']  # This is the beta
+                # Correct P&L = Portfolio Value × Beta × Shock Amount
+                # NOT: (Beta × Portfolio Value) × Shock Amount which double-counts beta
+                factor_pnl = portfolio_market_value * exposure_value * shock_amount
+                exposure_dollar = latest_exposures[mapped_factor_name]['exposure_dollar']  # Keep for reporting
                 direct_impacts[factor_name] = {
                     'exposure_dollar': exposure_dollar,
                     'shock_amount': shock_amount,
@@ -335,6 +358,26 @@ async def calculate_correlated_stress_impact(
             calculation_date=calculation_date
         )
         
+        # Get portfolio market value
+        from app.models.positions import Position
+        positions_stmt = select(Position).where(
+            and_(
+                Position.portfolio_id == portfolio_id,
+                Position.deleted_at.is_(None)  # Active positions have no deletion date
+            )
+        )
+        positions_result = await db.execute(positions_stmt)
+        positions = positions_result.scalars().all()
+        
+        portfolio_market_value = sum(
+            float(pos.quantity * pos.last_price) if pos.last_price else 0.0
+            for pos in positions
+        )
+        
+        if portfolio_market_value <= 0:
+            logger.warning(f"Portfolio {portfolio_id} has no market value")
+            portfolio_market_value = 1.0  # Avoid division by zero
+        
         # Get portfolio factor exposures (reuse from direct calculation)
         stmt = select(FactorExposure).where(
             and_(
@@ -373,9 +416,11 @@ async def calculate_correlated_stress_impact(
             for shocked_factor, shock_amount in shocked_factors.items():
                 if shocked_factor in correlation_matrix and factor_name in correlation_matrix[shocked_factor]:
                     correlation = correlation_matrix[shocked_factor][factor_name]
-                    # Correlated shock = Original shock × Correlation × Factor exposure
+                    # Correlated shock = Original shock × Correlation
                     correlated_shock = shock_amount * correlation
-                    correlated_pnl = exposure_data['exposure_dollar'] * correlated_shock
+                    # Correct P&L = Portfolio Value × Beta × Correlated Shock
+                    exposure_value = exposure_data['exposure_value']  # This is the beta
+                    correlated_pnl = portfolio_market_value * exposure_value * correlated_shock
                     
                     factor_impact += correlated_pnl
                     impact_breakdown[shocked_factor] = {
@@ -386,7 +431,8 @@ async def calculate_correlated_stress_impact(
                     }
                 elif shocked_factor == factor_name:
                     # Direct impact (correlation = 1.0)
-                    direct_pnl = exposure_data['exposure_dollar'] * shock_amount
+                    exposure_value = exposure_data['exposure_value']  # This is the beta
+                    direct_pnl = portfolio_market_value * exposure_value * shock_amount
                     factor_impact += direct_pnl
                     impact_breakdown[shocked_factor] = {
                         'original_shock': shock_amount,

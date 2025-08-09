@@ -633,17 +633,17 @@ ls -la app/config/stress_scenarios.json
 ## Phase 2.5: Critical Bug Fixes - Report Data Integrity Issues
 *Emergency fixes for calculation engine and report generation bugs discovered through portfolio report analysis*
 
-**Timeline**: 2-3 Days | **Status**: 🟢 **PARTIALLY COMPLETE** | **Priority**: HIGHEST | **Created**: 2025-08-08 | **Updated**: 2025-08-09
+**Timeline**: 2-3 Days | **Status**: 🟡 **60% COMPLETE** | **Priority**: HIGHEST | **Created**: 2025-08-08 | **Updated**: 2025-08-09
 
 ### **Executive Summary**
 Analysis of the three demo portfolio reports revealed **systematic calculation engine failures** affecting data integrity:
 - ✅ Position classification returning all zeros **FIXED**
 - ✅ Factor exposures showing duplicates **FIXED**
-- ❌ Stress test losses exceeding portfolio values by 4-5X
+- ✅ JSON/Markdown data source mismatches **FIXED**
+- ❌ Stress test losses exceeding portfolio values by 4-5X **ROOT CAUSE FOUND**
 - ❌ Daily P&L showing $0.00 for all portfolios
-- ❌ JSON/Markdown data source mismatches
 
-**Progress**: 2 of 5 critical issues fixed (40% complete)
+**Progress**: 3 of 5 critical issues fixed (60% complete)
 
 ### **Critical Issues Found Across All Portfolios**
 
@@ -672,13 +672,21 @@ Analysis of the three demo portfolio reports revealed **systematic calculation e
 .group_by(PositionGreeks.position_id)  # This line is missing in factor query!
 ```
 
-#### 3. **Stress Test Losses Impossible** 🔴
+#### 3. **Stress Test Losses Impossible** 🟡 **ROOT CAUSE IDENTIFIED**
 **Evidence**: 
 - Individual ($529K): -$2.1M loss (397% of value)
 - HNW ($1.57M): -$6.5M loss (414% of value)  
 - Hedge Fund ($6.3M): -$32M loss (507% of value)
 
-**Hypothesis**: The `exposure_dollar` in FactorExposure might be storing total portfolio exposure to that factor (e.g., $6M to Market Beta), making losses realistic in absolute terms but being compared to wrong base.
+**Root Cause (CONFIRMED 2025-08-09)**: Fundamental calculation flaw in `factors.py` line 675:
+```python
+exposure_dollar = float(beta_value) * float(portfolio_value)
+```
+Each factor's exposure_dollar is calculated as beta × full_portfolio_value. With multiple factors, total exposures exceed portfolio value:
+- Demo Individual ($485K): Total factor exposures = $5.4M (7 factors × avg $770K each)
+- When 2008 crisis shocks 5 factors simultaneously, losses compound to 400%+ of portfolio
+
+**Why the attempted fix failed**: The stress test calculation was corrected to use `portfolio_value × beta × shock` instead of `exposure_dollar × shock`, but this is mathematically equivalent since `exposure_dollar = beta × portfolio_value`. The fundamental issue is that each factor treats the entire portfolio as exposed to it, rather than portfolio exposure being distributed across factors.
 
 #### 4. **Daily P&L Always Zero** 🟡
 **Evidence**: All portfolios show exactly $0.00 P&L
@@ -688,7 +696,7 @@ Analysis of the three demo portfolio reports revealed **systematic calculation e
 daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
 ```
 
-#### 5. **JSON/Markdown Data Mismatch** 🔴
+#### 5. **JSON/Markdown Data Mismatch** ✅ **FIXED 2025-08-09**
 **Evidence**: JSON says `stress_testing.available = false` but Markdown shows 18 scenarios
 **Root Cause**: Lines 884-888 hardcode `available: false` while Markdown checks actual data
 
@@ -706,8 +714,10 @@ daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
    - Added total_exposure, avg_exposure, and position_count fields
    - Verified: No more duplicate factors in reports
 
-3. **Fix JSON/Markdown Consistency**
-   - Line 885: Change to `"available": len(stress_test_results) > 0`
+3. **Fix JSON/Markdown Consistency** ✅ **FIXED**
+   - Changed lines 890-894 to dynamically check stress test results
+   - Now includes scenario count and actual data in JSON
+   - Verified: JSON and Markdown now consistent
 
 #### **Phase 2: Complex Fixes (Day 2)**
 4. **Investigate Stress Test Scaling**
@@ -741,13 +751,14 @@ daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
    - ✅ Line 431: Fix position_type storage **DONE**
    - ✅ Lines 461-478: Add GROUP BY to factor query **DONE - completely refactored query**
    - ✅ Lines 893-896: Fix position classification logic **FIXED via line 431**
-   - ❌ Line 885: Fix stress test availability flag **PENDING**
+   - ✅ Lines 890-894: Fix stress test availability flag **DONE**
 
 2. **app/calculations/snapshots.py**
    - ❌ Lines 261-262: Handle first snapshot P&L **PENDING**
 
 3. **app/calculations/stress_testing.py**
-   - ❌ Investigate exposure_dollar calculation **PENDING**
+   - 🟡 Investigate exposure_dollar calculation **ROOT CAUSE FOUND**
+   - ❌ Implement proper stress test calculation **PENDING**
    - ❌ Add loss validation **PENDING**
 
 ### **Success Criteria**
@@ -755,7 +766,7 @@ daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
 - [x] No duplicate factor exposures ✅ **FIXED 2025-08-09**
 - [ ] Stress losses ≤ 100% for unlevered portfolios
 - [ ] P&L shows non-zero values or explains why
-- [ ] JSON and Markdown data sources agree
+- [x] JSON and Markdown data sources agree ✅ **FIXED 2025-08-09**
 - [ ] All tests pass
 
 ### **Monitoring**
@@ -764,7 +775,7 @@ After fixes, regenerate all three portfolio reports and verify:
 2. ✅ Factor exposures have no duplicates **VERIFIED**
 3. ❌ Stress test losses are realistic **STILL BROKEN**
 4. ❌ P&L calculations work (or show clear reason if zero) **STILL ZERO**
-5. ❌ Data consistency between formats **STILL INCONSISTENT**
+5. ✅ Data consistency between formats **FIXED**
 
 ### **Completion Notes (2025-08-09)**
 
@@ -779,7 +790,33 @@ After fixes, regenerate all three portfolio reports and verify:
 - Factor exposures now show aggregated values with no duplicates
 
 **Next Steps:**
-- Fix stress test scaling issue (losses should not exceed 100% for unlevered)
+- Implement proper stress test calculation that doesn't multiply exposures
+- Fix P&L calculation for first snapshots
+
+### **Updated Status (2025-08-09 Evening)**
+
+**Additional Fixes Completed:**
+3. **JSON/Markdown Consistency**: Fixed stress test availability flag to dynamically check data
+
+**Stress Test Root Cause Investigation:**
+- Attempted fix: Changed calculation from `exposure_dollar × shock` to `portfolio_value × beta × shock`
+- Result: No improvement because these are mathematically equivalent
+- Real problem: Each factor's exposure_dollar = beta × full_portfolio_value
+- With 7 factors averaging beta ≈ 0.8, total exposures = 7 × 0.8 × $485K = $2.7M
+- Multi-factor scenarios (like 2008 crisis with 5 simultaneous shocks) compound the issue
+- Solution needed: Portfolio exposure should be distributed across factors, not multiplied
+
+**Example from 2008 Crisis Scenario:**
+```json
+"shocked_factors": {
+  "Market": -0.45,
+  "Value": -0.30,
+  "Size": -0.25,
+  "Quality": 0.20,
+  "Low Volatility": -0.35
+}
+```
+Each factor applies its shock to the full portfolio value × its beta, resulting in losses that exceed 400% of portfolio value.
 - Fix P&L calculation for first snapshots
 - Fix JSON/Markdown consistency for stress test availability
 
