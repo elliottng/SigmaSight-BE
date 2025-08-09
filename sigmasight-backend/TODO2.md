@@ -637,15 +637,17 @@ ls -la app/config/stress_scenarios.json
 
 ### **Executive Summary**
 Analysis of the three demo portfolio reports revealed **systematic calculation engine failures** affecting data integrity:
-- Position classification returning all zeros
-- Factor exposures showing duplicates  
-- Stress test losses exceeding portfolio values by 4-5X
-- Daily P&L showing $0.00 for all portfolios
-- JSON/Markdown data source mismatches
+- ✅ Position classification returning all zeros **FIXED**
+- ✅ Factor exposures showing duplicates **FIXED**
+- ❌ Stress test losses exceeding portfolio values by 4-5X
+- ❌ Daily P&L showing $0.00 for all portfolios
+- ❌ JSON/Markdown data source mismatches
+
+**Progress**: 2 of 5 critical issues fixed (40% complete)
 
 ### **Critical Issues Found Across All Portfolios**
 
-#### 1. **Position Classification Completely Broken** 🔴
+#### 1. **Position Classification Completely Broken** ✅ **FIXED 2025-08-09**
 **Evidence**: All portfolios show `long_count=0, stock_count=0, options_count=0` despite having 16-30 positions
 **Root Cause (CONFIRMED)**: Lines 893-896 in `portfolio_report_generator.py` check `p.get("position_type")` as strings, but line 431 stores the raw Enum object
 ```python
@@ -655,7 +657,7 @@ Analysis of the three demo portfolio reports revealed **systematic calculation e
 "long_count": sum(1 for p in positions if p.get("position_type") in ["LONG", "LC", "LP"])
 ```
 
-#### 2. **Factor Exposures Duplicated** 🔴
+#### 2. **Factor Exposures Duplicated** ✅ **FIXED 2025-08-09**
 **Evidence**: TSLA-Value appears twice (2.3744 vs 2.3717), ~0.1% difference across all factors
 **Root Cause (CONFIRMED)**: Lines 464-472 in `portfolio_report_generator.py` missing GROUP BY:
 ```python
@@ -736,17 +738,17 @@ daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
 ### **Files to Modify**
 
 1. **app/reports/portfolio_report_generator.py**
-   - Line 431: Fix position_type storage
-   - Lines 464-472: Add GROUP BY to factor query
-   - Lines 893-896: Fix position classification logic
-   - Line 885: Fix stress test availability flag
+   - ✅ Line 431: Fix position_type storage **DONE**
+   - ✅ Lines 461-478: Add GROUP BY to factor query **DONE - completely refactored query**
+   - ✅ Lines 893-896: Fix position classification logic **FIXED via line 431**
+   - ❌ Line 885: Fix stress test availability flag **PENDING**
 
 2. **app/calculations/snapshots.py**
-   - Lines 261-262: Handle first snapshot P&L
+   - ❌ Lines 261-262: Handle first snapshot P&L **PENDING**
 
 3. **app/calculations/stress_testing.py**
-   - Investigate exposure_dollar calculation
-   - Add loss validation
+   - ❌ Investigate exposure_dollar calculation **PENDING**
+   - ❌ Add loss validation **PENDING**
 
 ### **Success Criteria**
 - [x] Position counts show correct values (not zeros) ✅ **FIXED 2025-08-09**
@@ -758,11 +760,28 @@ daily_pnl = current_value - previous_snapshot.total_value  # No previous = 0
 
 ### **Monitoring**
 After fixes, regenerate all three portfolio reports and verify:
-1. Position summary totals match actual positions
-2. Factor exposures have no duplicates
-3. Stress test losses are realistic
-4. P&L calculations work (or show clear reason if zero)
-5. Data consistency between formats
+1. ✅ Position summary totals match actual positions **VERIFIED**
+2. ✅ Factor exposures have no duplicates **VERIFIED**
+3. ❌ Stress test losses are realistic **STILL BROKEN**
+4. ❌ P&L calculations work (or show clear reason if zero) **STILL ZERO**
+5. ❌ Data consistency between formats **STILL INCONSISTENT**
+
+### **Completion Notes (2025-08-09)**
+
+**Fixed Issues:**
+1. **Position Classification**: Changed line 431 to properly convert Enum to string value using `.value` attribute with fallback
+2. **Factor Duplication**: Completely refactored factor query to aggregate by factor across all positions, added total/avg exposure and position count
+
+**Verification Results:**
+- Demo Individual: 16 positions correctly shown as LONG
+- Demo HNW: Mixed positions correctly classified
+- Demo Hedge Fund: 17 long, 13 short, 8 options, 22 stocks all correct
+- Factor exposures now show aggregated values with no duplicates
+
+**Next Steps:**
+- Fix stress test scaling issue (losses should not exceed 100% for unlevered)
+- Fix P&L calculation for first snapshots
+- Fix JSON/Markdown consistency for stress test availability
 
 ---
 
