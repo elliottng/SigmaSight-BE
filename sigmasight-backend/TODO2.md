@@ -921,6 +921,133 @@ select(FactorExposure, FactorDefinition)
 
 ---
 
+## Phase 2.6: Deep Calculation Engine Fixes - Post-Report Analysis
+*Critical calculation engine issues discovered through detailed analysis of generated reports*
+
+**Timeline**: 3-4 Days | **Status**: 🔴 **NOT STARTED** | **Priority**: HIGH | **Created**: 2025-08-09
+
+### **Executive Summary**
+Detailed analysis of the three demo portfolio reports revealed deeper calculation issues beyond the surface-level fixes in Phase 2.5. These issues affect the mathematical correctness and risk assessment accuracy of the reports.
+
+### **Issue Categories**
+
+#### **A. VALIDATED ISSUES - Confirmed with Data** ✅
+
+##### 1. **Short Position Exposure Calculation** 🔴 **CRITICAL**
+**Evidence**: 
+- Demo Hedge Fund has 13 short positions (9 SHORT stocks + 4 short options)
+- Position counts show correctly: `short_count: 13`
+- But exposure shows: `short_exposure: $0.00`
+**Root Cause**: Exposure calculation not handling negative quantities/short positions
+**Impact**: Understates risk by missing ~$1.5M in short exposure
+**Status**: VALIDATED - Clear data inconsistency
+
+##### 2. **Factor Dollar Exposures Exceed Gross Exposure** 🔴 **CRITICAL**
+**Evidence**:
+- Demo Individual: $485K gross, but factors sum to ~$2.7M
+- Demo HNW: $1.3M gross, but factors sum to ~$9M
+- Demo Hedge Fund: $5.5M gross, but factors sum to ~$38M
+**Root Cause**: Each factor's `exposure_dollar = beta × portfolio_value` treats entire portfolio as exposed
+**Current Workaround**: 99% loss cap masks the issue
+**Impact**: Fundamentally incorrect risk calculations
+**Status**: VALIDATED - Mathematical impossibility
+
+##### 3. **Stress Test Historical Scenarios All Hit Cap** 🟡 **MAJOR**
+**Evidence**: All crash scenarios (2008, COVID, Dot-Com) show identical losses at 99% cap
+**Root Cause**: Factor exposure overlap causes unrealistic loss magnitudes
+**Impact**: Historical scenarios provide no differentiation
+**Status**: VALIDATED - Direct consequence of factor exposure issue
+
+#### **B. MISSING FEATURES - Never Implemented** ⚠️
+
+##### 4. **Interest Rate Beta Calculation** 🟡
+**Evidence**: All rate scenarios show $0.00 impact across all portfolios
+**Status**: HYPOTHESIS - Engine likely never implemented
+**Impact**: Cannot assess rate sensitivity for REITs, utilities, financials
+**Priority**: MEDIUM - Important for complete risk assessment
+
+##### 5. **Correlation Analysis** 🟡
+**Evidence**: `correlation_analysis: { "available": false }` in all reports
+**Status**: HYPOTHESIS - Engine not running or not storing data
+**Impact**: Stress test correlation effects based on assumptions not data
+**Priority**: MEDIUM - Affects stress test accuracy
+
+#### **C. OPTIONS-RELATED ISSUES - DEFERRED** 🔵
+
+**Note**: The following issues require options chain data (strikes, expiries, implied volatility) which we don't currently have access to. These will be addressed once we solve the options data provider issue.
+
+##### 6. **Greeks Calculation Not Working** 🔵 **DEFERRED**
+**Evidence**: 8 options positions but all Greeks show 0.0000
+**Root Cause**: Missing options chain data (need strike prices, expiry dates, IV)
+**Status**: DEFERRED - Requires options data provider
+
+##### 7. **Stress Test Linear-Only (No Convexity)** 🔵 **DEFERRED**
+**Evidence**: Perfect symmetry in up/down scenarios even with options
+**Root Cause**: Cannot calculate gamma/convexity without Greeks
+**Status**: DEFERRED - Depends on Greeks calculation
+
+##### 8. **Options P&L Attribution** 🔵 **DEFERRED**
+**Evidence**: Cannot separate intrinsic vs. time value changes
+**Root Cause**: Need options chain data for proper attribution
+**Status**: DEFERRED - Requires options data provider
+
+#### **D. EXPECTED BEHAVIOR - No Fix Needed** ✅
+
+##### 9. **Daily P&L Shows $0.00** ✅
+**Evidence**: All portfolios show zero P&L
+**Explanation**: 
+- Friday 8/8: First snapshot created (no previous to compare)
+- Saturday 8/9: No snapshot created (not a market day)
+- Monday 8/11: Will show P&L when comparing to Friday
+**Status**: EXPECTED BEHAVIOR - No fix needed
+
+### **Implementation Plan**
+
+#### **Phase 1: Critical Calculation Fixes (Day 1-2)**
+1. **Fix Short Exposure Calculation**
+   - Audit `calculate_portfolio_exposures()` in `portfolio.py`
+   - Ensure negative quantities handled correctly
+   - Test with Demo Hedge Fund's 13 short positions
+
+2. **Fix Factor Exposure Model**
+   - Redesign factor exposure calculation
+   - Option A: Allocate portfolio proportionally across factors
+   - Option B: Use factor loadings that sum to 100%
+   - Option C: Calculate factor-specific exposures based on holdings
+   - Remove 99% cap after fixing root cause
+
+#### **Phase 2: Missing Features (Day 3-4)**
+3. **Implement Interest Rate Beta** (if time permits)
+   - Add rate sensitivity calculation
+   - Use treasury yield changes vs. equity returns
+   - Store in database for report access
+
+4. **Enable Correlation Analysis** (if time permits)
+   - Calculate rolling correlations
+   - Store correlation matrices
+   - Feed into stress test engine
+
+#### **Phase 3: Deferred - Awaiting Options Data**
+- Greeks calculation
+- Non-linear stress testing
+- Options P&L attribution
+- *Timeline: After securing options data provider*
+
+### **Success Criteria**
+- [ ] Short exposures show correct non-zero values
+- [ ] Factor exposures sum to ≤ gross exposure
+- [ ] Historical stress scenarios show differentiated impacts
+- [ ] Interest rate scenarios show non-zero impacts (if implemented)
+- [ ] Correlation data available in reports (if implemented)
+
+### **Testing Requirements**
+- Validate with Demo Hedge Fund (has shorts and options)
+- Verify factor exposures are mathematically consistent
+- Ensure stress test results are realistic without caps
+- Document any remaining limitations
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 
