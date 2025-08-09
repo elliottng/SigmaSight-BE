@@ -938,25 +938,89 @@ Detailed analysis of the three demo portfolio reports revealed deeper calculatio
 - Demo Hedge Fund has 13 short positions (9 SHORT stocks + 4 short options)
 - Position counts show correctly: `short_count: 13`
 - But exposure shows: `short_exposure: $0.00`
-**Root Cause**: Exposure calculation not handling negative quantities/short positions
+
+**Root Cause Found** (portfolio_report_generator.py, lines 422-430):
+```python
+# Line 422: market_val is always positive (absolute value)
+market_val = position.market_value if position.market_value else (position.quantity * position.entry_price)
+
+# Line 430: exposure is set to market_val (always positive!)
+"exposure": market_val,  # WRONG - should be negative for shorts
+```
+
+**Correct Implementation Exists** (portfolio.py, lines 158-162):
+```python
+# The calculate_portfolio_exposures() function correctly handles signed exposures:
+long_mask = df['exposure'] > 0
+short_mask = df['exposure'] < 0
+short_exposure = df.loc[short_mask, 'exposure'].sum()  # Expects negative values
+```
+
+**Fix Required**: In portfolio_report_generator.py line 430, change to:
+```python
+"exposure": market_val if position.quantity >= 0 else -market_val,
+```
+
 **Impact**: Understates risk by missing ~$1.5M in short exposure
-**Status**: VALIDATED - Clear data inconsistency
+**Status**: VALIDATED - Bug in report data preparation, not calculation engine
 
 ##### 2. **Factor Dollar Exposures Exceed Gross Exposure** 🔴 **CRITICAL**
 **Evidence**:
 - Demo Individual: $485K gross, but factors sum to ~$2.7M
 - Demo HNW: $1.3M gross, but factors sum to ~$9M
 - Demo Hedge Fund: $5.5M gross, but factors sum to ~$38M
-**Root Cause**: Each factor's `exposure_dollar = beta × portfolio_value` treats entire portfolio as exposed
-**Current Workaround**: 99% loss cap masks the issue
-**Impact**: Fundamentally incorrect risk calculations
-**Status**: VALIDATED - Mathematical impossibility
+
+**Root Cause Found** (factors.py, lines 674-675):
+```python
+# Line 674: Uses gross_exposure as portfolio value
+portfolio_value = portfolio_exposures.get("gross_exposure", Decimal('0'))
+# Line 675: Each factor multiplies beta by ENTIRE portfolio value
+exposure_dollar = float(beta_value) * float(portfolio_value)
+```
+
+**Mathematical Problem**: 
+- Each factor assumes 100% of portfolio is exposed to it
+- With 7 factors, total exposure = 7 × portfolio_value × avg(beta)
+- Example: $485K × 7 factors × 0.8 avg beta = $2.7M (550% of portfolio!)
+
+**Conceptual Error**: Factor exposures should represent:
+- Either: Portion of portfolio exposed to each factor (sum to ≤100%)
+- Or: Dollar amount specifically attributable to each factor
+- Not: Each factor claiming the entire portfolio
+
+**Current Workaround**: 99% loss cap masks the issue (stress_testing.py, lines 356-366)
+**Impact**: Fundamentally incorrect risk calculations, stress tests hit cap immediately
+**Status**: VALIDATED - Architectural flaw in factor model
 
 ##### 3. **Stress Test Historical Scenarios All Hit Cap** 🟡 **MAJOR**
 **Evidence**: All crash scenarios (2008, COVID, Dot-Com) show identical losses at 99% cap
-**Root Cause**: Factor exposure overlap causes unrealistic loss magnitudes
-**Impact**: Historical scenarios provide no differentiation
-**Status**: VALIDATED - Direct consequence of factor exposure issue
+
+**Root Cause Confirmed** (stress_testing.py, lines 333-335):
+```python
+# Line 333: Uses the inflated exposure_value (beta)
+exposure_value = latest_exposures[mapped_factor_name]['exposure_value']
+# Line 335: Multiplies portfolio value × beta × shock
+factor_pnl = portfolio_market_value * exposure_value * shock_amount
+```
+
+**Why Cap Gets Hit**:
+- Each factor exposure_dollar already = beta × portfolio_value (inflated)
+- Stress test then does portfolio_value × beta × shock (correct formula)
+- But with 5+ factors shocked simultaneously in crisis scenarios:
+  - 2008 Crisis: Shocks Market, Value, Size, Momentum, Quality
+  - Total impact = sum of (portfolio × beta × shock) for each factor
+  - Example: $485K × (0.77 × -35% + 0.91 × -20% + 0.77 × -15% + ...) = -$2M+
+
+**99% Cap Logic** (lines 356-366):
+```python
+max_loss = -portfolio_market_value * 0.99
+if total_direct_pnl < max_loss:
+    scaling_factor = max_loss / total_direct_pnl
+    total_direct_pnl = max_loss  # Cap applied
+```
+
+**Impact**: All historical scenarios show identical -99% loss, no risk differentiation
+**Status**: VALIDATED - Direct consequence of factor exposure overlap issue
 
 #### **B. MISSING FEATURES - Never Implemented** ⚠️
 
@@ -1001,31 +1065,84 @@ Detailed analysis of the three demo portfolio reports revealed deeper calculatio
 - Monday 8/11: Will show P&L when comparing to Friday
 **Status**: EXPECTED BEHAVIOR - No fix needed
 
-### **Implementation Plan**
+### **Code Analysis Summary (Combined from Two Independent Analyses)**
 
-#### **Phase 1: Critical Calculation Fixes (Day 1-2)**
-1. **Fix Short Exposure Calculation**
-   - Audit `calculate_portfolio_exposures()` in `portfolio.py`
-   - Ensure negative quantities handled correctly
-   - Test with Demo Hedge Fund's 13 short positions
+**Two independent deep code analyses revealed complementary findings:**
 
-2. **Fix Factor Exposure Model**
-   - Redesign factor exposure calculation
-   - Option A: Allocate portfolio proportionally across factors
-   - Option B: Use factor loadings that sum to 100%
-   - Option C: Calculate factor-specific exposures based on holdings
-   - Remove 99% cap after fixing root cause
+#### **Analysis 1 Findings (Line-by-Line Code Review)**
+1. **Short Exposure Bug**: Line 430 in portfolio_report_generator.py doesn't negate market value for shorts
+2. **Factor Exposure Bug**: factors.py line 675 - Each factor claims 100% of portfolio 
+3. **Stress Test Cap**: Lines 356-366 in stress_testing.py - Cap hides factor problem
 
-#### **Phase 2: Missing Features (Day 3-4)**
-3. **Implement Interest Rate Beta** (if time permits)
-   - Add rate sensitivity calculation
-   - Use treasury yield changes vs. equity returns
-   - Store in database for report access
+#### **Analysis 2 Findings (Data Flow & Upstream Analysis)**
+1. **Short Exposure Root**: Sign inconsistencies in snapshots._prepare_position_data() and CSV/ETL layer
+2. **Interest Rate Beta Bug**: market_risk.py uses wrong units (pct_change() * 10000 on yields)
+3. **Stress Test Scaling**: Proportional rescaling after cap forces scenario convergence
+4. **Quantity Sign Issues**: SHORT positions may have positive quantities from data import
 
-4. **Enable Correlation Analysis** (if time permits)
-   - Calculate rolling correlations
-   - Store correlation matrices
-   - Feed into stress test engine
+#### **Synthesis - Complete Picture**
+- **Short Exposure**: Multiple layers have sign issues (report generation, snapshots, ETL)
+- **Factor Model**: Both analyses agree on position-level attribution solution
+- **Interest Rates**: Not "missing" but implemented with wrong units (Analysis 2 insight)
+- **Stress Tests**: Cap should clip total only, not scale factors (Analysis 2 insight)
+
+### **Implementation Plan (Revised with Combined Insights)**
+
+#### **Phase 1: Quick Fixes & Validation (Day 1)**
+
+1. **Fix Short Exposure Calculation** (Multi-layer fix)
+   a. **Report Layer** (portfolio_report_generator.py line 430):
+      ```python
+      "exposure": market_val if position.quantity >= 0 else -market_val,
+      ```
+   b. **Snapshot Layer** (snapshots._prepare_position_data):
+      - Add sign normalization by position_type
+      - If exposure == 0 but quantity != 0, derive exposure from position_type
+      - Log warnings for any normalization
+   c. **Data Import Layer**:
+      - Add validation for quantity signs vs position_type in CSV import
+      - Ensure SHORT, SC, SP have negative quantities
+
+2. **Fix Interest Rate Beta Units** (market_risk.py)
+   - Replace `pct_change() * 10000` with proper yield handling:
+   ```python
+   # Auto-detect units
+   if max(yields) <= 1.0:  # Decimals (0.043)
+       yield_changes_bp = yields.diff() * 10000
+   else:  # Percent (4.3)
+       yield_changes_bp = yields.diff() * 100
+   ```
+
+#### **Phase 2: Factor Model Redesign (Day 2-3)**
+
+3. **Factor Exposure Redesign** (See separate design document: FACTOR_EXPOSURE_REDESIGN.md)
+   - Implement position-level factor attribution
+   - Calculate true dollar contributions per factor
+   - Maintain portfolio betas separately for reporting
+   - Document breaking changes and migration path
+
+4. **Fix Stress Test Capping**
+   - Change cap to clip total only, not scale individual factors:
+   ```python
+   if total_pnl < max_loss:
+       total_pnl = max_loss  # Clip only
+       # Don't scale factor_impacts - preserve structure
+   ```
+   - Add configuration toggles for cap level and enable/disable
+
+#### **Phase 3: Comprehensive Testing (Day 4)**
+
+5. **Validation Test Suite**
+   - **Exposures**: Assert short_exposure <= 0, gross = sum(|exposure_i|)
+   - **Factor Dollars**: Compare legacy vs new, ensure interpretable
+   - **Stress Tests**: Verify scenarios produce different results
+   - **Rate Betas**: Test decimal vs percent detection, non-zero impacts
+
+6. **End-to-End Testing**
+   - Re-run batch for all 3 demo portfolios
+   - Verify reports show correct short exposures
+   - Confirm factor exposures sum to reasonable values
+   - Check stress scenarios show differentiation
 
 #### **Phase 3: Deferred - Awaiting Options Data**
 - Greeks calculation
@@ -1034,17 +1151,26 @@ Detailed analysis of the three demo portfolio reports revealed deeper calculatio
 - *Timeline: After securing options data provider*
 
 ### **Success Criteria**
-- [ ] Short exposures show correct non-zero values
-- [ ] Factor exposures sum to ≤ gross exposure
-- [ ] Historical stress scenarios show differentiated impacts
-- [ ] Interest rate scenarios show non-zero impacts (if implemented)
-- [ ] Correlation data available in reports (if implemented)
+- [ ] Short exposures show correct negative values (Demo Hedge Fund: ~$1.5M)
+- [ ] Factor dollar exposures are interpretable and documented
+- [ ] Stress scenarios show differentiated impacts (not all at 99% cap)
+- [ ] Interest rate scenarios show non-zero impacts
+- [ ] Data validation prevents quantity sign mismatches
+- [ ] All fixes have comprehensive test coverage
 
 ### **Testing Requirements**
-- Validate with Demo Hedge Fund (has shorts and options)
-- Verify factor exposures are mathematically consistent
-- Ensure stress test results are realistic without caps
-- Document any remaining limitations
+- Validate with Demo Hedge Fund (13 shorts, 8 options)
+- Compare factor exposures before/after redesign
+- Verify stress test scenarios produce unique results
+- Test interest rate beta with both decimal and percent yields
+- Document breaking changes and migration guide
+
+### **Deliverables**
+1. Fixed code with multi-layer validation
+2. FACTOR_EXPOSURE_REDESIGN.md design document
+3. Comprehensive test suite
+4. Migration guide for factor exposure changes
+5. Updated reports showing corrected values
 
 ---
 
