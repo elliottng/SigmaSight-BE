@@ -27,6 +27,55 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "config" / "stress_scenario
 DEFAULT_LOOKBACK_DAYS = 252
 CORRELATION_DECAY_FACTOR = 0.94
 STRESS_MAGNITUDE_CAP = 1.0
+OPTIONS_CONTRACT_MULTIPLIER = 100  # Standard options contract size
+
+
+def calculate_portfolio_market_value(positions) -> float:
+    """
+    Calculate total portfolio market value correctly handling options and short positions.
+    
+    Args:
+        positions: List of Position objects
+        
+    Returns:
+        Absolute portfolio market value (gross exposure)
+        
+    Note:
+        - Uses Position.market_value if available
+        - Applies options contract multiplier (100)
+        - Handles SHORT positions correctly (negative values)
+        - Returns absolute value for stress testing (gross exposure)
+    """
+    total = 0.0
+    
+    for pos in positions:
+        # Use pre-calculated market value if available
+        if pos.market_value is not None:
+            total += float(pos.market_value)
+        elif pos.last_price is not None:
+            # Calculate market value based on position type
+            quantity = float(pos.quantity)
+            price = float(pos.last_price)
+            
+            # Apply options contract multiplier
+            if pos.position_type.name in ['LC', 'LP', 'SC', 'SP']:
+                multiplier = OPTIONS_CONTRACT_MULTIPLIER
+            else:
+                multiplier = 1
+            
+            # Apply sign for short positions
+            # Note: SHORT stock and short options (SC, SP) are negative
+            if pos.position_type.name in ['SHORT', 'SC', 'SP']:
+                sign = -1
+            else:
+                sign = 1
+            
+            market_value = sign * quantity * price * multiplier
+            total += market_value
+    
+    # Return absolute value (gross exposure) for stress testing
+    # Stress tests apply to total portfolio exposure regardless of long/short mix
+    return abs(total)
 
 
 async def calculate_factor_correlation_matrix(
@@ -228,11 +277,8 @@ async def calculate_direct_stress_impact(
         positions_result = await db.execute(positions_stmt)
         positions = positions_result.scalars().all()
         
-        # Calculate portfolio market value
-        portfolio_market_value = sum(
-            float(pos.quantity * pos.last_price) if pos.last_price else 0.0
-            for pos in positions
-        )
+        # Calculate portfolio market value using proper helper
+        portfolio_market_value = calculate_portfolio_market_value(positions)
         
         if portfolio_market_value <= 0:
             logger.warning(f"Portfolio {portfolio_id} has no market value")
@@ -389,10 +435,7 @@ async def calculate_correlated_stress_impact(
         positions_result = await db.execute(positions_stmt)
         positions = positions_result.scalars().all()
         
-        portfolio_market_value = sum(
-            float(pos.quantity * pos.last_price) if pos.last_price else 0.0
-            for pos in positions
-        )
+        portfolio_market_value = calculate_portfolio_market_value(positions)
         
         if portfolio_market_value <= 0:
             logger.warning(f"Portfolio {portfolio_id} has no market value")

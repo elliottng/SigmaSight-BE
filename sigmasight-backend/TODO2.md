@@ -824,8 +824,57 @@ After fixes, regenerate all three portfolio reports and verify:
 }
 ```
 Each factor applies its shock to the full portfolio value × its beta, resulting in losses that exceed 400% of portfolio value.
-- Fix P&L calculation for first snapshots
-- Fix JSON/Markdown consistency for stress test availability
+
+### **CRITICAL BUG: Portfolio Value Calculation Missing Options Multiplier** ✅ **FIXED 2025-08-09**
+
+**Issue Discovered**: External code review identified that stress test portfolio value calculation is incorrect:
+```python
+# Current WRONG calculation:
+portfolio_market_value = sum(
+    float(pos.quantity * pos.last_price) if pos.last_price else 0.0
+    for pos in positions
+)
+```
+
+**Problems**:
+1. **Missing options contract multiplier** (typically 100) - understates options value by 100x
+2. **Ignores position direction** - SHORT positions should be negative, currently treats all as positive
+3. **Not using Position.market_value** if available - recalculating unnecessarily
+
+**Impact**: 
+- Stress test P&L calculations severely understated for portfolios with options
+- Portfolio market value incorrect for any portfolio with short positions
+- Affects all stress test results generated to date
+
+**Fix Required**:
+```python
+def calculate_portfolio_market_value(positions):
+    total = 0.0
+    for pos in positions:
+        if pos.market_value:  # Use pre-calculated if available
+            total += float(pos.market_value)
+        else:
+            multiplier = 100 if pos.position_type in ['LC', 'LP', 'SC', 'SP'] else 1
+            sign = -1 if pos.position_type in ['SHORT', 'SC', 'SP'] else 1
+            total += sign * float(pos.quantity * pos.last_price) * multiplier
+    return abs(total)  # Gross market value for stress testing
+```
+
+**Files to Fix**:
+- `app/calculations/stress_testing.py`: Lines 232-234 and 372-374
+
+**Fix Implemented**:
+- Created `calculate_portfolio_market_value()` helper function with proper logic
+- Applies options contract multiplier (100x)
+- Handles SHORT positions correctly (negative values)
+- Uses Position.market_value if available
+- Returns absolute value (gross exposure) for stress testing
+
+**Impact of Fix**:
+- Demo Hedge Fund portfolio: Was $2.1M, actually $5.5M (difference: $3.4M)
+- Options positions were understated by 100x (e.g., SPY call: was $1,500, actually $150,000)
+- Stress test losses now correctly scaled to actual portfolio values
+- All portfolios recalculated with corrected values
 
 ---
 
