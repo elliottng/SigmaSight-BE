@@ -888,9 +888,9 @@ def build_json_report(data: Mapping[str, Any]) -> Dict[str, Any]:
                 "description": "Position-level market data and pricing"
             },
             "stress_testing": {
-                "available": len(stress_test_results) > 0,
-                "scenario_count": len(stress_test_results),
-                "data": stress_test_results if stress_test_results else None,
+                "available": len(data.get('stress_test_results', [])) > 0,
+                "scenario_count": len(data.get('stress_test_results', [])),
+                "data": data.get('stress_test_results') if data.get('stress_test_results') else None,
                 "description": "Stress test scenario analysis with factor-based shocks"
             },
             "interest_rate_betas": {
