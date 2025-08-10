@@ -1235,100 +1235,125 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 - Lines 290-324: OLS regression calculating betas
 - Line 308: Beta capping at ±3 (BETA_CAP_LIMIT) - but many hitting this limit!
 
-### 2.6.8.1 Investigation Tasks (Priority: CRITICAL)
+### 2.6.8.1 Investigation Results ✅ COMPLETED (2025-01-10)
 
-1. **Analyze Beta Calculation** 🔴
-   - [ ] Check if returns are scaled correctly (daily vs annualized)
-   - [ ] Verify regression window (252 days) has enough valid data
-   - [ ] Check if factor ETF returns are calculated correctly
-   - [ ] Investigate why so many betas hit the ±3 cap
+1. **Beta Calculation Analysis** ✅
+   - [x] Returns are correctly scaled (daily decimals)
+   - [x] Factor ETFs have severe multicollinearity (correlations up to 0.954)
+   - [x] Many betas hit ±3 cap due to data quality issues
+   - [x] Univariate approach is correct given multicollinearity
 
-2. **Data Quality Issues**
-   - [ ] Missing price data for options (only 2 days available)
-   - [ ] Factor ETFs missing data points (MTUM, QUAL, SIZE, USMV, VTV, VUG)
-   - [ ] Regression warnings: "RuntimeWarning: invalid value encountered in scalar divide"
+2. **Data Quality Root Causes Identified** ✅
+   - [x] **Zero-filling returns** - distorts variance/covariance
+   - [x] **No delta adjustment for options** - causes extreme swings
+   - [x] **Hard cap at ±3** - masks underlying problems
+   - [x] **No minimum data requirements** - allows unreliable fits
 
-3. **Potential Fixes**
-   - [ ] Fix return calculations (check for percentage vs decimal)
-   - [ ] Handle missing data better (minimum data requirements)
-   - [ ] Adjust beta cap or use winsorization instead of hard cap
-   - [ ] Consider robust regression instead of OLS
+3. **Solution: Improved Univariate (Phase 2.7)**
+   - Keep univariate regression (avoids multicollinearity issues)
+   - Remove zero-filling of returns
+   - Mandatory delta adjustment for options
+   - Replace hard cap with winsorization (1st/99th percentile)
+   - Enforce MIN_REGRESSION_DAYS = 60
 
 ### 2.6.8.2 Scripts Created for Investigation
-- `scripts/validate_option_b_implementation.py` - Validates the implementation
-- `scripts/debug_factor_calculation.py` - Deep dive into calculation details
+- `scripts/validate_option_b_implementation.py` - Validates the implementation ✅
+- `scripts/debug_factor_calculation.py` - Deep dive into calculation details ✅
+- `scripts/export_factor_etf_data.py` - Export and analyze factor correlations ✅
 
-### 2.6.8.3 Next Immediate Steps
-1. Create script to analyze beta distributions
-2. Check if position returns and factor returns are on same scale
-3. Investigate the OLS regression warnings
-4. Fix beta calculation before generating reports
+### 2.6.8.3 Investigation Outcome
+✅ **Root cause identified**: Data quality issues in univariate regression, NOT a need for multivariate
+✅ **Multicollinearity confirmed**: Factor ETFs too correlated for multivariate (VIF up to 39)
+✅ **Solution designed**: Improved univariate approach (see Phase 2.7)
+→ **Next step**: Implement Phase 2.7 improvements to fix beta calculations
 
 ---
 
-## Phase 2.7: Factor Beta Redesign
-*Implement the factor beta redesign to produce stable, realistic, and institutionally-aligned factor betas.*
+## Phase 2.7: Factor Beta Redesign (Improved Univariate)
+*Enhance univariate beta estimation with data quality improvements to produce stable, realistic factor betas.*
 
-**Status**: IN PROGRESS - MULTICOLLINEARITY DISCOVERED
+**Status**: READY FOR IMPLEMENTATION
 **Priority**: High
 **Dependencies**: None
 **Design Doc**: See `_docs/requirements/FACTOR_BETA_REDESIGN.md` for full details.
 
 ### Critical Discovery (2025-01-10)
 Investigation revealed severe multicollinearity in factor ETFs:
-- Factor correlations up to 0.96 (Size vs Value)
-- VIF values > 50 for some factors (Quality VIF = 52.5)
-- Condition number > 600 indicating numerical instability
-- This causes multivariate OLS to produce MORE extreme betas than univariate
+- Factor correlations up to 0.954 (Size vs Value), with 17/21 pairs > 0.7
+- VIF values: Quality (39.0), Growth (27.4), Value (19.6), Size (18.8)
+- Condition number: 644.86 indicating numerical instability
+- **Impact**: Multivariate OLS produces MORE extreme betas than univariate due to multicollinearity
 
-**Recommendation**: Use Ridge regression (L2 regularization) instead of standard OLS for multivariate approach, OR keep univariate but with better data handling.
+**Decision**: Keep univariate regression but fix data quality issues. Multivariate is not viable without regularization.
 
-### 2.7.1 Implementation Plan
+### 2.7.1 Implementation Plan - Improved Univariate Approach
 
-#### 2.7.1.1 Code Changes
- - [ ] `app/calculations/factors.py::calculate_position_returns()`
-  - [x] Remove `returns_df.fillna(0)`; do not impute zeros.
-  - [x] Keep returns as decimal daily returns via `.pct_change()`.
-  - [ ] Ensure delta application path logs when delta unavailable and falls back to dollar exposure.
+#### 2.7.1.1 Data Quality Improvements
+- [ ] `app/calculations/factors.py::calculate_position_returns()`
+  - [ ] Remove `returns_df.fillna(0)` - preserve NaN values
+  - [ ] Compute returns on prices directly via `.pct_change()`
+  - [ ] Log when delta unavailable and falling back to dollar exposure
+  
 - [ ] `app/calculations/factors.py::calculate_factor_betas_hybrid()`
-  - [ ] Build a multivariate `X_multi` containing all aligned factor return columns.
-  - [ ] Run a single `statsmodels.api.OLS(y, sm.add_constant(X_multi)).fit()` per position.
-  - [ ] Extract betas from `model.params[1:]` and map to factor names.
-  - [x] Implement quality gating: require `MIN_REGRESSION_DAYS` of non-`NaN` data after inner-join; otherwise, return zero betas and flag.
-  - [ ] Maintain and expand `regression_stats` per position (R², p-values, std errors).
-- [ ] `app/calculations/factors.py::_aggregate_portfolio_betas()`
-  - [ ] No functional change expected; verify exposure weights and normalization.
-- [ ] `app/calculations/factors.py::aggregate_portfolio_factor_exposures()`
-  - [ ] No change expected; confirm position-level attribution remains intact and dollar exposures are computed as sum(signed position exposure × position beta).
+  - [ ] **Keep univariate OLS** (one factor at a time) - no multivariate
+  - [ ] Enforce `use_delta_adjusted=True` for all options positions
+  - [ ] Inner-join position and factor returns, drop NaN rows before regression
+  - [ ] Enforce `MIN_REGRESSION_DAYS` (60 days) requirement
+  - [ ] Replace hard cap (±3) with winsorization at 1st/99th percentiles
+  - [ ] Store regression diagnostics: R², p-values, standard errors, sample size
 
-#### 2.7.1.2 Scripts and Diagnostics
- - [ ] Add `scripts/analyze_beta_distributions.py`
-    - [ ] Load latest betas and regression stats; produce histograms, boxplots, and summary stats pre/post.
-    - [ ] Report % of betas exceeding a threshold, R² distribution, and outlier counts beyond winsorization thresholds.
-  - [ ] Confirm or update `scripts/debug_factor_calculation.py` to validate alignments and NaN handling after changes.
+#### 2.7.1.2 Quality Controls
+- [ ] Winsorization implementation:
+  - [ ] Apply to final beta distribution per factor
+  - [ ] Use 1st/99th percentile thresholds
+  - [ ] Log any values beyond thresholds
+  - [ ] NO hard emergency cap after winsorization
+  
+- [ ] Data alignment improvements:
+  - [ ] Ensure position and factor returns are properly aligned by date
+  - [ ] Only use overlapping non-NaN data points
+  - [ ] Mark positions with insufficient data as low-quality
 
-#### 2.7.1.3 Tests
- - [ ] Unit tests for:
-  - [ ] Multivariate regression extraction mapping to factor names.
-  - [ ] Behavior when data is insufficient (quality flag, zero betas).
-  - [ ] Delta-adjusted option positions vs non-adjusted behavior.
-  - [x] No zero-fill: ensure inner-join/dropna path works and yields stable fits.
-- [ ] Regression tests to compare reasonable beta ranges and reduced cap-trigger rates after redesign.
+#### 2.7.1.3 Scripts and Diagnostics
+- [x] Create `scripts/export_factor_etf_data.py` - COMPLETED
+  - [x] Export factor ETF correlations and VIF analysis
+  - [x] Document multicollinearity evidence
+  
+- [ ] Update `scripts/analyze_beta_distributions.py`
+  - [ ] Compare beta distributions before/after improvements
+  - [ ] Report % of betas at winsorization thresholds
+  - [ ] Show R² distribution improvements
+  - [ ] Track positions with insufficient data
 
-#### 2.7.1.4 Data Quality and Configuration
- - [ ] Validate factor ETF coverage via `validate_historical_data_availability()`; alert on symbols with < `MIN_REGRESSION_DAYS`.
-- [ ] Confirm `FACTOR_ETFS` mapping aligns with stored symbols and that price histories are consistent in `MarketDataCache`.
-- [ ] Document any required backfills or data hygiene steps (e.g., forward-fill policy is not used in regressions, only in factor return preparation where appropriate).
+#### 2.7.1.4 Tests
+- [ ] Unit tests for improved univariate:
+  - [ ] Verify no zero-filling in returns
+  - [ ] Test winsorization vs hard cap behavior
+  - [ ] Confirm mandatory delta adjustment for options
+  - [ ] Test MIN_REGRESSION_DAYS enforcement
+  
+- [ ] Integration tests:
+  - [ ] Run on demo portfolios and verify beta ranges
+  - [ ] Confirm fewer extreme values post-winsorization
+  - [ ] Validate regression diagnostics storage
 
-#### 2.7.1.5 Rollout and Governance
- - [ ] Introduce a feature flag (e.g., `BETA_MULTIVARIATE_ENABLED`) for staged rollout and A/B comparison.
-- [ ] Run batch on a sandbox portfolio; capture before/after diagnostics.
-- [ ] Upon approval, remove the flag and make multivariate the default path.
+#### 2.7.1.5 Configuration Updates
+- [ ] Update `app/constants/factors.py`:
+  - [ ] Set `MIN_REGRESSION_DAYS = 60`
+  - [ ] Remove or deprecate `BETA_CAP_LIMIT`
+  - [ ] Add winsorization percentiles (1st/99th)
 
-#### 2.7.1.6 Documentation
- - [ ] Update `FACTOR_EXPOSURE_REDESIGN.md` to cross-reference this beta redesign.
-- [ ] Document expected ranges and interpretation of portfolio-level betas for stakeholders.
-- [ ] Note that stress tests continue to rely on `exposure_value` betas; `exposure_dollar` is reporting-only.
+#### 2.7.1.6 Rollout Plan
+- [ ] No feature flag needed (improvements are backwards compatible)
+- [ ] Run diagnostics script on current production data
+- [ ] Deploy improvements and monitor beta distributions
+- [ ] Verify stress test results become more realistic
+
+#### 2.7.1.7 Documentation Updates
+- [x] Updated `FACTOR_BETA_REDESIGN.md` with improved univariate as primary approach
+- [x] Added empirical evidence appendix with correlation matrix and VIF analysis
+- [ ] Update any references to multivariate approach in other docs
+- [ ] Document that we accept omitted variable bias as trade-off for stability
 
 ---
 
@@ -1380,7 +1405,7 @@ Currently, portfolio exposures (long, short, gross, net, delta-adjusted) are cal
 - [ ] Add indexes for query performance
 - [ ] Create Alembic migration
 
-### 2.7.2 Calculation Engine Updates
+### 2.8.2 Calculation Engine Updates
 - [ ] Create `calculate_and_store_portfolio_exposures()` in `app/calculations/portfolio.py`:
   - Calculate all exposure metrics with correct signs
   - Include delta-adjusted exposures using Greeks
@@ -1390,7 +1415,7 @@ Currently, portfolio exposures (long, short, gross, net, delta-adjusted) are cal
   - Run after position snapshots but before factor calculations
   - Include in calculation dependencies
 
-### 2.7.3 Report Generator Refactoring
+### 2.8.3 Report Generator Refactoring
 - [ ] Refactor `portfolio_report_generator.py`:
   - Remove on-the-fly `calculate_portfolio_exposures()` calls
   - Fetch exposures from `portfolio_exposures` table
@@ -1400,14 +1425,14 @@ Currently, portfolio exposures (long, short, gross, net, delta-adjusted) are cal
   - Show exposure trends over time
   - Add exposure attribution by asset class
 
-### 2.7.4 Historical Data Backfill
+### 2.8.4 Historical Data Backfill
 - [ ] Create backfill script:
   - Process all historical snapshots
   - Calculate exposures for each date
   - Store in `portfolio_exposures` table
 - [ ] Validate backfilled data against current calculations
 
-### 2.7.5 API Enhancements
+### 2.8.5 API Enhancements
 - [ ] Create exposure history endpoints:
   - `GET /api/v1/portfolio/{id}/exposures/history`
   - `GET /api/v1/portfolio/{id}/exposures/trends`

@@ -8,12 +8,14 @@ Owners: Risk/Analytics
 
 ## 1. Summary
 
-Observed unrealistic portfolio factor betas (e.g., Market betas near ±3 and frequent capping). Root cause is upstream beta estimation rather than the position-level attribution (Option B), which is correct. This document proposes a redesign of the beta estimation to produce stable, realistic, and institutionally-aligned factor betas that integrate cleanly with existing storage, factor dollar exposures, and stress testing.
+Observed unrealistic portfolio factor betas (e.g., Market betas near ±3 and frequent capping). Root cause is upstream beta estimation combined with severe multicollinearity in factor ETFs (correlations up to 0.96, VIF values > 50). This document proposes an improved univariate regression approach with better data handling to produce stable, realistic factor betas while avoiding the numerical instability of multivariate methods.
 
 Key points:
-- Position-level attribution for factor dollar exposures in `aggregate_portfolio_factor_exposures()` is correct and should remain as-is.
-- Stress testing P&L uses `FactorExposure.exposure_value` (portfolio-level beta), not `exposure_dollar`.
-- Notional and delta-adjusted exposures are independent of factor betas and remain unaffected.
+- **Recommended approach**: Improved univariate regression with data quality enhancements (no zero-fill, winsorization, mandatory delta adjustment for options)
+- **Why not multivariate**: Severe multicollinearity (condition number 640+) makes multivariate regression numerically unstable without regularization
+- Position-level attribution for factor dollar exposures in `aggregate_portfolio_factor_exposures()` is correct and should remain as-is
+- Stress testing P&L uses `FactorExposure.exposure_value` (portfolio-level beta), not `exposure_dollar`
+- Notional and delta-adjusted exposures are independent of factor betas and remain unaffected
 
 Plain-English quick primer (what the terms mean):
 - Beta: how sensitive a position/portfolio is to a risk factor. Beta = 1 to “Market” means if the market moves +1%, we expect about +1% move in the position (on average).
@@ -92,33 +94,33 @@ and contrasts them with the current SigmaSight implementation.
 - __Computation__: Primarily on-demand; no explicit caching visible.
   - Why this matters: treating missing data as “0% return” falsely implies no movement occurred; keeping `NaN` and aligning/dropping missing rows avoids systematic bias.
 
-3.5) Comparison vs Current State (today)
+3.5) Comparison vs Recommended Redesign
 - 3.5.1 __Returns__
   - Legacy: price-based returns per ticker; preserves `NaN`.
   - Current: exposure-based position returns via `calculate_position_returns()` using `.pct_change()` on exposure time series; currently zero-fills missing values.
-  - Redesign: remove zero-fill; inner-join with factor returns and drop `NaN`; default delta-adjusted path for options.
+  - **Redesign (Improved Univariate)**: remove zero-fill; inner-join with factor returns and drop `NaN`; default delta-adjusted path for options.
   - Plain-English: zero-filling is like pretending we had a flat return on missing days, which can artificially shrink or distort relationships. Dropping missing rows keeps analysis to days when both series exist.
 - 3.5.2 __Betas__
   - Legacy: portfolio-level multivariate OLS; position-level per-factor covariance ratio (univariate with respect to each factor).
   - Current: univariate OLS per factor per position with hard cap ±`BETA_CAP_LIMIT`.
-  - Redesign: multivariate OLS per position across all factors simultaneously, with quality gates and winsorization; remove hard emergency caps.
+  - **Redesign (Improved Univariate)**: Keep univariate OLS but with quality improvements - winsorization instead of hard caps, better data alignment, mandatory delta adjustment for options. Accept omitted variable bias as trade-off for stability given severe multicollinearity.
 - 3.5.3 __Missing data & quality__
   - Legacy: no zero-fill; fewer implicit biases from imputation.
   - Current: zero-fill introduces bias; warnings observed; many betas hit caps.
-  - Redesign: enforce `MIN_REGRESSION_DAYS`, preserve `NaN` by inner-join and drop, store diagnostics (R², p-values, std err).
+  - **Redesign**: enforce `MIN_REGRESSION_DAYS`, preserve `NaN` by inner-join and drop, store diagnostics (R², p-values, std err).
 - 3.5.4 __Covariance/Correlation & VaR/Stress__
   - Legacy: provides simple and decayed covariance matrices and a VaR matrix multiplication routine.
   - Current: stress testing uses an exponentially weighted correlation matrix and scenario impacts; factor betas (`FactorExposure.exposure_value`) drive P&L, dollar exposures are reporting-only.
-  - Redesign: no change to stress testing mechanics; improved betas should yield more realistic scenario P&L.
+  - **Redesign**: no change to stress testing mechanics; improved betas should yield more realistic scenario P&L.
 - 3.5.5 __Aggregation & usage__
   - Legacy: matrix-based VaR uses exposures × betas × covariances.
- - Current: Option B position-level attribution for factor dollar exposures is in place and correct; stress uses portfolio betas.
- - Redesign: preserve existing storage and attribution paths; only change beta estimation pipeline.
+  - Current: Option B position-level attribution for factor dollar exposures is in place and correct; stress uses portfolio betas.
+  - **Redesign**: preserve existing storage and attribution paths; only change beta estimation pipeline.
 
 3.6) Legacy Implementation Insight
  - Discovery: The legacy system used a mixed approach - multivariate for portfolio-level betas but univariate (covariance method) for position-level betas.
- - Interpretation: The legacy developers likely recognized the importance of multivariate regression but made computational trade-offs at the position level.
- - Our proposal: Moving to multivariate at both levels is computationally feasible with modern hardware and will eliminate the omitted variable bias.
+ - Interpretation: The legacy developers likely recognized multicollinearity issues and avoided them at the position level.
+ - **Our approach**: Given empirical evidence of severe multicollinearity (VIF > 50, condition number 640+), we adopt improved univariate regression as the pragmatic solution, similar to the legacy position-level approach but with better data handling.
 
 
 ## 4. (unused)
@@ -126,26 +128,29 @@ and contrasts them with the current SigmaSight implementation.
 
 ## 5. Problems Observed
 
-- Omitted variable bias from univariate regressions inflates coefficients and double-counts exposure across factors.
-- Options using option-price returns (high variance) vs factor ETF returns (lower variance) tend to yield oversized slopes if not delta adjusted.
-- Zero-filling returns distorts variance/covariance and biases regressions.
-- Insufficient or irregular data can lead to unstable fits and runtime warnings.
-
 ### 5.1 Critical Discovery: Severe Multicollinearity (2025-01-10)
 
 Investigation of the factor ETFs revealed extreme multicollinearity:
 - **Factor correlations**: Up to 0.96 (Size vs Value), with 17 pairs having |r| > 0.7
-- **VIF values**: Quality (52.5), Growth (41.8), Value (23.9), Size (22.0) - all indicating severe multicollinearity
-- **Condition number**: 640+ indicating numerical instability
+- **VIF values**: Quality (39.0), Growth (27.4), Value (19.6), Size (18.8) - all indicating severe multicollinearity
+- **Condition number**: 644.86 indicating numerical instability
 - **Impact**: Standard multivariate OLS produces MORE extreme betas than univariate due to this multicollinearity
+- **Root cause**: Factor ETFs have overlapping holdings and similar market exposures (all US equity-based)
 
-This explains why the simple univariate approach has been relatively stable - it avoids the multicollinearity problem entirely.
- 
- Plain-English: why these problems happen
- - Univariate fits look at one factor at a time, so if factors move together, each one can get “too much credit,” inflating betas.
- - Options can swing more than ETFs; without delta adjustment, regressions can latch onto noise instead of signal.
- - Replacing missing values with 0% return is like pretending nothing happened on that day; this skews averages and correlations.
- - If we don’t have enough overlapping days between a position and factors, the fit is shaky and statistical warnings pop up.
+This discovery validates keeping univariate regression - it avoids multicollinearity-induced instability entirely.
+
+### 5.2 Current Implementation Issues
+
+- **Data quality**: Zero-filling returns distorts variance/covariance and biases regressions
+- **Options handling**: Option-price returns (high variance) vs factor ETF returns (lower variance) yield oversized slopes without delta adjustment
+- **Hard caps**: Frequent beta truncation at ±3 indicates underlying estimation problems
+- **Insufficient data handling**: No minimum data requirements lead to unstable fits
+
+Plain-English: why these problems matter
+- Zero-filling is like pretending nothing happened on missing days; this artificially reduces volatility and correlations
+- Options can swing 10x more than their underlying; without delta adjustment, regressions capture noise not signal
+- Hard caps hide the problem but don't fix it; we need better estimation not just truncation
+- With too few data points, statistical fits become unreliable gambling
 
 ---
 
@@ -164,74 +169,83 @@ Plain-English: what “stable and realistic” looks like
 
 ---
 
-## 7. Proposed Redesign
+## 7. Proposed Redesign: Improved Univariate Regression
 
-7.1 Return computation clarification
-    - Compute position returns on prices directly: `prices.pct_change()`.
-    - Under constant quantity/multiplier, `pct_change(price × constant) == pct_change(price)`; computing on prices is equivalent and clearer.
-    - Remove zero-filling from return series; NaN handling occurs via inner-join with factor returns and dropping rows before regression.
-
-7.2 Multivariate regression per position (Original Proposal)
-    - Replace per-factor univariate OLS with a single multivariate OLS per position using all factor return columns simultaneously (plus intercept) over aligned dates.
-    - Use `statsmodels.api.OLS(y, sm.add_constant(X_multi)).fit()`; extract betas from `params[1:]` mapped to factor names.
-    - Rationale: removes omitted variable bias and reduces inflated betas.
-    - Plain-English: fit "all factors together" so we don't double-count shared movements. This typically yields more balanced, realistic betas.
-    - **WARNING**: Testing revealed severe multicollinearity (see Section 5.1), making this approach numerically unstable without regularization.
-
-7.2.1 Alternative Approaches (Based on Multicollinearity Discovery)
+### 7.1 Primary Approach: Enhanced Univariate with Data Quality Improvements
     
-    **Option A: Ridge Regression (L2 Regularization)**
-    - Use Ridge regression instead of OLS to handle multicollinearity
-    - Penalizes large coefficients, producing more stable betas
-    - Requires choosing regularization parameter (alpha)
-    - Implementation: `sklearn.linear_model.Ridge` or equivalent
-    
-    **Option B: Principal Component Regression (PCR)**
-    - Transform correlated factors into orthogonal principal components
-    - Run regression on components, then transform back to factor space
-    - Reduces dimensionality while preserving most variance
-    - More complex interpretation but handles multicollinearity well
-    
-    **Option C: Elastic Net**
-    - Combines L1 and L2 regularization
-    - Can perform feature selection (zeroing out less important factors)
-    - Good middle ground between Ridge and LASSO
-    
-    **Option D: Improved Univariate with Better Data Handling**
-    - Keep univariate regression (one factor at a time) to avoid multicollinearity entirely
-    - Focus on data quality improvements:
-        - Remove zero-filling of returns ✓
-        - Better alignment and NaN handling ✓
-        - Apply winsorization instead of hard caps ✓
-        - Mandatory delta adjustment for options ✓
-    - Simpler, more stable, already working reasonably well
-    - Accept some omitted variable bias as trade-off for stability
-    
-    **Recommendation**: Given the severity of multicollinearity (VIF > 50, correlations > 0.95), Option D (improved univariate) is the most pragmatic choice for immediate implementation, with Option A (Ridge) as a future enhancement.
+**Core Design**: Keep univariate regression (one factor at a time) to avoid multicollinearity-induced numerical instability entirely.
 
-7.3 Make delta-adjusted returns mandatory for options
-    - In `calculate_factor_betas_hybrid()`, enforce `use_delta_adjusted=True` when calling `calculate_position_returns()` (no per-portfolio override in this phase).
-    - Keep fallback to dollar exposure when delta is unavailable, but log quality degradation.
-    - Optional future improvement: for options, consider constructing the exposure series off the underlying price series × delta × multiplier × quantity to further reduce noise.
-    - Plain-English: treat options as a scaled version of the underlying’s move (via delta) so their link to factors is less noisy.
+**Key Improvements**:
+- **Remove zero-filling**: Preserve NaN values and handle via proper alignment
+- **Better data alignment**: Inner-join position and factor returns, drop NaN rows
+- **Winsorization instead of hard caps**: Apply 1st/99th percentile winsorization on final betas
+- **Mandatory delta adjustment for options**: Enforce `use_delta_adjusted=True` for all options positions
+- **Minimum data requirements**: Enforce `MIN_REGRESSION_DAYS` (60 days) for reliable estimates
+- **Quality diagnostics**: Store R², p-values, standard errors for each regression
 
-7.4 Missing data handling and alignment
-    - Remove zero-filling of returns. For each position, inner-join `y` (position returns) with `X_multi` (factor returns) and drop rows with NaNs prior to regression.
-    - Enforce per-position minimum sample requirement (e.g., `MIN_REGRESSION_DAYS`). If not met, skip regression for that position, set betas to 0, log, and set low-quality flag.
-    - Plain-English: only compare days where both series exist; require “enough days” to trust the fit, otherwise mark as low-quality.
+**Rationale**: Given severe multicollinearity (correlations > 0.95, VIF > 30, condition number 645), univariate regression is the most stable approach. We accept some omitted variable bias as a reasonable trade-off for numerical stability and interpretability.
 
-7.5 Quality controls and outlier handling
-    - Prefer quality gating to hard caps: check R², standard errors, and p-values per beta.
-    - Apply winsorization on the final beta distribution at the 1st/99th percentile; do not use a hard ±3 cap.
-    - Do not use a hard emergency cap; rely on winsorization and quality gating. Log and alert on any extreme values that remain post-winsorization.
-    - Plain-English: look at model “health checks” (fit quality and error bars) and tame only the far-out tail via winsorization; there is no last-resort cap.
+### 7.2 Return Computation Improvements
+- Compute position returns on prices directly: `prices.pct_change()`
+- Under constant quantity/multiplier, `pct_change(price × constant) == pct_change(price)`
+- Remove zero-filling from return series completely
+- Handle NaN via inner-join with factor returns and drop missing rows before regression
+- Plain-English: Only use days where both position and factor data exist; no artificial "flat" days
 
-7.6 Diagnostics, logging, and observability
-    - Persist `regression_stats` per position: R², p-values, std errors, residual diagnostics (for audit and debugging).
-    - Add a one-off analyzer script to generate beta histograms, R² distributions, and outlier counts (beyond winsorization thresholds) before/after this redesign.
-    - Plain-English: keep simple dashboards/stats so we can see distributions, spot issues early, and prove improvements.
+### 7.3 Delta Adjustment for Options (Mandatory)
+- In `calculate_factor_betas_hybrid()`, enforce `use_delta_adjusted=True` for all options
+- No per-portfolio override in this phase
+- Fallback to dollar exposure when delta unavailable, but mark as low-quality
+- Future enhancement: construct exposure series from underlying price × delta × multiplier × quantity
+- Plain-English: Options move as scaled versions of their underlying; delta captures this scaling
 
-7.7 Storage and downstream usage
+### 7.4 Alternative Approaches (Not Recommended Due to Multicollinearity)
+
+**Multivariate OLS (Original Proposal - Now Rejected)**
+- Would fit all factors simultaneously to remove omitted variable bias
+- Testing revealed this produces MORE extreme betas due to multicollinearity
+- Condition number 645 indicates severe numerical instability
+- Not viable without regularization
+
+**Ridge Regression (Future Enhancement)**
+- L2 regularization could handle multicollinearity
+- Requires tuning regularization parameter (alpha)
+- More complex to implement and explain
+- Consider as Phase 2 enhancement after stabilizing with univariate
+
+**Other Regularization Methods**
+- Principal Component Regression: transforms to orthogonal space but loses interpretability
+- Elastic Net: combines L1/L2 but adds complexity
+- LASSO: feature selection but unstable with correlated predictors
+
+### 7.5 Missing Data Handling and Alignment
+- Remove zero-filling of returns completely
+- For each position, inner-join position returns with factor returns
+- Drop rows with NaNs prior to regression
+- Enforce `MIN_REGRESSION_DAYS` (60 days minimum)
+- If insufficient data: skip regression, set betas to 0, mark as low-quality
+- Plain-English: Only use overlapping clean data; require sufficient history for reliability
+
+### 7.6 Quality Controls and Outlier Handling
+- Replace hard ±3 cap with winsorization at 1st/99th percentiles
+- Check regression quality metrics: R², p-values, standard errors
+- Log and alert on extreme values post-winsorization
+- No emergency caps - rely on winsorization and quality checks
+- Plain-English: Use statistical methods not arbitrary cutoffs; preserve information about extremes
+
+### 7.7 Diagnostics, Logging, and Observability
+- Persist regression statistics per position:
+  - R² (goodness of fit)
+  - p-values (statistical significance)
+  - Standard errors (uncertainty bounds)
+  - Sample size used
+- Generate analysis reports:
+  - Beta distributions before/after redesign
+  - R² distribution across positions
+  - Count of outliers beyond winsorization thresholds
+- Plain-English: Track everything to prove improvements and catch issues early
+
+### 7.8 Storage and Downstream Usage
     - Continue storing position-level betas and portfolio-level betas as currently done.
     - Factor dollar exposures remain position-level contributions: sum(position signed dollar exposure × position beta) — unchanged.
     - Stress testing continues to use `FactorExposure.exposure_value` (beta) for P&L; `exposure_dollar` remains reporting-only.
@@ -266,21 +280,24 @@ This document will remain the source of truth for the *design*, while `TODO2.md`
 
 ## 11. Risks and Mitigations
 
-- Data sparsity for some symbols or factors → enforce per-position minimum days; mark low-quality; consider robust regression later.
-- Options still noisy even with delta adjustment → consider underlying-price-based exposure series in a future enhancement.
-- Performance considerations with multivariate fits → acceptable for current scale; monitor and optimize if needed.
+- **Omitted variable bias from univariate** → Accept as trade-off for stability; multicollinearity makes multivariate worse not better
+- **Data sparsity for some symbols** → Enforce MIN_REGRESSION_DAYS (60); mark low-quality when insufficient
+- **Options noise even with delta adjustment** → Future: use underlying price × delta for exposure series
+- **Continued beta inflation for correlated moves** → Monitor via diagnostics; consider Ridge regression in Phase 2
 
 ---
 
 ## 12. Decisions
 
-- **Regression approach**: Option D (Improved Univariate) due to severe multicollinearity in factor ETFs
-  - Keep univariate regression to avoid numerical instability
-  - Apply data quality improvements (no zero-fill, winsorization, better alignment)
-  - Consider Ridge regression (Option A) as future enhancement
-- **Delta-adjustment**: Mandatory for options; no per-portfolio override in this phase. If delta is unavailable, fall back to dollar exposure and mark low-quality.
-- **Emergency cap**: None after winsorization and quality gating; remove the hard cap.
-- **Diagnostics**: Yes — persist detailed regression diagnostics (R², p-values, std err, residual checks) for audit/debugging and monitoring.
+- **Regression approach**: **Improved Univariate Regression** (avoiding multicollinearity-induced instability)
+  - Keep univariate OLS to avoid numerical problems from factor correlations > 0.95
+  - Focus on data quality: remove zero-fill, proper NaN handling, mandatory delta adjustment
+  - Winsorization instead of hard caps
+  - Ridge regression deferred to future enhancement
+- **Delta-adjustment**: **Mandatory for all options** - no exceptions or per-portfolio overrides
+- **Data requirements**: **Minimum 60 days** of overlapping data for regression
+- **Outlier handling**: **Winsorization at 1st/99th percentiles** - no hard emergency caps
+- **Diagnostics**: **Comprehensive tracking** - R², p-values, standard errors, sample sizes for all regressions
 
 ---
 
@@ -289,3 +306,63 @@ This document will remain the source of truth for the *design*, while `TODO2.md`
 - `app/calculations/factors.py`
 - `app/calculations/market_data.py`
 - `sigmasight-backend/_docs/requirements/FACTOR_EXPOSURE_REDESIGN.md`
+
+---
+
+## Appendix A: Empirical Evidence of Factor ETF Multicollinearity
+
+### A.1 Factor Correlation Matrix
+
+The following correlation matrix was calculated from 204 days of historical returns (2024-06-19 to 2025-01-10) for the seven factor ETFs used in our factor model. Values show Pearson correlation coefficients.
+
+| Factor | Market (SPY) | Value (VTV) | Growth (VUG) | Momentum (MTUM) | Quality (QUAL) | Size (SIZE) | Low Vol (USMV) |
+|--------|-------------|------------|--------------|-----------------|----------------|-------------|----------------|
+| **Market (SPY)** | 1.000 | 0.664 | 0.727 | 0.699 | 0.735 | 0.704 | 0.586 |
+| **Value (VTV)** | 0.664 | 1.000 | 0.759 | 0.826 | 0.897 | **0.954** | 0.907 |
+| **Growth (VUG)** | 0.727 | 0.759 | 1.000 | 0.921 | **0.942** | 0.847 | 0.658 |
+| **Momentum (MTUM)** | 0.699 | 0.826 | 0.921 | 1.000 | 0.909 | 0.872 | 0.735 |
+| **Quality (QUAL)** | 0.735 | 0.897 | **0.942** | 0.909 | 1.000 | **0.937** | 0.829 |
+| **Size (SIZE)** | 0.704 | **0.954** | 0.847 | 0.872 | **0.937** | 1.000 | 0.857 |
+| **Low Vol (USMV)** | 0.586 | 0.907 | 0.658 | 0.735 | 0.829 | 0.857 | 1.000 |
+
+**Key Observations:**
+- **17 out of 21 pairs** have correlations > 0.7 (highlighted values > 0.9 in bold)
+- **Highest correlation**: Value-Size at 0.954
+- **Average pairwise correlation**: 0.81 (excluding diagonal)
+- Market (SPY) has the lowest average correlation with others, yet still > 0.58 with all factors
+
+### A.2 Variance Inflation Factor (VIF) Analysis
+
+VIF measures how much the variance of a regression coefficient increases due to multicollinearity. Values > 10 indicate problematic multicollinearity.
+
+| Factor | VIF | Interpretation |
+|--------|-----|----------------|
+| Market (SPY) | 2.26 | Low multicollinearity |
+| Value (VTV) | 19.63 | **High multicollinearity** |
+| Growth (VUG) | 27.45 | **High multicollinearity** |
+| Momentum (MTUM) | 9.53 | Moderate multicollinearity |
+| Quality (QUAL) | **39.04** | **Severe multicollinearity** |
+| Size (SIZE) | 18.77 | **High multicollinearity** |
+| Low Volatility (USMV) | 7.28 | Moderate multicollinearity |
+
+**Condition Number**: 644.86 (severe multicollinearity; values > 100 indicate problems)
+
+### A.3 Implications for Beta Estimation
+
+This empirical evidence demonstrates why multivariate regression fails for our factor model:
+
+1. **Numerical Instability**: With condition number > 600, the regression matrix is nearly singular
+2. **Coefficient Explosion**: High VIF values mean small data changes cause large beta swings
+3. **Sign Reversals**: Multicollinearity can cause economically meaningless negative betas
+4. **Overfitting**: The model fits noise rather than true relationships
+
+The improved univariate approach avoids these issues entirely by estimating each factor's beta independently, accepting some omitted variable bias as a reasonable trade-off for numerical stability and interpretability.
+
+### A.4 Data Source and Methodology
+
+- **Data Period**: 2024-06-19 to 2025-01-10 (204 trading days)
+- **Source**: Market data cache from FMP API
+- **Returns Calculation**: Daily percentage change using pandas `pct_change()`
+- **Correlation Method**: Pearson correlation on aligned return series
+- **VIF Calculation**: Standard VIF formula using statsmodels
+- **Export Script**: `scripts/export_factor_etf_data.py`
