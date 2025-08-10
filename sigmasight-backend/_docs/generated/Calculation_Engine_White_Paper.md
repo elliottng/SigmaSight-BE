@@ -198,13 +198,52 @@ Today's Profit/Loss = Number of Shares × (Today's Price - Yesterday's Price) ×
 
 ### Market Data Integration
 
-**Where Does Price Data Come From?**
+**Current Data Sources and API Endpoints:**
 
-- **Primary Source**: FMP (Financial Modeling Prep) - professional data for stocks/ETFs
-- **Backup Source**: Polygon - specialized options data
-- **Storage**: We cache prices in our database for speed and reliability
-- **Frequency**: Updated daily with 5-day lookback for accuracy
-- **History**: We keep 150 days of history for trend analysis
+**1. FMP (Financial Modeling Prep) - Primary Stock/ETF Data**
+- **Endpoint**: `/api/v3/quote/{symbol}`
+  - Returns: Current price, volume, day change, 52-week range
+  - Usage: Real-time stock prices during market hours
+- **Endpoint**: `/api/v3/historical-price-full/{symbol}`
+  - Returns: Historical OHLCV data (Open, High, Low, Close, Volume)
+  - Usage: Factor analysis requires 252 trading days of history
+- **Status**: ✅ Fully operational
+
+**2. Polygon.io - Options & Backup Stock Data**
+- **Endpoint**: `/v2/aggs/ticker/{ticker}/prev`
+  - Returns: Previous day's OHLCV for stocks
+  - Usage: Backup when FMP unavailable
+- **Endpoint**: `/v3/reference/options/contracts` (NOT CURRENTLY ACCESSIBLE)
+  - Would return: Options chain with strikes, expirations, Greeks
+  - Status: ❌ No options chain access - critical limitation
+- **Endpoint**: `/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from}/{to}`
+  - Returns: Historical price aggregates
+  - Usage: Backup historical data source
+
+**3. FRED (Federal Reserve Economic Data) - Interest Rates**
+- **Library**: `fredapi` Python client
+- **Endpoint**: `fred.get_series('DGS10')`
+  - Returns: 10-Year Treasury Constant Maturity Rate
+  - Usage: Risk-free rate for Black-Scholes options pricing
+  - Format: Daily percentage rates (e.g., 4.25 = 4.25%)
+- **Endpoint**: `fred.get_series('DGS2')`
+  - Returns: 2-Year Treasury Constant Maturity Rate
+  - Usage: Short-term risk-free rate, yield curve analysis
+- **Endpoint**: `fred.get_series('DGS30')`
+  - Returns: 30-Year Treasury Rate
+  - Usage: Long-term rate sensitivity calculations
+- **Status**: ⚠️ API key configured but calculation bug causes $0 impact (units conversion issue)
+
+**4. Internal Cache (PostgreSQL)**
+- **Table**: `market_data_cache`
+  - Stores: 150+ days of price history per symbol
+  - Updates: Daily batch at 4:00 PM ET
+  - Purpose: Fast queries, reduced API calls, consistency
+
+**Data Limitations:**
+- **Options Data**: No access to live options chains, implied volatility, or market Greeks
+- **Interest Rates**: FRED integration has calculation bugs
+- **Frequency**: End-of-day only, no intraday updates
 
 ---
 
@@ -444,6 +483,12 @@ Think of factors as different "flavors" of market risk. We measure each factor u
 | **Size** | SIZE | Smaller company premium | Small-cap vs. large-cap performance |
 | **Low Volatility** | USMV | Stable, defensive stocks | Utilities and consumer staples |
 
+**Factor ETF Data Collection:**
+- These ETF prices are fetched daily via FMP's historical price endpoint
+- We maintain 252 trading days of history for regression analysis
+- Factor betas are calculated using ordinary least squares (OLS) regression
+- Data is cached in `market_data_cache` table for consistency
+
 ### Critical Discovery: The Correlation Problem
 
 **What We Found**: These factors are highly correlated, moving together in the same direction. When value stocks decline, size and quality factors often decline simultaneously, reducing diversification benefits.
@@ -459,6 +504,57 @@ Think of factors as different "flavors" of market risk. We measure each factor u
 - Like checking each car system separately rather than all at once
 
 ### How We Measure Factor Exposure
+
+**Step 1: Position-Level Factor Betas**
+
+For each individual position (stock or ETF), we calculate its sensitivity to each factor:
+
+```
+Position: AAPL (Apple Stock)
+Market Value: $50,000
+
+Factor Regression Results (252-day window):
+- Market Beta: 1.2 (moves 1.2x the S&P 500)
+- Growth Beta: 1.8 (high growth characteristics)
+- Momentum Beta: 1.5 (strong trending behavior)
+- Value Beta: -0.3 (negative - it's expensive, not value)
+- Quality Beta: 1.1 (profitable company)
+- Size Beta: -0.5 (large-cap, not small-cap)
+- Low Vol Beta: 0.2 (more volatile than defensive stocks)
+```
+
+**Step 2: Position Factor Exposures (Dollar Amounts)**
+
+```
+Factor Exposure = Position Market Value × Factor Beta
+
+AAPL Factor Exposures:
+- Market: $50,000 × 1.2 = $60,000 market exposure
+- Growth: $50,000 × 1.8 = $90,000 growth exposure
+- Momentum: $50,000 × 1.5 = $75,000 momentum exposure
+(etc. for all 7 factors)
+```
+
+**Step 3: Portfolio-Level Aggregation**
+
+Sum all position exposures for each factor:
+
+```
+Portfolio with 3 positions:
+- AAPL: $50,000 (Growth Beta = 1.8)
+- JPM: $30,000 (Value Beta = 1.2)
+- TSLA: $20,000 (Momentum Beta = 2.5)
+
+Portfolio Growth Exposure:
+= (AAPL: $50,000 × 1.8) + (JPM: $30,000 × 0.3) + (TSLA: $20,000 × 2.1)
+= $90,000 + $9,000 + $42,000
+= $141,000 total growth exposure
+
+Portfolio Growth Beta:
+= Total Growth Exposure / Portfolio Value
+= $141,000 / $100,000
+= 1.41 portfolio growth beta
+```
 
 **Beta - Your Sensitivity Score**
 
@@ -648,9 +744,7 @@ Next, we model how shocks spread to other factors through correlations:
 ### Real-World Example: Tech Sector Crash Scenario
 
 **Scenario**: Technology sector drops 30% (primary shock)
-
-**Your Portfolio**:
-- $1,000,000 total value
+**Your Portfolio**: $1,000,000 total value
 - Growth factor beta: 1.5 (high tech exposure)
 - Momentum factor beta: 0.8
 - Market factor beta: 1.1
@@ -662,9 +756,7 @@ Direct P&L = $1,000,000 × 1.5 × (-30%) = -$450,000
 ```
 
 **Phase 2 - Correlation Contagion (The Domino Effect)**:
-
 **Simple Version**: When tech crashes, it drags everything else down too. We calculate how much.
-
 ```
 What Actually Happens:
 - Tech crashes -30% (the trigger)
@@ -677,15 +769,60 @@ Correlated P&L:
 
 Total Scenario Impact: -$450,000 + -$204,000 + -$303,600 = -$957,600
 ```
-
 **Why This Matters**: 
 - A 30% tech crash doesn't just hit your tech stocks
 - Through correlations, it triggers a near-total portfolio loss (95.8%)
 - Without correlation modeling, you'd underestimate risk by 2x
 
-### The 99% Loss Cap
+### Issues Observed With Our Stress Testing Approach
 
-We cap losses at 99% of portfolio value. Why? Because in reality, exchanges would halt trading, margins would be called, and positions would be closed before 100% loss.
+**The Correlation Cascade Problem:**
+
+Our stress testing framework reveals concerning results that may be overly pessimistic due to three compounding factors:
+
+1. **Factor ETF Multicollinearity**
+   - Our 7 factor ETFs have correlations up to 95.4% (Value vs Size)
+   - When one factor crashes, our model assumes ALL correlated factors crash
+   - This creates unrealistic "everything goes to zero" scenarios
+
+2. **Correlation Contagion Methodology**
+   - We apply correlation shocks multiplicatively: if Tech crashes 30% and Tech-Momentum correlation is 85%, Momentum crashes 25.5%
+   - Then Momentum's crash triggers its own correlations, creating a cascade
+   - In reality, correlations often break down during crises (flight to quality)
+
+3. **Historical Correlation Assumptions**
+   - We use 252-day historical correlations, assuming they hold during stress events
+   - Academic research shows correlations increase during crashes but not linearly
+   - Our approach may overestimate contagion effects by 2-3x
+
+**Questions About Our Approach:**
+- Should we use conditional correlations (different in up vs down markets)?
+- Should we apply correlation decay (weaker correlations for secondary effects)?
+- Should we model correlation breakdown thresholds?
+- Are we double-counting risk through both factor betas AND correlation contagion?
+
+**Example of the Problem:**
+A 30% tech shock becomes a 95.8% portfolio loss through our correlation cascade. Historical data shows even the 2008 crisis "only" saw 50-60% drawdowns in aggressive portfolios.
+
+### The 99% Loss Cap (Temporary Solution)
+
+We cap losses at 99% of portfolio value as a pragmatic workaround for our correlation cascade problem.
+
+**Why We Need This Cap:**
+- Our correlation contagion model can produce losses exceeding 100%
+- Mathematical artifacts from multicollinearity create unrealistic scenarios
+- Without the cap, stress tests would show impossible negative portfolio values
+
+**What This Really Means:**
+- The cap masks a fundamental modeling issue we need to address
+- Results showing 99% loss likely mean our model calculated 100%+ loss
+- These extreme results suggest our correlation assumptions are too aggressive
+
+**Planned Improvements (Phase 2.7):**
+- Implement correlation decay for secondary effects
+- Add regime-switching correlations (bull vs bear markets)
+- Consider correlation floors and ceilings based on empirical data
+- Potentially move to copula-based dependency modeling
 
 ---
 
