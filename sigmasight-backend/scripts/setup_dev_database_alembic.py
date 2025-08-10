@@ -222,7 +222,7 @@ async def main():
     if success:
         print("\n🎉 Database setup complete!")
         print("\nNext steps:")
-        print("1. Run: uv run python scripts/seed_demo_users.py")
+        print("1. Run: uv run python scripts/seed_database.py")
         print("2. Start development: uv run python run.py")
         print("\nFor future schema changes:")
         print("1. Modify models in app/models/")

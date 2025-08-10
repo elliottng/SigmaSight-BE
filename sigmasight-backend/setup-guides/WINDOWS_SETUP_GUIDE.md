@@ -191,11 +191,11 @@ We'll install these tools in order:
    - When prompted, type `y` and press Enter to continue
    - Provides proper database versioning and rollback capabilities
 
-4. **Create demo users (optional):**
+4. **Seed demo data (optional):**
    ```bash
-   uv run python scripts/seed_demo_users.py
+   uv run python scripts/seed_database.py
    ```
-   - This creates three demo accounts:
+   - This creates three demo accounts and demo portfolios:
      - demo_individual@sigmasight.com (password: demo12345)
      - demo_hnw@sigmasight.com (password: demo12345)
      - demo_hedgefundstyle@sigmasight.com (password: demo12345)
@@ -305,8 +305,8 @@ uv sync
 # Set up database with Alembic migrations
 uv run python scripts/setup_dev_database_alembic.py
 
-# Seed demo users
-uv run python scripts/seed_demo_users.py
+# Seed demo data
+uv run python scripts/seed_database.py
 
 # Run authentication tests
 uv run python scripts/test_auth.py

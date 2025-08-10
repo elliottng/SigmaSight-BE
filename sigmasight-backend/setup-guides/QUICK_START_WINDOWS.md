@@ -33,7 +33,7 @@ DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigma
 ```bash
 docker-compose up -d
 uv run python scripts/setup_dev_database_alembic.py
-uv run python scripts/seed_demo_users.py
+uv run python scripts/seed_database.py
 ```
 
 Demo accounts created:

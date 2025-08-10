@@ -46,7 +46,7 @@ DEMO_USERS = [
 DEMO_PORTFOLIOS = [
     {
         "user_email": "demo_individual@sigmasight.com",
-        "portfolio_name": "Balanced Individual Investor Portfolio",
+        "portfolio_name": "Demo Individual Investor Portfolio",
         "description": "Individual investor with 401k, IRA, and taxable accounts. Core holdings with growth tilt, heavy mutual fund allocation.",
         "total_value": 485000,
         "positions": [
@@ -75,7 +75,7 @@ DEMO_PORTFOLIOS = [
     },
     {
         "user_email": "demo_hnw@sigmasight.com", 
-        "portfolio_name": "Sophisticated High Net Worth Portfolio",
+        "portfolio_name": "Demo High Net Worth Investor Portfolio",
         "description": "High net worth individual with access to private investments. Diversified across public markets with alternative investments.",
         "total_value": 2850000,
         "positions": [
@@ -105,7 +105,7 @@ DEMO_PORTFOLIOS = [
     },
     {
         "user_email": "demo_hedgefundstyle@sigmasight.com",
-        "portfolio_name": "Long/Short Equity Hedge Fund Style Portfolio", 
+        "portfolio_name": "Demo Hedge Fund Style Investor Portfolio", 
         "description": "Sophisticated trader with derivatives access. Market-neutral with volatility trading and options overlay.",
         "total_value": 3200000,
         "positions": [
@@ -191,7 +191,7 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
-        raise ValueError(f"Demo user not found: {email}. Run scripts/seed_demo_users.py first.")
+        raise ValueError(f"Demo user not found: {email}. Run scripts/seed_database.py first.")
     return user
 
 async def get_or_create_tag(db: AsyncSession, user_id: str, tag_name: str) -> Tag:

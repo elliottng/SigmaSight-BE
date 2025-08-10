@@ -26,8 +26,8 @@ docker-compose up -d
 # Set up database using proper Alembic migrations
 uv run python scripts/setup_dev_database_alembic.py
 
-# Add demo users for testing
-uv run python scripts/seed_demo_users.py
+# Seed demo data (users, portfolios, factors, security master, prices)
+uv run python scripts/seed_database.py
 ```
 
 ### 3. Verify Setup
@@ -69,7 +69,7 @@ uv run python run.py
 
 ## Why This Approach?
 
-### ✅ Benefits for Professional Development:
+### Benefits for Professional Development:
 - **Database versioning**: Full history of all schema changes
 - **Rollback capability**: Can undo problematic migrations safely
 - **Team coordination**: Clear migration files show what changed and when
@@ -77,7 +77,7 @@ uv run python run.py
 - **Change tracking**: Alembic tracks exactly what was applied when
 - **Industry standard**: Professional teams expect Alembic workflows
 
-### ✅ Migration Advantages:
+### Migration Advantages:
 - **Incremental updates**: Only apply changes since last migration
 - **Data preservation**: Migrations can transform data during schema changes
 - **Conflict resolution**: Team members can coordinate schema changes through git
@@ -132,8 +132,7 @@ alembic upgrade head
 ```
 scripts/
 ├── setup_dev_database_alembic.py  # Professional Alembic-based setup
-├── init_database.py          # Legacy script (kept for compatibility)
-├── seed_demo_users.py        # Demo data creation
+├── seed_database.py          # Orchestrated demo data creation
 └── test_api_providers/       # Section 1.4.9 testing scripts
 
 app/models/                    # All database models (source of truth)

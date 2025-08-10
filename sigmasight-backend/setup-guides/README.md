@@ -10,8 +10,9 @@ SigmaSight is a sophisticated portfolio analytics platform designed for options 
 
 - **Windows Users**: See [WINDOWS_SETUP_GUIDE.md](WINDOWS_SETUP_GUIDE.md) for detailed instructions
 - **Quick Reference**: See [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) for a one-page guide
-- **Mac/Linux Users**: Continue reading below
-- **🤖 AI Agents**: See [AI_AGENT_REFERENCE.md](AI_AGENT_REFERENCE.md) for comprehensive codebase reference
+- **Mac Users**: See [MAC_INSTALL_GUIDE.md](MAC_INSTALL_GUIDE.md) for detailed instructions
+- **Linux Users**: Continue reading below
+- **🤖 AI Agents**: See [../AI_AGENT_REFERENCE.md](../AI_AGENT_REFERENCE.md) for comprehensive codebase reference
 
 FastAPI backend for SigmaSight portfolio risk management platform.
 
@@ -95,6 +96,16 @@ This will:
 cp .env.example .env
 ```
 
+**Windows (Command Prompt):**
+```cmd
+copy .env.example .env
+```
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
+```
+
 2. **Edit .env file** (optional for basic testing):
    - The default values work for local development
    - You can leave it as-is for now
@@ -135,20 +146,20 @@ uv run python scripts/setup_dev_database_alembic.py
 uv run alembic upgrade head
 ```
 
-5. **Seed demo users (optional):**
+5. **Seed demo data (optional):**
 ```bash
-uv run python scripts/seed_demo_users.py
+uv run python scripts/seed_database.py
 ```
 
-This creates three demo users:
-- demo_individual@sigmasight.com (password: demo12345)
-- demo_hnw@sigmasight.com (password: demo12345)
-- demo_hedgefundstyle@sigmasight.com (password: demo12345)
+This creates the three demo accounts and portfolios:
+- demo_individual@sigmasight.com (password: demo12345) — "Demo Individual Investor Portfolio" (16 positions)
+- demo_hnw@sigmasight.com (password: demo12345) — "Demo High Net Worth Investor Portfolio" (17 positions)
+- demo_hedgefundstyle@sigmasight.com (password: demo12345) — "Demo Hedge Fund Style Investor Portfolio" (30 positions)
 
 **Option B: Use Existing PostgreSQL**
 1. Update DATABASE_URL in .env file with your PostgreSQL connection
 2. Set up database: `uv run python scripts/setup_dev_database_alembic.py`
-3. Optionally seed demo users: `uv run python scripts/seed_demo_users.py`
+3. Optionally seed demo data: `uv run python scripts/seed_database.py`
 
 **Note:** The database is required for authentication, portfolio management, and all core features.
 
@@ -238,7 +249,7 @@ Run this checklist to ensure identical setup:
 - [ ] Environment file created (`.env` exists with correct DATABASE_URL)
 - [ ] PostgreSQL container running (`docker-compose ps` shows postgres as "Up")
 - [ ] Database migrations applied (`uv run alembic upgrade head` succeeded)
-- [ ] Demo users seeded (optional: `uv run python scripts/seed_demo_users.py`)
+- [ ] Demo data seeded (optional: `uv run python scripts/seed_database.py`)
 - [ ] Server starts without errors (`uv run python run.py`)
 - [ ] API responds at http://localhost:8000
 - [ ] API documentation loads at http://localhost:8000/docs

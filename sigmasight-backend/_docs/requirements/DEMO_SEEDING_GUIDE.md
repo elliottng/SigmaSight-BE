@@ -39,7 +39,6 @@ python scripts/reset_and_seed.py validate
 python scripts/seed_database.py
 
 # Run individual components
-python scripts/seed_demo_users.py
 python app/db/seed_demo_portfolios.py
 python app/db/seed_security_master.py
 python app/db/seed_initial_prices.py
@@ -142,7 +141,7 @@ Once Section 1.6 Batch Processing Framework is implemented:
 ### Common Issues
 1. **Import Errors**: Ensure you're in the project root directory
 2. **Database Connection**: Check .env file has correct DATABASE_URL
-3. **Missing Users**: Run `python scripts/seed_demo_users.py` first
+3. **Missing Users**: Run `python scripts/seed_database.py` first
 4. **API Errors**: Demo seeding uses mock data, so API failures are handled gracefully
 
 ### Reset Process
@@ -152,7 +151,6 @@ If demo environment gets corrupted:
 python scripts/reset_and_seed.py reset --confirm
 
 # Or safer incremental approach
-python scripts/seed_demo_users.py
 python scripts/seed_database.py
 ```
 
@@ -168,7 +166,7 @@ app/db/
 
 scripts/
 ├── seed_database.py         # Master orchestration
-├── seed_demo_users.py       # 3 demo user accounts
+├── (seed_demo_users.py removed) # consolidated into seed_database.py
 └── reset_and_seed.py        # Reset & validation utilities
 ```
 

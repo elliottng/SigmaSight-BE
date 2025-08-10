@@ -169,7 +169,7 @@ sigmasight-backend/
 - [x] Create user registration endpoint (admin-only initially) *(POST /auth/register with auto portfolio creation)*
 - [x] Create login endpoint with email/password *(POST /auth/login returning JWT token)*
 - [x] Implement token refresh mechanism *(POST /auth/refresh, V1 simple token renewal)*
-- [x] Create demo user seeding script *(scripts/seed_demo_users.py with 3 demo users)*
+- [x] Create unified demo data seeding script *(scripts/seed_database.py orchestrates users, portfolios, factors, security master, prices)*
 - [x] Add authentication dependencies to protected routes *(app/core/dependencies.py, portfolio endpoints protected)*
 - [x] Complete authentication testing: ✅ ALL TESTS PASSING (2025-07-15)
   - [x] Test user registration flow (email validation, password hashing, portfolio creation)
@@ -188,7 +188,7 @@ sigmasight-backend/
   - [x] Update FactorDefinition model to match addendum (add etf_proxy, display_order fields) *(Migration applied)*
   - [x] Update market_data_cache to include sector/industry fields *(Already implemented)*
 - [x] Create database seeding scripts:
-  - [x] Demo users (demo_growth, demo_value, demo_balanced) *(scripts/seed_demo_users.py ready)*
+  - [x] Demo users and portfolios (demo_individual, demo_hnw, demo_hedgefundstyle) *(seeded via scripts/seed_database.py)*
   - [ ] Sample portfolios with strategy characteristics *(Deferred to section 1.5)*
   - [ ] Historical positions (90 days) *(Deferred to section 1.5)*
   - [ ] Pre-calculated risk metrics *(Deferred to section 1.5)*
@@ -1416,7 +1416,7 @@ This approach provides the best of both worlds: fast, conflict-free development 
 
 - [x] **Core Seeding Infrastructure** *(Required for any demo)*
   - [x] `app/db/seed_factors.py` - Seeds 8 factor definitions (Market Beta, Momentum, Value, Growth, Quality, Size, Low Volatility, Short Interest)
-  - [x] `scripts/seed_demo_users.py` - 3 demo user accounts (demo_individual, demo_hnw, demo_hedgefundstyle)
+  - [x] `app/db/seed_demo_portfolios.py` - Creates 3 demo portfolios and their users
   - [x] `scripts/seed_database.py` - Master orchestration script with proper dependency ordering
 
 - [x] **Demo Portfolio Structure** *(3 sophisticated portfolios from Ben Mock Portfolios.md)*
@@ -1491,33 +1491,28 @@ This approach provides the best of both worlds: fast, conflict-free development 
 **📁 Current Seeding Files**:
 ```
 scripts/
-├── seed_demo_users.py          # ❌ OBSOLETE - Creates users only, conflicts with others
-├── seed_database.py            # ❌ BROKEN - Tries to orchestrate but fails on portfolio conflicts  
-├── reset_and_seed.py           # ❓ UNKNOWN STATUS - May be obsolete
-└── fix_demo_user_consistency.py # ❌ TEMPORARY - One-time fix script, should be deleted
+├── seed_database.py            # ✅ Master orchestration (authoritative)
+└── reset_and_seed.py           # ✅ Reset + validation utility (uses seed_database.py)
 
 app/db/
-├── seed_demo_portfolios.py     # ✅ CORRECT DESIGN - Should create 63 positions but fails due to conflicts
-├── seed_factors.py             # ✅ WORKING - 8 factor definitions
-├── seed_initial_prices.py      # ✅ WORKING - Market data cache
-└── seed_security_master.py     # ✅ WORKING - Security classifications
+├── seed_demo_portfolios.py     # ✅ Creates 3 demo users & portfolios (16/17/30 positions)
+├── seed_factors.py             # ✅ Seeds 8 factor definitions
+├── seed_initial_prices.py      # ✅ Seeds market data cache
+└── seed_security_master.py     # ✅ Seeds security classifications
 
-docs/
-└── DEMO_SEEDING_GUIDE.md       # ❓ UNKNOWN STATUS - May be outdated
+_docs/requirements/
+└── DEMO_SEEDING_GUIDE.md       # ✅ Up-to-date demo seeding instructions
 ```
 
 #### Cleanup & Fix Plan:
 
 **Step 1: Inventory & Analysis** ✅ **COMPLETED**
 - [x] **Document current seeding script status** - Tested each script, identified conflicts and redundancies
-- [x] **Identify obsolete scripts** - Marked seed_demo_users.py and fix_demo_user_consistency.py for deletion  
 - [x] **Verify demo data expectations** - Confirmed 63 position requirement vs actual database state
 - [x] **Check if reset_and_seed.py works** - Verified as intended single authoritative script with validation
 
 **Step 2: Script Consolidation** ✅ **COMPLETED**
 - [x] **Delete obsolete development scripts**:
-  - [x] Remove `scripts/seed_demo_users.py` (redundant - consolidated into portfolio script)
-  - [x] Remove `scripts/fix_demo_user_consistency.py` (one-time use, completed)
   - [x] Keep `scripts/seed_database.py` and fix orchestration logic
 - [x] **Fix seed_database.py orchestration**:
   - [x] Fixed import issues by consolidating user creation into app/db/seed_demo_portfolios.py
@@ -1599,8 +1594,6 @@ python scripts/reset_and_seed.py seed
 ```
 
 **Files Modified**:
-- `scripts/seed_demo_users.py` → **DELETED** (consolidated)
-- `scripts/fix_demo_user_consistency.py` → **DELETED** (obsolete)
 - `app/db/seed_demo_portfolios.py` → **Enhanced** (added user creation)
 - `alembic/versions/714625d883d9_*.py` → **Fixed** (asymmetric downgrade)
 - `scripts/reset_and_seed.py` → **Fixed** (config imports, error handling)

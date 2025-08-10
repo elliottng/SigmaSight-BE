@@ -2,7 +2,7 @@
 
 **Quick Start**: See [setup-guides/README.md](setup-guides/README.md) for installation instructions.
 
-**Development**: See [dev-docs/AI_AGENT_REFERENCE.md](dev-docs/AI_AGENT_REFERENCE.md) for codebase reference.
+**Development**: See [AI_AGENT_REFERENCE.md](AI_AGENT_REFERENCE.md) for codebase reference.
 
 **Project Status**: See [TODO1.md](TODO1.md) and [TODO2.md](TODO2.md) for current development progress.
 
@@ -13,7 +13,9 @@ FastAPI backend for SigmaSight portfolio risk analytics platform with 8 calculat
 ## 🚀 Quick Links
 
 - **[Setup Guide](setup-guides/README.md)** - Complete installation and environment setup
-- **[Development Guide](dev-docs/AI_AGENT_REFERENCE.md)** - Architecture and codebase reference  
+- **[Development Guide](AI_AGENT_REFERENCE.md)** - Architecture and codebase reference  
+- **[Windows Setup Guide](setup-guides/WINDOWS_SETUP_GUIDE.md)** - Step-by-step Windows instructions
+- **[Mac Install Guide](setup-guides/MAC_INSTALL_GUIDE.md)** - Step-by-step macOS instructions
 - **[Project Status](TODO1.md)** - Current development progress and known issues
 
 ## 🎯 System Status

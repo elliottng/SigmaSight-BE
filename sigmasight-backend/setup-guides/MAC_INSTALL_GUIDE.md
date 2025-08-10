@@ -247,17 +247,16 @@ EOF
 # Run professional Alembic database setup
 uv run python scripts/setup_dev_database_alembic.py
 
-# Create demo users for testing (optional but recommended)
-if [ -f scripts/seed_demo_users.py ]; then
-    uv run python scripts/seed_demo_users.py
-    echo "✅ Demo users created:"
-    echo "  - Email: demo_individual@sigmasight.com | Password: demo12345"
-    echo "  - Email: demo_hnw@sigmasight.com | Password: demo12345"
-    echo "  - Email: demo_hedgefundstyle@sigmasight.com | Password: demo12345"
-    echo ""
-    echo "Note: These demo accounts represent different investment strategies:"
-    echo "  • Growth: Tech-heavy, momentum plays, some options"
-    echo "  • Value: Traditional value investing"
+# Seed demo data (optional but recommended)
+uv run python scripts/seed_database.py
+echo "✅ Demo data created:"
+echo "  - Demo Individual Investor Portfolio (16 positions): demo_individual@sigmasight.com / demo12345"
+echo "  - Demo High Net Worth Investor Portfolio (17 positions): demo_hnw@sigmasight.com / demo12345"
+echo "  - Demo Hedge Fund Style Investor Portfolio (30 positions): demo_hedgefundstyle@sigmasight.com / demo12345"
+echo ""
+echo "Note: These demo accounts represent different investment strategies:"
+echo "  • Growth: Tech-heavy, momentum plays, some options"
+echo "  • Value: Traditional value investing"
     echo "  • Balanced: Mixed strategies with pairs trades and hedges"
 fi
 ```
@@ -666,8 +665,8 @@ git pull
 uv sync
 uv run python scripts/setup_dev_database_alembic.py
 
-# Seed demo users
-uv run python scripts/seed_demo_users.py
+# Seed demo data
+uv run python scripts/seed_database.py
 
 # Run authentication tests
 uv run python scripts/test_auth.py
@@ -725,7 +724,7 @@ If the AI agent encounters issues it cannot resolve:
 
 ### Demo User Credentials
 The current implementation uses:
-- Password: `demo12345` (as implemented in seed_demo_users.py)
+- Password: `demo12345` (as implemented in scripts/seed_database.py)
 - Note: Design docs originally specified `demo123`, but implementation uses `demo12345`
 
 ### User Model
