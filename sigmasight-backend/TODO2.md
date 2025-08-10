@@ -1579,6 +1579,218 @@ signed_exposure = exposure  # Exposure already has correct sign from batch
 
 ---
 
+## Phase 2.10: Report Generator Enhancements - Add Pre-Computed Data
+*Add already-calculated batch data to reports without new calculations*
+**Created**: 2025-08-10
+**Status**: Planning
+
+### Background
+During batch processing, we calculate extensive risk metrics that aren't currently included in reports. These metrics are already computed and stored in database tables - we just need to fetch and format them. Adding these would provide richer insights without any performance impact.
+
+### 2.10.1 Add Market Risk Scenarios
+**Table**: `MarketRiskScenario`
+**Already Contains**: Scenario P&L for ±5%, ±10%, ±20% market moves
+**Report Addition**:
+```markdown
+### Market Risk Scenarios
+| Scenario | Expected P&L | Impact % |
+|----------|-------------|----------|
+| Market +20% | $XXX,XXX | +XX.X% |
+| Market +10% | $XXX,XXX | +XX.X% |
+| Market -10% | $(XXX,XXX) | -XX.X% |
+| Market -20% | $(XXX,XXX) | -XX.X% |
+```
+
+#### Tasks
+- [ ] Query MarketRiskScenario table in _collect_report_data()
+- [ ] Add market_risk section to Markdown template
+- [ ] Add market_risk fields to JSON export
+- [ ] Add market_risk columns to CSV export
+- [ ] Test with all 3 demo portfolios
+
+### 2.10.2 Add Top Stress Test Results
+**Table**: `StressTestResult`
+**Already Contains**: P&L for 15 predefined stress scenarios
+**Report Addition**: Show top 3 worst-case scenarios
+```markdown
+### Stress Test Results (Top 3 Risks)
+1. **Tech Bubble Burst**: -$XXX,XXX (-XX.X%)
+2. **Equity Market Crash**: -$XXX,XXX (-XX.X%)
+3. **Flight to Quality**: -$XXX,XXX (-XX.X%)
+```
+
+#### Tasks
+- [ ] Query StressTestResult table, sort by impact
+- [ ] Add stress_tests section to Markdown template
+- [ ] Include scenario descriptions and impacts
+- [ ] Add to JSON with full scenario details
+- [ ] Consider adding warning thresholds
+
+### 2.10.3 Add Factor Correlation Matrix
+**Table**: `FactorCorrelation`
+**Already Contains**: Correlation matrix between 7 factors
+**Report Addition**: Show factor correlations affecting portfolio
+```markdown
+### Factor Correlations
+High correlations between your factor exposures:
+- Growth ↔ Momentum: 0.85
+- Value ↔ Size: 0.95
+- Market ↔ Growth: 0.72
+```
+
+#### Tasks
+- [ ] Query FactorCorrelation for portfolio's factors
+- [ ] Filter for correlations > 0.7 (significant)
+- [ ] Add to risk section of report
+- [ ] Consider visual representation for MD format
+
+### Success Criteria
+- [ ] Zero new calculations in report generator
+- [ ] All data fetched from existing batch results
+- [ ] Report generation time unchanged (<3 seconds)
+- [ ] New sections appear in all 3 formats (MD/JSON/CSV)
+
+### Estimated Timeline
+- Database queries: 0.5 days
+- Template updates: 0.5 days
+- Testing: 0.5 days
+- **Total: 1.5 days**
+
+---
+
+## Phase 2.11: PortfolioMetrics Table Design
+*Persistent storage for portfolio-level aggregations to eliminate recalculation*
+**Created**: 2025-08-10
+**Status**: Proposal - NOT YET APPROVED
+
+### Situation Analysis
+
+**Current Problem**:
+The report generator recalculates portfolio-level metrics on every report generation:
+```python
+# Line 460-461 in portfolio_report_generator.py
+exposures = calculate_portfolio_exposures(position_data)  # ~500ms
+greeks_aggregated = aggregate_portfolio_greeks(position_data)  # ~300ms
+```
+
+These calculations:
+1. Run on every report request (multiple times daily per portfolio)
+2. Produce identical results for the same batch run
+3. Add ~800ms to report generation time
+4. Create unnecessary database load
+
+**Evidence of Inefficiency**:
+- Same calculations in batch_orchestrator_v2.py lines 334-387 (portfolio_aggregation)
+- Results discarded after batch, recalculated in reports
+- 3 portfolios × 365 days × 2 calculations = 2,190 redundant calculations/year
+
+### Rationale for New Table
+
+**Why Not Use Existing Tables?**
+
+1. **PortfolioSnapshot**: Already stores P&L and value metrics, but not exposures/Greeks
+   - Adding 15+ columns would bloat the table
+   - Different update frequencies (snapshots are immutable, metrics could be recalculated)
+
+2. **Separate Tables per Metric**: Would require multiple joins
+   - PortfolioExposures + PortfolioGreeks + PortfolioCounts = 3 joins
+   - More complex queries and maintenance
+
+3. **Single PortfolioMetrics Table**: Best option
+   - One join for all aggregate metrics
+   - Clear separation of concerns (metrics vs snapshots)
+   - Easier to version and update calculation logic
+
+### 2.11.1 Database Schema Design
+
+**Note**: This schema is proposed but NOT YET APPROVED for implementation.
+
+```sql
+CREATE TABLE portfolio_metrics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    portfolio_id UUID NOT NULL REFERENCES portfolios(id),
+    calculation_date DATE NOT NULL,
+    
+    -- Exposure Metrics (from calculate_portfolio_exposures)
+    gross_exposure DECIMAL(20, 2),
+    net_exposure DECIMAL(20, 2),
+    long_exposure DECIMAL(20, 2),
+    short_exposure DECIMAL(20, 2),
+    options_exposure DECIMAL(20, 2),
+    stock_exposure DECIMAL(20, 2),
+    notional_exposure DECIMAL(20, 2),
+    
+    -- Greeks Aggregations (from aggregate_portfolio_greeks)
+    portfolio_delta DECIMAL(10, 4),
+    portfolio_gamma DECIMAL(10, 4),
+    portfolio_theta DECIMAL(10, 4),
+    portfolio_vega DECIMAL(10, 4),
+    portfolio_rho DECIMAL(10, 4),
+    
+    -- Position Counts (currently recalculated in report)
+    position_count INTEGER,
+    long_count INTEGER,
+    short_count INTEGER,
+    options_count INTEGER,
+    stock_count INTEGER,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    calculation_version VARCHAR(10),  -- Track calculation logic version
+    
+    -- Constraints
+    UNIQUE(portfolio_id, calculation_date),
+    INDEX idx_portfolio_date (portfolio_id, calculation_date DESC)
+);
+```
+
+### 2.11.2 Implementation Tasks
+
+#### Tasks (IF APPROVED)
+- [ ] Get approval for schema addition
+- [ ] Create Alembic migration
+- [ ] Create SQLAlchemy model
+- [ ] Update batch_orchestrator_v2._calculate_portfolio_aggregation() to persist
+- [ ] Update batch_orchestrator_v2._calculate_greeks() to persist aggregates
+- [ ] Modify report generator to check PortfolioMetrics first
+- [ ] Add fallback to calculation if metrics not found
+- [ ] Backfill historical data from existing calculations
+
+### 2.11.3 Performance Impact
+
+**Expected Improvements**:
+- Report generation: 3 seconds → 2.2 seconds (27% faster)
+- Database load: Reduce by ~2,000 queries/year
+- Consistency: Guaranteed same values across all report formats
+
+**Storage Cost**:
+- ~100 bytes per portfolio per day
+- 3 portfolios × 365 days × 100 bytes = ~110 KB/year
+- Negligible compared to market_data_cache
+
+### Success Criteria
+- [ ] Approval from technical lead
+- [ ] Report generation <2.5 seconds
+- [ ] Zero recalculation in report generator
+- [ ] Backward compatibility maintained
+- [ ] Historical backfill completed
+
+### Estimated Timeline (IF APPROVED)
+- Schema design review: 1 day
+- Implementation: 2 days
+- Testing & validation: 1 day
+- Historical backfill: 0.5 days
+- **Total: 4.5 days**
+
+### Decision Required
+**Question for Technical Lead**: Should we proceed with adding the PortfolioMetrics table, or would you prefer to:
+1. Continue with recalculation (status quo)
+2. Extend PortfolioSnapshot table instead
+3. Use a different approach (Redis cache, etc.)
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 
