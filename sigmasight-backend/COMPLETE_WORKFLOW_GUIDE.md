@@ -47,8 +47,8 @@ This creates all necessary tables for calculations, snapshots, correlations, etc
 ## Step 3: Create Demo Accounts and Portfolios
 
 ```bash
-# Run the seeding script
-uv run python scripts/seed_database.py
+# Use the bulletproof demo setup (avoids async/sync issues)
+uv run python scripts/setup_minimal_demo.py
 ```
 
 This creates:
@@ -56,11 +56,16 @@ This creates:
   - `demo_individual@sigmasight.com` (password: demo12345)
   - `demo_hnw@sigmasight.com` (password: demo12345)
   - `demo_hedgefundstyle@sigmasight.com` (password: demo12345)
+- **3 Demo Portfolios** ready for calculations and reports
 
-- **3 Demo Portfolios** with 63 total positions:
-  - Individual Investor Portfolio (21 positions)
-  - High Net Worth Portfolio (21 positions)
-  - Hedge Fund Style Portfolio (21 positions)
+## Step 3.1: Validate Setup (Recommended)
+
+```bash
+# Run comprehensive validation
+uv run python scripts/validate_setup.py
+```
+
+Expected output: `📊 Validation Summary: 8/8 checks passed`
 
 ---
 

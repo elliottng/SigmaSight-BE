@@ -127,20 +127,25 @@ uv --version       # Should show UV version
 
 ### Step 3: Create and Configure Environment File
 
-```bash
-# Create .env from example
-cp .env.example .env
+⚠️ **IMPORTANT**: We'll create a clean .env file that matches the current application settings to avoid configuration conflicts.
 
-# Update database credentials to match docker-compose.yml
-cat > .env << 'EOF'
+```bash
+# Generate a secure secret key
+SECRET_KEY=$(openssl rand -hex 32)
+
+# Create clean .env file with correct settings
+cat > .env << EOF
 # Database Configuration (matches docker-compose.yml)
 DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
 
-# Market Data API Keys (optional for basic testing)
+# Market Data API Keys (required for full functionality)
 POLYGON_API_KEY=your_polygon_api_key_here
+FMP_API_KEY=your_fmp_api_key_here
+TRADEFEEDS_API_KEY=your_tradefeeds_api_key_here
+FRED_API_KEY=your_fred_api_key_here
 
-# JWT Configuration (generate a secure key)
-SECRET_KEY=$(openssl rand -hex 32)
+# JWT Configuration
+SECRET_KEY=$SECRET_KEY
 
 # Application Settings
 DEBUG=true
@@ -155,6 +160,7 @@ echo "✅ Environment file created with development settings"
 ```bash
 test -f .env && echo "✅ .env file exists" || echo "❌ .env file missing"
 grep DATABASE_URL .env  # Should show the PostgreSQL connection string
+grep SECRET_KEY .env | grep -v "your_secret_key_here" && echo "✅ SECRET_KEY generated" || echo "❌ SECRET_KEY not generated"
 ```
 
 ### Step 4: Install Python Dependencies
@@ -247,18 +253,14 @@ EOF
 # Run professional Alembic database setup
 uv run python scripts/setup_dev_database_alembic.py
 
-# Seed demo data (optional but recommended)
-uv run python scripts/seed_database.py
-echo "✅ Demo data created:"
-echo "  - Demo Individual Investor Portfolio (16 positions): demo_individual@sigmasight.com / demo12345"
-echo "  - Demo High Net Worth Investor Portfolio (17 positions): demo_hnw@sigmasight.com / demo12345"
-echo "  - Demo Hedge Fund Style Investor Portfolio (30 positions): demo_hedgefundstyle@sigmasight.com / demo12345"
-echo ""
-echo "Note: These demo accounts represent different investment strategies:"
-echo "  • Growth: Tech-heavy, momentum plays, some options"
-echo "  • Value: Traditional value investing"
-    echo "  • Balanced: Mixed strategies with pairs trades and hedges"
-fi
+# Create demo users with bulletproof script (avoids async/sync issues)
+echo "Creating demo users..."
+uv run python scripts/setup_minimal_demo.py
+
+echo "✅ Demo users created successfully:"
+echo "  • demo_individual@sigmasight.com / demo12345 - Individual investor portfolio"
+echo "  • demo_hnw@sigmasight.com / demo12345 - High net worth investor portfolio"  
+echo "  • demo_hedgefundstyle@sigmasight.com / demo12345 - Hedge fund style portfolio"
 ```
 
 **Verification**:
@@ -384,36 +386,37 @@ curl -s http://localhost:8000/health | python -m json.tool || echo "❌ Server n
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs | grep -q "200" && echo "✅ API docs available at http://localhost:8000/docs" || echo "❌ API docs not accessible"
 ```
 
-### Step 8: Run Tests (Recommended)
+### Step 8: Validate Complete Setup
+
+Run our comprehensive setup validation:
 
 ```bash
-# Run all tests
-uv run pytest tests/ -v
-
-# Run specific test categories
-uv run pytest tests/test_main.py -v  # Basic API tests
-uv run pytest tests/test_market_data_service.py -v  # Market data tests
-uv run pytest tests/test_portfolio_aggregation.py -v  # Portfolio tests
-
-# Test authentication system (if demo users were created)
-if [ -f scripts/test_auth.py ]; then
-    uv run python scripts/test_auth.py
-    echo "Authentication tests complete - should show 'Success Rate: 100%'"
-fi
-
-# Check code quality
-uv run black app/ --check
-uv run flake8 app/
+# Run complete setup validation
+uv run python scripts/validate_setup.py
 ```
 
-**Verification**:
+This will check:
+- ✅ Python 3.11+ installation
+- ✅ UV package manager 
+- ✅ Docker and PostgreSQL status
+- ✅ Environment configuration
+- ✅ Virtual environment and dependencies
+- ✅ API server responsiveness
+- ✅ Demo user accounts
+
+**Expected Output**:
+```
+📊 Validation Summary: 8/8 checks passed
+🎉 All checks passed! SigmaSight is ready to use.
+```
+
+### Step 9: Run Basic Tests (Optional)
+
 ```bash
-# Check test results
-if uv run pytest tests/test_main.py -q 2>/dev/null; then
-    echo "✅ Basic tests passing"
-else
-    echo "⚠️ Some tests failing (may be expected without full configuration)"
-fi
+# Run core API tests
+uv run pytest tests/test_main.py -v
+
+# Expected results: 3/5 tests pass (auth tests fail without valid login data)
 ```
 
 ## 🧪 Complete System Validation

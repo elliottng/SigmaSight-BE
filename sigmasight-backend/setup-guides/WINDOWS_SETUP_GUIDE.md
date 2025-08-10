@@ -151,29 +151,31 @@ We'll install these tools in order:
    - This creates a virtual environment and installs all dependencies
    - Wait for "Installed X packages" message
 
-2. **Set up configuration:**
+2. **Create clean configuration file:**
    ```bash
-   copy .env.example .env
+   echo # Database Configuration > .env
+   echo DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db >> .env
+   echo. >> .env
+   echo # Market Data API Keys >> .env
+   echo POLYGON_API_KEY=your_polygon_api_key_here >> .env
+   echo FMP_API_KEY=your_fmp_api_key_here >> .env
+   echo TRADEFEEDS_API_KEY=your_tradefeeds_api_key_here >> .env
+   echo FRED_API_KEY=your_fred_api_key_here >> .env
+   echo. >> .env
+   echo # JWT Configuration >> .env
+   echo SECRET_KEY=your_generated_secret_key_here >> .env
+   echo. >> .env
+   echo # Application Settings >> .env
+   echo DEBUG=true >> .env
+   echo ENVIRONMENT=development >> .env
+   echo LOG_LEVEL=INFO >> .env
    ```
-   - This creates your configuration file
+   - This creates a clean configuration file without conflicts
 
-3. **Configure API Keys and Database:**
-   - Open `.env` file in Notepad
-   - Update these settings:
-   ```
-   # Database (keep as-is for local development)
-   DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
-   
-   # Market Data API Keys
-   FMP_API_KEY=your_actual_fmp_key_here  # REQUIRED - Get free key at https://site.financialmodelingprep.com/developer/docs
-   POLYGON_API_KEY=dummy_key_not_used    # Can use dummy value if only using FMP
-   FRED_API_KEY=your_fred_key_here       # Optional - For interest rates
-   
-   # Security
-   SECRET_KEY=your_secret_key_here       # Generate with: openssl rand -hex 32
-   ```
-   - Save and close the file
-   - **Note**: FMP_API_KEY is required for market data to work
+3. **Generate secure secret key:**
+   - If you have Git Bash: `openssl rand -hex 32`
+   - Or use any 64-character random string
+   - Replace `your_generated_secret_key_here` in .env with the generated key
 
 ---
 
@@ -200,13 +202,13 @@ We'll install these tools in order:
    - When prompted, type `y` and press Enter to continue
    - Provides proper database versioning and rollback capabilities
 
-4. **Seed demo data (optional):**
+4. **Create demo users (bulletproof method):**
    ```bash
-   uv run python scripts/seed_database.py
+   uv run python scripts/setup_minimal_demo.py
    ```
-   - This creates three demo accounts and demo portfolios:
+   - This creates three demo accounts without async/sync issues:
      - demo_individual@sigmasight.com (password: demo12345)
-     - demo_hnw@sigmasight.com (password: demo12345)
+     - demo_hnw@sigmasight.com (password: demo12345)  
      - demo_hedgefundstyle@sigmasight.com (password: demo12345)
 
 ---
@@ -227,12 +229,12 @@ We'll install these tools in order:
    - Go to http://localhost:8000/docs
    - You'll see all available API endpoints
 
-4. **Test Authentication (optional):**
+4. **Validate Complete Setup:**
    ```bash
-   uv run python scripts/test_auth.py
+   uv run python scripts/validate_setup.py
    ```
-   - This runs automated tests for login, registration, and security
-   - You should see "Success Rate: 100%" at the end
+   - This checks all components are working correctly
+   - You should see "📊 Validation Summary: 8/8 checks passed"
 
 ---
 
