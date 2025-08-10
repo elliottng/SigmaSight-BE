@@ -1276,8 +1276,8 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 
 ### 2.7.1 Implementation Plan
 
-#### A. Code changes
-- [ ] `app/calculations/factors.py::calculate_position_returns()`
+#### 2.7.1.1 Code Changes
+ - [ ] `app/calculations/factors.py::calculate_position_returns()`
   - [x] Remove `returns_df.fillna(0)`; do not impute zeros.
   - [x] Keep returns as decimal daily returns via `.pct_change()`.
   - [ ] Ensure delta application path logs when delta unavailable and falls back to dollar exposure.
@@ -1292,32 +1292,32 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 - [ ] `app/calculations/factors.py::aggregate_portfolio_factor_exposures()`
   - [ ] No change expected; confirm position-level attribution remains intact and dollar exposures are computed as sum(signed position exposure × position beta).
 
-#### B. Scripts and diagnostics
-- [ ] Add `scripts/analyze_beta_distributions.py`
-  - [ ] Load latest betas and regression stats; produce histograms, boxplots, and summary stats pre/post.
-  - [ ] Report % of betas exceeding a threshold, R² distribution, and count of emergency cap triggers.
-- [ ] Confirm or update `scripts/debug_factor_calculation.py` to validate alignments and NaN handling after changes.
+#### 2.7.1.2 Scripts and Diagnostics
+ - [ ] Add `scripts/analyze_beta_distributions.py`
+    - [ ] Load latest betas and regression stats; produce histograms, boxplots, and summary stats pre/post.
+    - [ ] Report % of betas exceeding a threshold, R² distribution, and outlier counts beyond winsorization thresholds.
+  - [ ] Confirm or update `scripts/debug_factor_calculation.py` to validate alignments and NaN handling after changes.
 
-#### C. Tests
-- [ ] Unit tests for:
+#### 2.7.1.3 Tests
+ - [ ] Unit tests for:
   - [ ] Multivariate regression extraction mapping to factor names.
   - [ ] Behavior when data is insufficient (quality flag, zero betas).
   - [ ] Delta-adjusted option positions vs non-adjusted behavior.
   - [x] No zero-fill: ensure inner-join/dropna path works and yields stable fits.
 - [ ] Regression tests to compare reasonable beta ranges and reduced cap-trigger rates after redesign.
 
-#### D. Data quality and configuration
-- [ ] Validate factor ETF coverage via `validate_historical_data_availability()`; alert on symbols with < `MIN_REGRESSION_DAYS`.
+#### 2.7.1.4 Data Quality and Configuration
+ - [ ] Validate factor ETF coverage via `validate_historical_data_availability()`; alert on symbols with < `MIN_REGRESSION_DAYS`.
 - [ ] Confirm `FACTOR_ETFS` mapping aligns with stored symbols and that price histories are consistent in `MarketDataCache`.
 - [ ] Document any required backfills or data hygiene steps (e.g., forward-fill policy is not used in regressions, only in factor return preparation where appropriate).
 
-#### E. Rollout and governance
-- [ ] Introduce a feature flag (e.g., `BETA_MULTIVARIATE_ENABLED`) for staged rollout and A/B comparison.
+#### 2.7.1.5 Rollout and Governance
+ - [ ] Introduce a feature flag (e.g., `BETA_MULTIVARIATE_ENABLED`) for staged rollout and A/B comparison.
 - [ ] Run batch on a sandbox portfolio; capture before/after diagnostics.
 - [ ] Upon approval, remove the flag and make multivariate the default path.
 
-#### F. Documentation
-- [ ] Update `FACTOR_EXPOSURE_REDESIGN.md` to cross-reference this beta redesign.
+#### 2.7.1.6 Documentation
+ - [ ] Update `FACTOR_EXPOSURE_REDESIGN.md` to cross-reference this beta redesign.
 - [ ] Document expected ranges and interpretation of portfolio-level betas for stakeholders.
 - [ ] Note that stress tests continue to rely on `exposure_value` betas; `exposure_dollar` is reporting-only.
 
