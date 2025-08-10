@@ -7,9 +7,10 @@ The SigmaSight Calculation Engine provides institutional-grade portfolio analyti
 ### Who Should Read This Document
 
 - **Portfolio Managers**: Understand how your portfolio risk is measured and managed
-- **Risk Officers**: Learn about our comprehensive risk calculation methodology
 - **Quantitative Analysts**: Deep dive into mathematical models and implementation details
-- **Business Stakeholders**: Grasp the business value and capabilities of our analytics platform
+- **High Net Worth Investors**: Learn how institutional-grade analytics protect and optimize your wealth
+- **Swing Traders**: Understand factor exposures and Greeks for position timing
+- **Retail Investors**: Grasp portfolio risk concepts in accessible terms
 - **Technical Teams**: Understand system architecture and integration points
 
 ### What You'll Learn
@@ -31,7 +32,7 @@ The SigmaSight Calculation Engine provides institutional-grade portfolio analyti
 
 ### In Plain English
 
-Our system is like a sophisticated financial health monitor for investment portfolios. Just as a medical scanner can show different aspects of your health (blood pressure, heart rate, oxygen levels), our calculation engine examines portfolios from eight different angles to provide a complete picture of financial health and risk.
+Our system provides comprehensive portfolio analytics through eight integrated calculation modules. Each module examines a different dimension of portfolio risk and performance, delivering the complete picture institutional investors need to make informed decisions.
 
 ## Table of Contents
 
@@ -56,7 +57,7 @@ Our system is like a sophisticated financial health monitor for investment portf
 
 ### The Big Picture
 
-Imagine you're driving a car. You have a dashboard that shows you speed, fuel level, engine temperature, and warning lights. Similarly, a portfolio needs a dashboard showing its "vital signs":
+Every successful portfolio requires continuous monitoring of key performance indicators, similar to how businesses track revenue, costs, and profitability. A portfolio needs real-time visibility into its critical metrics:
 
 - **How much is it worth?** (Market Value)
 - **Am I making or losing money?** (P&L - Profit & Loss)
@@ -64,7 +65,7 @@ Imagine you're driving a car. You have a dashboard that shows you speed, fuel le
 - **What happens if the market crashes?** (Stress Testing)
 - **Which positions move together?** (Correlations)
 
-Our calculation engine is that dashboard, running complex calculations to answer these questions accurately and quickly.
+Our calculation engine provides this essential intelligence, running complex calculations to answer these questions accurately and quickly.
 
 ### Why Eight Different Calculations?
 
@@ -97,22 +98,22 @@ By 7:00 PM ET, you have a complete risk report ready for the next trading day.
 
 ### Technology Stack
 
-Think of our technology stack like the ingredients in a recipe:
+Our technology infrastructure consists of:
 
-- **Backend Framework**: FastAPI (the kitchen) - handles all requests and coordinates work
-- **Database**: PostgreSQL (the pantry) - stores all data reliably
-- **Package Manager**: UV (the shopping list) - manages all software dependencies
-- **Calculation Libraries**: (the cooking tools)
-  - mibian: Calculates options prices (like a specialized calculator)
-  - statsmodels: Performs statistical analysis (finds patterns in data)
-  - pandas/numpy: Data manipulation (organizes and processes numbers)
-  - empyrical: Risk metrics (measures portfolio risk)
+- **Backend Framework**: FastAPI - handles all requests and coordinates work
+- **Database**: PostgreSQL - stores all data reliably
+- **Package Manager**: UV - manages all software dependencies
+- **Calculation Libraries**:
+  - mibian: Calculates options prices using Black-Scholes models
+  - statsmodels: Performs statistical analysis and regression
+  - pandas/numpy: Data manipulation and numerical computation
+  - empyrical: Risk metrics and performance analytics
 
 ### Batch Processing Architecture
 
 **What is Batch Processing?**
 
-Instead of calculating everything continuously (which would be like keeping your oven on all day), we run calculations in scheduled "batches" - like meal prep for the week. Every morning, the system processes all portfolios sequentially, ensuring accuracy and avoiding conflicts.
+Similar to how stock exchanges process and settle trades after market close, we run all portfolio calculations in scheduled batches. This approach ensures data consistency, reduces computational overhead, and provides a complete risk picture at regular intervals. The system processes all portfolios sequentially after market close, ensuring accuracy and avoiding conflicts.
 
 ```python
 job_sequence = [
@@ -129,7 +130,7 @@ job_sequence = [
 
 **Why Sequential Processing?**
 
-We process portfolios one at a time (like a single-file line) rather than all at once (like a crowd rushing through a door). This prevents technical conflicts and ensures each portfolio gets accurate calculations.
+We process portfolios one at a time rather than concurrently. This prevents database conflicts, ensures data consistency, and provides predictable resource utilization for each portfolio's calculations.
 
 ---
 
@@ -186,7 +187,7 @@ where Cost Basis = Quantity × Entry Price × Multiplier
 
 **What is Daily P&L?**
 
-Daily P&L tells you how much money you made or lost today specifically. It's like checking your weight daily when dieting - you want to know if today helped or hurt your goal.
+Daily P&L shows your portfolio's profit or loss for the current trading day. Similar to how businesses track daily revenue, this metric helps you understand whether today's market movements helped or hurt your portfolio value.
 
 ```
 Today's Profit/Loss = Number of Shares × (Today's Price - Yesterday's Price) × Multiplier
@@ -208,7 +209,7 @@ Today's Profit/Loss = Number of Shares × (Today's Price - Yesterday's Price) ×
 
 ### What Are Options Greeks? (For Everyone)
 
-Options Greeks are like the instrument panel in an airplane - they show how your options will behave under different conditions. Each "Greek" (named after Greek letters) measures a different type of sensitivity.
+Options Greeks are risk metrics that measure how an option's price changes in response to different market variables. Each "Greek" (named after Greek letters) quantifies a specific type of risk exposure, providing traders with essential information for managing options positions.
 
 ### Why Greeks Matter to Your Business
 
@@ -223,12 +224,12 @@ If you trade options, Greeks help you understand:
 
 #### 1. Delta (Δ) - "The Speed Gauge"
 **What it measures**: How much your option value changes when the stock moves $1
-**Business Translation**: Delta of 0.5 means: If the stock goes up $1, your option goes up $0.50. Think of it like driving speed - how fast you're making/losing money as the stock moves.
+**Business Translation**: Delta of 0.5 means: If the stock goes up $1, your option goes up $0.50. This measures your directional exposure to the underlying stock price.
 **Real Example**: You own Apple calls with delta of 0.6. Apple rises $10. Your options gain $6 per share (0.6 × $10).
 
 #### 2. Gamma (Γ) - "The Acceleration"
 **What it measures**: How fast your Delta changes
-**Business Translation**: Like a car's acceleration - shows if you're speeding up or slowing down. High gamma means your profits/losses can accelerate quickly.
+**Business Translation**: Gamma shows how your directional exposure (delta) changes as the stock price moves. High gamma means your profits/losses can accelerate quickly.
 **Real Example**: Your option has gamma of 0.05. If the stock moves $1, your delta increases by 0.05 (getting more sensitive).
 
 #### 3. Theta (Θ) - "The Time Tax"
@@ -280,13 +281,12 @@ Imagine you have 50 different investments. Aggregation is like creating a summar
 
 **Gross vs. Net Exposure - What's the Difference?**
 
-Think of a football game:
-- **Gross Exposure**: Total bets placed (regardless of which team)
-- **Net Exposure**: Your actual directional bet (which team you favor overall)
+- **Gross Exposure**: Total capital deployed across all positions (sum of absolute values)
+- **Net Exposure**: Your directional market exposure (long positions minus short positions)
 
 **Example**:
-- You bet $100,000 on Team A (long position)
-- You bet $60,000 against Team B (short position)
+- You own $100,000 of Apple stock (long position)
+- You short $60,000 of Meta stock (short position)
 - **Gross Exposure**: $160,000 (total money at risk)
 - **Net Exposure**: $40,000 long (your net bullish position)
 
@@ -346,7 +346,7 @@ Total Delta-Adjusted Exposure = $150,000 + $12,000 - $3,000 = $159,000
 
 ### What is Factor Analysis? (For Everyone)
 
-Factor analysis is like understanding what makes your car go fast. Is it the engine (market factor)? The aerodynamics (momentum)? The weight (value)? Similarly, we analyze what drives your portfolio's performance.
+Factor analysis identifies what drives your portfolio's performance by measuring exposure to systematic market factors. Just as a company's revenue depends on multiple factors (market demand, pricing, competition), your portfolio's returns are driven by exposure to different investment styles and market themes.
 
 ### How Investors Use Factor Analysis
 
@@ -419,7 +419,7 @@ Think of factors as different "flavors" of market risk. We measure each factor u
 
 ### Critical Discovery: The Correlation Problem
 
-**What We Found**: These factors are highly correlated (move together), like cars in rush hour traffic - when one slows down, they all tend to slow down.
+**What We Found**: These factors are highly correlated, moving together in the same direction. When value stocks decline, size and quality factors often decline simultaneously, reducing diversification benefits.
 
 **The Numbers**:
 - Value and Size factors: 95.4% correlated (almost perfect correlation!)
@@ -447,10 +447,10 @@ Beta measures how sensitive your portfolio is to each factor:
 
 ### Data Quality Issues We're Fixing
 
-1. **Zero-filling Problem**: Like assuming your car didn't move on days you didn't check the odometer
-2. **Options Without Delta**: Like measuring a convertible with the top up vs. down
-3. **Hard Caps**: Like limiting your speedometer to 120mph when you might go faster
-4. **Insufficient Data**: Like judging performance from just one week of driving
+1. **Zero-filling Problem**: Incorrectly treating missing data as zero returns, distorting calculations
+2. **Options Without Delta**: Treating options positions as static when they're actually dynamic
+3. **Hard Caps**: Artificially limiting beta values to ±3 when actual exposures may be higher
+4. **Insufficient Data**: Making statistical inferences from inadequate sample sizes
 
 ---
 
@@ -458,7 +458,7 @@ Beta measures how sensitive your portfolio is to each factor:
 
 ### What Are Correlations? (For Everyone)
 
-Correlation measures how much two investments move together. It's like noting that when it rains, umbrella sales go up and sunscreen sales go down.
+Correlation measures how much two investments move together. When interest rates rise, bond prices typically fall - this negative correlation is fundamental to portfolio construction.
 
 ### Understanding Correlation Numbers
 
@@ -502,7 +502,7 @@ Correlation measures how much two investments move together. It's like noting th
 
 ### What is Market Risk?
 
-Market risk is the chance of losing money due to market movements. It's like weather risk for outdoor events - you need to know the probability and impact of rain.
+Market risk represents potential losses from adverse market movements. Understanding both the probability and magnitude of potential losses is essential for risk management.
 
 ### Currently Implemented (Available Now)
 
@@ -566,7 +566,7 @@ We prioritized scenario analysis (what-if) over historical metrics (what-was) be
 
 ### What is Stress Testing?
 
-Stress testing is like crash-testing a car - we simulate various disasters to see how your portfolio would perform. Better to know in advance than be surprised!
+Stress testing simulates extreme market scenarios to assess portfolio resilience. Similar to how banks undergo regulatory stress tests, we evaluate how your portfolio would perform during market crises.
 
 ### The 15 Scenarios We Test
 
@@ -660,7 +660,7 @@ We cap losses at 99% of portfolio value. Why? Because in reality, exchanges woul
 
 ### What Are Snapshots?
 
-Daily snapshots are like taking a photograph of your portfolio every day. Over time, these create a "movie" showing how your portfolio evolved.
+Daily snapshots capture your portfolio's complete state at market close each day. Similar to how companies produce quarterly financial statements, these snapshots provide a historical record for performance measurement and compliance.
 
 ### Why We Create Snapshots
 
@@ -733,7 +733,7 @@ We prioritized **essential daily metrics** over **derived analytics** because:
 
 ### What is Batch Processing?
 
-Instead of calculating continuously (expensive and complex), we process everything once per day in a "batch" - like doing all your laundry on Sunday instead of one sock at a time.
+We process all calculations once daily after market close, similar to how exchanges batch-process trade settlements. This approach ensures consistency, reduces computational overhead, and provides a complete risk assessment at regular intervals.
 
 ### The Daily Schedule (Eastern Time)
 
@@ -767,7 +767,7 @@ Instead of calculating continuously (expensive and complex), we process everythi
 
 ### Why Sequential Processing?
 
-We process one portfolio at a time to avoid conflicts. It's like having one chef in the kitchen instead of three - less chance of mistakes.
+Sequential portfolio processing eliminates database conflicts and ensures consistent resource allocation for each portfolio's calculations.
 
 ### Error Handling Philosophy
 
