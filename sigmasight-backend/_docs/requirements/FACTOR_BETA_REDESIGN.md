@@ -130,6 +130,16 @@ and contrasts them with the current SigmaSight implementation.
 - Options using option-price returns (high variance) vs factor ETF returns (lower variance) tend to yield oversized slopes if not delta adjusted.
 - Zero-filling returns distorts variance/covariance and biases regressions.
 - Insufficient or irregular data can lead to unstable fits and runtime warnings.
+
+### 5.1 Critical Discovery: Severe Multicollinearity (2025-01-10)
+
+Investigation of the factor ETFs revealed extreme multicollinearity:
+- **Factor correlations**: Up to 0.96 (Size vs Value), with 17 pairs having |r| > 0.7
+- **VIF values**: Quality (52.5), Growth (41.8), Value (23.9), Size (22.0) - all indicating severe multicollinearity
+- **Condition number**: 640+ indicating numerical instability
+- **Impact**: Standard multivariate OLS produces MORE extreme betas than univariate due to this multicollinearity
+
+This explains why the simple univariate approach has been relatively stable - it avoids the multicollinearity problem entirely.
  
  Plain-English: why these problems happen
  - Univariate fits look at one factor at a time, so if factors move together, each one can get “too much credit,” inflating betas.
@@ -161,11 +171,43 @@ Plain-English: what “stable and realistic” looks like
     - Under constant quantity/multiplier, `pct_change(price × constant) == pct_change(price)`; computing on prices is equivalent and clearer.
     - Remove zero-filling from return series; NaN handling occurs via inner-join with factor returns and dropping rows before regression.
 
-7.2 Multivariate regression per position
+7.2 Multivariate regression per position (Original Proposal)
     - Replace per-factor univariate OLS with a single multivariate OLS per position using all factor return columns simultaneously (plus intercept) over aligned dates.
     - Use `statsmodels.api.OLS(y, sm.add_constant(X_multi)).fit()`; extract betas from `params[1:]` mapped to factor names.
     - Rationale: removes omitted variable bias and reduces inflated betas.
-    - Plain-English: fit “all factors together” so we don’t double-count shared movements. This typically yields more balanced, realistic betas.
+    - Plain-English: fit "all factors together" so we don't double-count shared movements. This typically yields more balanced, realistic betas.
+    - **WARNING**: Testing revealed severe multicollinearity (see Section 5.1), making this approach numerically unstable without regularization.
+
+7.2.1 Alternative Approaches (Based on Multicollinearity Discovery)
+    
+    **Option A: Ridge Regression (L2 Regularization)**
+    - Use Ridge regression instead of OLS to handle multicollinearity
+    - Penalizes large coefficients, producing more stable betas
+    - Requires choosing regularization parameter (alpha)
+    - Implementation: `sklearn.linear_model.Ridge` or equivalent
+    
+    **Option B: Principal Component Regression (PCR)**
+    - Transform correlated factors into orthogonal principal components
+    - Run regression on components, then transform back to factor space
+    - Reduces dimensionality while preserving most variance
+    - More complex interpretation but handles multicollinearity well
+    
+    **Option C: Elastic Net**
+    - Combines L1 and L2 regularization
+    - Can perform feature selection (zeroing out less important factors)
+    - Good middle ground between Ridge and LASSO
+    
+    **Option D: Improved Univariate with Better Data Handling**
+    - Keep univariate regression (one factor at a time) to avoid multicollinearity entirely
+    - Focus on data quality improvements:
+        - Remove zero-filling of returns ✓
+        - Better alignment and NaN handling ✓
+        - Apply winsorization instead of hard caps ✓
+        - Mandatory delta adjustment for options ✓
+    - Simpler, more stable, already working reasonably well
+    - Accept some omitted variable bias as trade-off for stability
+    
+    **Recommendation**: Given the severity of multicollinearity (VIF > 50, correlations > 0.95), Option D (improved univariate) is the most pragmatic choice for immediate implementation, with Option A (Ridge) as a future enhancement.
 
 7.3 Make delta-adjusted returns mandatory for options
     - In `calculate_factor_betas_hybrid()`, enforce `use_delta_adjusted=True` when calling `calculate_position_returns()` (no per-portfolio override in this phase).
@@ -232,9 +274,13 @@ This document will remain the source of truth for the *design*, while `TODO2.md`
 
 ## 12. Decisions
 
-- Delta-adjustment: Mandatory for options; no per-portfolio override in this phase. If delta is unavailable, fall back to dollar exposure and mark low-quality.
-- Emergency cap: None after winsorization and quality gating; remove the hard cap.
-- Diagnostics: Yes — persist detailed regression diagnostics (R², p-values, std err, residual checks) for audit/debugging and monitoring.
+- **Regression approach**: Option D (Improved Univariate) due to severe multicollinearity in factor ETFs
+  - Keep univariate regression to avoid numerical instability
+  - Apply data quality improvements (no zero-fill, winsorization, better alignment)
+  - Consider Ridge regression (Option A) as future enhancement
+- **Delta-adjustment**: Mandatory for options; no per-portfolio override in this phase. If delta is unavailable, fall back to dollar exposure and mark low-quality.
+- **Emergency cap**: None after winsorization and quality gating; remove the hard cap.
+- **Diagnostics**: Yes — persist detailed regression diagnostics (R², p-values, std err, residual checks) for audit/debugging and monitoring.
 
 ---
 

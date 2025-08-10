@@ -1269,10 +1269,19 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 ## Phase 2.7: Factor Beta Redesign
 *Implement the factor beta redesign to produce stable, realistic, and institutionally-aligned factor betas.*
 
-**Status**: IN PROGRESS
+**Status**: IN PROGRESS - MULTICOLLINEARITY DISCOVERED
 **Priority**: High
 **Dependencies**: None
 **Design Doc**: See `_docs/requirements/FACTOR_BETA_REDESIGN.md` for full details.
+
+### Critical Discovery (2025-01-10)
+Investigation revealed severe multicollinearity in factor ETFs:
+- Factor correlations up to 0.96 (Size vs Value)
+- VIF values > 50 for some factors (Quality VIF = 52.5)
+- Condition number > 600 indicating numerical instability
+- This causes multivariate OLS to produce MORE extreme betas than univariate
+
+**Recommendation**: Use Ridge regression (L2 regularization) instead of standard OLS for multivariate approach, OR keep univariate but with better data handling.
 
 ### 2.7.1 Implementation Plan
 
