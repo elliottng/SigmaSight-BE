@@ -157,14 +157,23 @@ We'll install these tools in order:
    ```
    - This creates your configuration file
 
-3. **Update database configuration:**
+3. **Configure API Keys and Database:**
    - Open `.env` file in Notepad
-   - Find the line starting with `DATABASE_URL=`
-   - Make sure it says:
+   - Update these settings:
    ```
+   # Database (keep as-is for local development)
    DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
+   
+   # Market Data API Keys
+   FMP_API_KEY=your_actual_fmp_key_here  # REQUIRED - Get free key at https://site.financialmodelingprep.com/developer/docs
+   POLYGON_API_KEY=dummy_key_not_used    # Can use dummy value if only using FMP
+   FRED_API_KEY=your_fred_key_here       # Optional - For interest rates
+   
+   # Security
+   SECRET_KEY=your_secret_key_here       # Generate with: openssl rand -hex 32
    ```
    - Save and close the file
+   - **Note**: FMP_API_KEY is required for market data to work
 
 ---
 
@@ -242,12 +251,26 @@ After initial setup, here's how to start SigmaSight each day:
    docker-compose up -d
    ```
 
-4. **Start SigmaSight:**
+4. **Option A: Start API Server Only**
    ```bash
    uv run python run.py
    ```
 
-5. **Stop everything when done:**
+5. **Option B: Run Batch Processing and Generate Reports**
+   ```bash
+   # Process all portfolios and generate reports
+   uv run python scripts/run_batch_with_reports.py
+   
+   # View generated reports
+   explorer reports  # Opens reports folder
+   ```
+
+6. **Find Portfolio IDs (if needed):**
+   ```bash
+   uv run python scripts/list_portfolios.py
+   ```
+
+7. **Stop everything when done:**
    - Press `Ctrl + C` in Command Prompt to stop SigmaSight
    - Run `docker-compose down` to stop the database
 
@@ -303,6 +326,8 @@ git pull
 uv sync
 
 # Set up database with Alembic migrations
+uv run alembic upgrade head
+# Or use the automated script:
 uv run python scripts/setup_dev_database_alembic.py
 
 # Seed demo data
@@ -310,6 +335,12 @@ uv run python scripts/seed_database.py
 
 # Run authentication tests
 uv run python scripts/test_auth.py
+
+# Run batch processing and generate reports
+uv run python scripts/run_batch_with_reports.py
+
+# List all portfolios with IDs
+uv run python scripts/list_portfolios.py
 ```
 
 ---
@@ -329,5 +360,9 @@ If you get stuck:
 1. Take a screenshot of any error messages
 2. Note which step you're on
 3. Contact the development team
+
+For more advanced workflows including batch processing and report generation, see:
+- [Complete Workflow Guide](../COMPLETE_WORKFLOW_GUIDE.md) - End-to-end workflow from setup to reports
+- [Quick Start Windows](../QUICK_START_WINDOWS.md) - Essential commands reference
 
 Remember: Everyone was a beginner once. Take your time and follow each step carefully!

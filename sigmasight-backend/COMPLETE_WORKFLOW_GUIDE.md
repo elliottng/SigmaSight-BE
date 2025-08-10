@@ -6,7 +6,8 @@ This guide walks through the **complete workflow** from initial setup to generat
 
 ✅ Completed the [Windows Setup Guide](setup-guides/WINDOWS_SETUP_GUIDE.md) or [Mac Install Guide](setup-guides/MAC_INSTALL_GUIDE.md)  
 ✅ Docker Desktop is running  
-✅ You're in the project directory: `sigmasight-backend`
+✅ You're in the project directory: `sigmasight-backend`  
+✅ API keys configured in `.env` file (especially FMP_API_KEY which is REQUIRED)
 
 ---
 
@@ -32,10 +33,10 @@ You should see a container named `sigmasight-backend_postgres_1` running.
 ## Step 2: Set Up Database Schema
 
 ```bash
-# Apply all database migrations
+# Apply all database migrations (recommended)
 uv run alembic upgrade head
 
-# Or use the automated setup script
+# Or use the automated setup script (alternative)
 uv run python scripts/setup_dev_database_alembic.py
 ```
 
@@ -67,24 +68,10 @@ This creates:
 
 ```bash
 # List all portfolios with their IDs
-uv run python -c "
-import asyncio
-from app.database import get_async_session
-from sqlalchemy import select
-from app.models.users import Portfolio
+uv run python scripts/list_portfolios.py
 
-async def list_portfolios():
-    async with get_async_session() as db:
-        result = await db.execute(select(Portfolio))
-        portfolios = result.scalars().all()
-        for p in portfolios:
-            print(f'Portfolio: {p.name}')
-            print(f'  ID: {p.id}')
-            print(f'  Owner: {p.user.email if p.user else \"Unknown\"}')
-            print()
-
-asyncio.run(list_portfolios())
-"
+# Or use the verbose mode for more details
+uv run python scripts/list_portfolios.py --verbose
 ```
 
 **Save these IDs!** You'll need them for batch processing and reports.
@@ -238,6 +225,7 @@ explorer reports  # Windows
 
 ### "No portfolios found"
 - Run the seeding script: `uv run python scripts/seed_database.py`
+- List portfolios to verify: `uv run python scripts/list_portfolios.py`
 
 ### "Market data fetch failed"
 - Check your `.env` file has valid API keys:
