@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The SigmaSight Calculation Engine provides institutional-grade portfolio analytics through eight integrated calculation modules operating in a sequential batch processing framework. Built on FastAPI with PostgreSQL, the system processes 3 demo portfolios with 63 positions, delivering comprehensive risk analytics including Greeks, factor exposures, correlations, stress testing, and portfolio snapshots. This document details the mathematical foundations, implementation status, and architectural decisions of our production-ready calculation infrastructure.
+The SigmaSight Calculation Engine provides institutional-grade portfolio analytics through eight integrated calculation modules operating in a sequential batch processing framework. Built on FastAPI with PostgreSQL, the system currently processes 3 demo portfolios with 63 positions. While the core architecture is complete and several modules are fully operational (market data, exposures, factor analysis), others have limitations due to data dependencies (Greeks without options chains) or pending implementation (VaR, Sharpe ratios). This document details the mathematical foundations, current implementation status, known limitations, and architectural decisions of our calculation infrastructure.
 
 ### Who Should Read This Document
 
@@ -23,12 +23,15 @@ The SigmaSight Calculation Engine provides institutional-grade portfolio analyti
 
 ## Current System Status (August 2025)
 
-- **Operational Status**: 100% calculation engine coverage across all 8 engines
-- **Data Coverage**: 63 positions across 3 portfolios with complete market data
+- **Architecture Status**: Core infrastructure complete with 8 calculation engines deployed
+- **Functional Coverage**: 
+  - ✅ Market data, exposures, factor analysis working with real data
+  - ⚠️ Greeks calculations limited (no options chain data, using simplified models)
+  - ⚠️ Interest rate sensitivity has known bugs (showing $0 impact)
+  - ❌ Advanced risk metrics (VaR, Sharpe) postponed pending data integration
+- **Data Coverage**: 63 positions across 3 portfolios with stock market data
 - **Batch Processing**: Sequential architecture avoiding concurrency issues
-- **Factor Model**: 7-factor model with univariate regression (multicollinearity-aware)
-- **Options Support**: Black-Scholes Greeks via mibian library
-- **Stress Testing**: 15 predefined scenarios with correlation-aware propagation
+- **Known Limitations**: Options data unavailable, requiring approximations for Greeks and stress testing
 
 ### In Plain English
 
@@ -350,7 +353,12 @@ Factor analysis identifies what drives your portfolio's performance by measuring
 
 ### How Investors Use Factor Analysis
 
-**Investment Decision Making:**
+**For Active Traders (Practical Examples):**
+- **Momentum Factor = 1.5**: Your portfolio moves 1.5x when trending stocks rally. Great for riding trends, dangerous when momentum reverses (like March 2021 meme stock crash)
+- **Growth Factor = 2.0**: You're heavily in growth stocks. When rates rise, growth gets hit hardest - you'll lose 2x what the growth index loses
+- **Market Beta = 1.8**: Your portfolio swings 1.8x the market. SPY drops 10%? You're down 18%. This is your leverage indicator
+
+**For Portfolio Managers:**
 - **Risk Assessment**: "Am I too exposed to tech growth stocks? Should I diversify?"
 - **Performance Attribution**: "Did I make money because I picked good stocks or because tech went up?"
 - **Style Drift Detection**: "Is my 'value' manager secretly buying growth stocks?"
@@ -369,6 +377,25 @@ We calculate factor sensitivities at two levels:
    - What's my overall market sensitivity? (Portfolio market beta)
    - Am I tilted toward value or growth overall?
    - How exposed am I to small-cap risk?
+
+### Beta vs Delta: What's the Difference?
+
+**Quick Answer for Traders:**
+- **Delta**: How your OPTION moves when the STOCK moves $1
+- **Beta**: How your STOCK moves when the MARKET moves 1%
+- Different instruments, different references, both measure sensitivity
+
+**Detailed Explanation:**
+
+**Delta (Options Only)**
+- Measures: Option price change per $1 stock move
+- Range: 0 to 1 for calls, -1 to 0 for puts
+- Example: AAPL call with 0.5 delta gains $50 when AAPL stock rises $1
+
+**Beta (Stocks & Portfolios)**
+- Measures: Stock/portfolio change per 1% market move
+- Range: Usually -3 to +3
+- Example: TSLA with 2.0 beta moves 2% when SPY moves 1%
 
 ### Understanding the Terminology
 
@@ -568,6 +595,12 @@ We prioritized scenario analysis (what-if) over historical metrics (what-was) be
 
 Stress testing simulates extreme market scenarios to assess portfolio resilience. Similar to how banks undergo regulatory stress tests, we evaluate how your portfolio would perform during market crises.
 
+**Important Limitation for Options Traders:**
+Without real options chain data, our stress tests use simplified Greeks. This means:
+- We can't model gamma acceleration (your puts won't "explode" in value correctly during a crash)
+- Volatility expansion effects are approximated, not precise
+- The stress test gives directional insight but not exact P&L for options-heavy portfolios
+
 ### The 15 Scenarios We Test
 
 #### Market Shocks (5 scenarios)
@@ -628,15 +661,15 @@ Growth factor shocked: -30%
 Direct P&L = $1,000,000 × 1.5 × (-30%) = -$450,000
 ```
 
-**Phase 2 - Correlation Contagion**:
-```
-Historical Correlations (from our factor ETF analysis):
-- Growth ↔ Momentum: 0.85 correlation
-- Growth ↔ Market: 0.92 correlation
+**Phase 2 - Correlation Contagion (The Domino Effect)**:
 
-Secondary Shocks:
-- Momentum gets: -30% × 0.85 = -25.5% shock
-- Market gets: -30% × 0.92 = -27.6% shock
+**Simple Version**: When tech crashes, it drags everything else down too. We calculate how much.
+
+```
+What Actually Happens:
+- Tech crashes -30% (the trigger)
+- Because tech and momentum stocks overlap: Momentum drops -25.5%
+- Because tech is 40% of the market: Broad market drops -27.6%
 
 Correlated P&L:
 - Momentum: $1,000,000 × 0.8 × (-25.5%) = -$204,000
@@ -734,6 +767,12 @@ We prioritized **essential daily metrics** over **derived analytics** because:
 ### What is Batch Processing?
 
 We process all calculations once daily after market close, similar to how exchanges batch-process trade settlements. This approach ensures consistency, reduces computational overhead, and provides a complete risk assessment at regular intervals.
+
+**Why Not Real-Time? (For Active Traders)**
+- **Cost**: Real-time options data feeds cost $10,000+/month
+- **Complexity**: Real-time Greeks require streaming market data and continuous calculation
+- **Use Case**: This system is designed for end-of-day risk analysis, not intraday trading
+- **Alternative**: For real-time needs, use your broker's risk tools during market hours
 
 ### The Daily Schedule (Eastern Time)
 
