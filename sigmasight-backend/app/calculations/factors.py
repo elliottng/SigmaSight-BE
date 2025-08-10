@@ -114,9 +114,11 @@ async def calculate_position_returns(
         DataFrame with dates as index and position IDs as columns, containing daily returns
         
     Note:
-        Returns are calculated based on position exposure changes:
-        - Dollar exposure (default): quantity × price × multiplier
-        - Delta-adjusted exposure: dollar_exposure × delta (for options)
+        Returns are calculated from price changes (price.pct_change()).
+        Under constant quantity/multiplier, pct_change(price × constant) == pct_change(price),
+        so computing on prices is equivalent and clearer. Exposure (quantity × price × multiplier)
+        is not used for return computation. Options-specific adjustments are deferred to the
+        broader redesign.
     """
     logger.info(f"Calculating position returns for portfolio {portfolio_id}")
     logger.info(f"Date range: {start_date} to {end_date}, Delta-adjusted: {use_delta_adjusted}")
@@ -169,28 +171,10 @@ async def calculate_position_returns(
                 logger.warning(f"Insufficient price data for position {position.id} ({symbol})")
                 continue
             
-            # Calculate position multiplier
-            multiplier = OPTIONS_MULTIPLIER if _is_options_position(position) else 1
-            
-            # Calculate base exposure time series
-            base_exposure = prices * float(position.quantity) * multiplier
-            
-            # Apply delta adjustment if requested and position is options
-            if use_delta_adjusted and _is_options_position(position):
-                # For now, use a simplified delta calculation
-                # TODO: Integrate with Greeks calculation from Section 1.4.2
-                delta = await _get_position_delta(db, position)
-                if delta is not None:
-                    exposure = base_exposure * float(delta)
-                else:
-                    # Fallback to dollar exposure if delta unavailable
-                    exposure = base_exposure
-                    logger.warning(f"Delta unavailable for position {position.id}, using dollar exposure")
-            else:
-                exposure = base_exposure
-            
-            # Calculate daily returns from exposure changes
-            returns = exposure.pct_change().dropna()
+            # Compute daily returns from prices directly for clarity.
+            # Note: Any constant scaling (quantity, 100× multiplier) cancels in pct_change().
+            # Options delta adjustments are not applied here; handled in future redesign steps.
+            returns = prices.pct_change().dropna()
             
             if not returns.empty:
                 position_returns[str(position.id)] = returns
@@ -207,9 +191,7 @@ async def calculate_position_returns(
     # Combine all position returns into a DataFrame
     returns_df = pd.DataFrame(position_returns)
     
-    # Align dates and handle missing data
-    returns_df = returns_df.fillna(0)  # Fill missing returns with 0
-    
+    # Do not zero-fill; NaNs will be handled during regression alignment and dropna
     logger.info(f"Position returns calculated: {len(returns_df)} days, {len(returns_df.columns)} positions")
     return returns_df
 
@@ -289,30 +271,37 @@ async def calculate_factor_betas_hybrid(
             regression_stats[position_id] = {}
             
             try:
-                y = position_returns_aligned[position_id].values
+                y_series = position_returns_aligned[position_id]
                 
-                # Run regression for each factor
+                # Run regression for each factor with pairwise NaN drop
                 for factor_name in factor_returns_aligned.columns:
-                    X = factor_returns_aligned[factor_name].values
+                    x_series = factor_returns_aligned[factor_name]
+                    pair = pd.concat([y_series, x_series], axis=1, keys=['y', 'x']).dropna()
                     
-                    # Add constant for intercept
+                    if len(pair) < MIN_REGRESSION_DAYS:
+                        position_betas[position_id][factor_name] = 0.0
+                        regression_stats[position_id][factor_name] = { 'r_squared': 0.0, 'p_value': 1.0, 'std_err': 0.0 }
+                        continue
+                    
+                    y = pair['y'].values
+                    X = pair['x'].values
                     X_with_const = sm.add_constant(X)
                     
-                    # Run OLS regression
-                    model = sm.OLS(y, X_with_const).fit()
-                    
-                    # Extract beta (slope coefficient)
-                    beta = model.params[1] if len(model.params) > 1 else 0.0
-                    
-                    # Cap beta at ±3 to prevent outliers
-                    beta = max(-BETA_CAP_LIMIT, min(BETA_CAP_LIMIT, beta))
-                    
-                    position_betas[position_id][factor_name] = float(beta)
-                    regression_stats[position_id][factor_name] = {
-                        'r_squared': float(model.rsquared),
-                        'p_value': float(model.pvalues[1]) if len(model.pvalues) > 1 else 1.0,
-                        'std_err': float(model.bse[1]) if len(model.bse) > 1 else 0.0
-                    }
+                    try:
+                        model = sm.OLS(y, X_with_const).fit()
+                        beta = model.params[1] if len(model.params) > 1 else 0.0
+                        beta = max(-BETA_CAP_LIMIT, min(BETA_CAP_LIMIT, beta))
+                        
+                        position_betas[position_id][factor_name] = float(beta)
+                        regression_stats[position_id][factor_name] = {
+                            'r_squared': float(model.rsquared),
+                            'p_value': float(model.pvalues[1]) if len(model.pvalues) > 1 else 1.0,
+                            'std_err': float(model.bse[1]) if len(model.bse) > 1 else 0.0
+                        }
+                    except Exception as e:
+                        logger.error(f"OLS error for position {position_id}, factor {factor_name}: {str(e)}")
+                        position_betas[position_id][factor_name] = 0.0
+                        regression_stats[position_id][factor_name] = { 'r_squared': 0.0, 'p_value': 1.0, 'std_err': 0.0 }
                 
             except Exception as e:
                 logger.error(f"Error calculating betas for position {position_id}: {str(e)}")
