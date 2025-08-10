@@ -12,7 +12,7 @@ Examples:
     python -m app.cli.report_generator_cli generate --portfolio-id 51134ffd-2f13-49bd-b1f5-0c327e801b69
     
     # Generate report for specific date
-    python -m app.cli.report_generator_cli generate --portfolio-id <UUID> --as-of 2025-01-01
+    python -m app.cli.report_generator_cli generate --portfolio-id <UUID> --as-of 2025-08-01
     
     # Generate only markdown format
     python -m app.cli.report_generator_cli generate --portfolio-id <UUID> --format md

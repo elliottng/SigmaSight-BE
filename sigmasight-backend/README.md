@@ -12,18 +12,29 @@ FastAPI backend for SigmaSight portfolio risk analytics platform with 8 calculat
 
 ## 🚀 Quick Links
 
-- **[Setup Guide](setup-guides/README.md)** - Complete installation and environment setup
-- **[Development Guide](AI_AGENT_REFERENCE.md)** - Architecture and codebase reference  
+### Setup & Installation
 - **[Windows Setup Guide](setup-guides/WINDOWS_SETUP_GUIDE.md)** - Step-by-step Windows instructions
 - **[Mac Install Guide](setup-guides/MAC_INSTALL_GUIDE.md)** - Step-by-step macOS instructions
-- **[Project Status](TODO1.md)** - Current development progress and known issues
+- **[Setup Guide](setup-guides/README.md)** - General installation overview
 
-## 🎯 System Status
+### Workflows & Operations
+- **🆕 [Complete Workflow Guide](COMPLETE_WORKFLOW_GUIDE.md)** - From setup to reports (START HERE!)
+- **🆕 [Quick Start Windows](QUICK_START_WINDOWS.md)** - Essential commands reference
+- **[Report Generator CLI](docs/PORTFOLIO_REPORT_CLI.md)** - Report generation documentation
 
-- **Calculation Engines**: 83.3% operational (5/6 engines working)
+### Development & Reference
+- **[Development Guide](AI_AGENT_REFERENCE.md)** - Architecture and codebase reference
+- **[Calculation Engine White Paper](_docs/generated/Calculation_Engine_White_Paper.md)** - Technical details
+- **[Project Status](TODO1.md)** - Phase 1 completion status
+- **[Current Roadmap](TODO2.md)** - Phase 2 active development
+
+## 🎯 System Status (August 2025)
+
+- **Calculation Engines**: 8 engines deployed (some with data limitations)
 - **Demo Data**: 3 portfolios with 63 positions ready
 - **Database**: PostgreSQL with complete schema
-- **Testing**: Pytest framework with async support
-- **API**: FastAPI with 8 batch calculation engines
+- **Batch Processing**: Sequential orchestrator (batch_orchestrator_v2)
+- **Report Generator**: ✅ Complete - MD/JSON/CSV formats
+- **API**: FastAPI backend with async support
 
-Ready for Phase 2.0 Portfolio Report Generator implementation.
+Currently in Phase 2.9-2.11: Report optimization and calculation migration.

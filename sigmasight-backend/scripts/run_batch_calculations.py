@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 """
+⚠️ DEPRECATED: Use run_batch_with_reports.py instead.
+This script is kept for backwards compatibility only.
+
+For new usage:
+  uv run python scripts/run_batch_with_reports.py --skip-reports
+  
+Or for specific portfolio:
+  uv run python scripts/run_batch_with_reports.py --portfolio <UUID> --skip-reports
+
+================================================================================
+Legacy documentation:
 Run batch calculations for demo portfolios
 This script executes all calculation engines for the three demo portfolios
 to populate Greeks, Factor Analysis, Correlations, Snapshots, etc.

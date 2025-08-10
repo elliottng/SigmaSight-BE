@@ -4,7 +4,7 @@
 
 **Target**: Claude Code, Claude 3.5 Sonnet, and other AI coding agents
 
-**Last Updated**: 2025-01-16
+**Last Updated**: 2025-08-10
 
 ---
 

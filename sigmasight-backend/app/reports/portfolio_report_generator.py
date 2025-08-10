@@ -114,8 +114,8 @@ def create_report_directory(portfolio_name: str, report_date: date) -> Path:
         Path to the created directory
     
     Example:
-        "Balanced Individual Investor" on 2025-01-08
-        -> reports/balanced-individual-investor_2025-01-08/
+        "Balanced Individual Investor" on 2025-08-08
+        -> reports/balanced-individual-investor_2025-08-08/
     """
     base_dir = Path("reports")
     slugified_name = slugify(portfolio_name)

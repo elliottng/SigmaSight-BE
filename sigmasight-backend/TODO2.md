@@ -2408,7 +2408,7 @@ exposure_dollar = float(beta_value) * float(portfolio_value)
 
 ## Recent Updates
 
-### Redis & Celery Dependency Cleanup ✅ **COMPLETED** (2025-01-16)
+### Redis & Celery Dependency Cleanup ✅ **COMPLETED** (2025-08-16)
 - **Removed unused dependencies**: `redis>=5.0.0` and `celery>=5.3.0` from `pyproject.toml`
 - **Cleaned configuration**: Removed `REDIS_URL` from `app/config.py` and `.env.example`
 - **Updated documentation**: Removed Redis references from README.md, MAC_INSTALL_GUIDE.md, and TODO2.md
