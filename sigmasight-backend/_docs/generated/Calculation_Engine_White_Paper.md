@@ -81,7 +81,7 @@ Each calculation module answers a specific question about your portfolio:
 
 ### Real-World Example
 
-Let's say you manage a $10 million portfolio with 50 positions including stocks and options. Every morning at 5:15 AM, our system:
+Let's say you manage a $10 million portfolio with 50 positions including stocks and options. Every evening at 4:00 PM ET (after market close), our system:
 
 1. Updates prices for all your holdings
 2. Calculates your overnight profit/loss
@@ -89,7 +89,7 @@ Let's say you manage a $10 million portfolio with 50 positions including stocks 
 4. Checks what would happen in 15 different crisis scenarios
 5. Saves a snapshot for historical tracking
 
-By 6:00 AM, you have a complete risk report waiting in your inbox.
+By 7:00 PM ET, you have a complete risk report ready for the next trading day.
 
 ---
 
@@ -182,33 +182,6 @@ Unrealized P&L = Current Exposure - Cost Basis
 where Cost Basis = Quantity × Entry Price × Multiplier
 ```
 
-#### Real-World Examples
-
-**Example 1: Buying Stock (Long Position)**
-
-You buy 1,000 shares of Apple at $150. The price rises to $155.
-
-- **Your Investment**: 1,000 × $150 = $150,000
-- **Current Value**: 1,000 × $155 = $155,000
-- **Your Profit**: $155,000 - $150,000 = $5,000 ✓
-
-**Example 2: Betting Against a Stock (Short Position)**
-
-You short 500 shares of Tesla at $200 (betting the price will fall). The price drops to $180.
-
-- **Your Bet**: Sold 500 shares at $200 = $100,000 received
-- **Cost to Buy Back**: 500 × $180 = $90,000
-- **Your Profit**: $100,000 - $90,000 = $10,000 ✓
-
-**Example 3: Options Contract**
-
-You buy 10 Apple call option contracts at $2.50. The price rises to $3.75.
-
-- **Important**: Each option contract represents 100 shares
-- **Your Investment**: 10 contracts × $2.50 × 100 shares = $2,500
-- **Current Value**: 10 contracts × $3.75 × 100 shares = $3,750
-- **Your Profit**: $3,750 - $2,500 = $1,250 ✓
-
 ### Daily P&L Calculations
 
 **What is Daily P&L?**
@@ -249,62 +222,49 @@ If you trade options, Greeks help you understand:
 ### The Five Greeks Explained
 
 #### 1. Delta (Δ) - "The Speed Gauge"
-
 **What it measures**: How much your option value changes when the stock moves $1
-
-**Business Translation**: 
-- Delta of 0.5 means: If the stock goes up $1, your option goes up $0.50
-- Think of it like driving: Delta is your speed - how fast you're making/losing money as the stock moves
-
-**Real Example**: 
-You own Apple calls with delta of 0.6. Apple rises $10. Your options gain $6 per share (0.6 × $10).
+**Business Translation**: Delta of 0.5 means: If the stock goes up $1, your option goes up $0.50. Think of it like driving speed - how fast you're making/losing money as the stock moves.
+**Real Example**: You own Apple calls with delta of 0.6. Apple rises $10. Your options gain $6 per share (0.6 × $10).
 
 #### 2. Gamma (Γ) - "The Acceleration"
-
 **What it measures**: How fast your Delta changes
-
-**Business Translation**: 
-- Like a car's acceleration - shows if you're speeding up or slowing down
-- High gamma means your profits/losses can accelerate quickly
-
-**Real Example**: 
-Your option has gamma of 0.05. If the stock moves $1, your delta increases by 0.05 (getting more sensitive).
+**Business Translation**: Like a car's acceleration - shows if you're speeding up or slowing down. High gamma means your profits/losses can accelerate quickly.
+**Real Example**: Your option has gamma of 0.05. If the stock moves $1, your delta increases by 0.05 (getting more sensitive).
 
 #### 3. Theta (Θ) - "The Time Tax"
-
 **What it measures**: How much value your option loses each day
-
-**Business Translation**: 
-- Options are like insurance policies - they lose value as they approach expiration
-- Theta of -0.05 means you lose $5 per day per contract (100 shares × $0.05)
-
-**Real Example**: 
-Your option expires in 30 days with theta of -0.10. You're losing $10/day just from time passing.
+**Business Translation**: Options are like insurance policies - they lose value as they approach expiration. Theta of -0.05 means you lose $5 per day per contract (100 shares × $0.05).
+**Real Example**: Your option expires in 30 days with theta of -0.10. You're losing $10/day just from time passing.
 
 #### 4. Vega (ν) - "The Volatility Sensor"
-
 **What it measures**: How much your option value changes when volatility changes by 1%
-
-**Business Translation**: 
-- When markets get scary (volatile), options become more valuable
-- Like earthquake insurance - worth more when earthquakes are likely
-
-**Real Example**: 
-Market volatility spikes 5% on Fed news. Your option with vega of 0.20 gains $1.00 (5 × $0.20).
+**Business Translation**: When markets get scary (volatile), options become more valuable. Like earthquake insurance - worth more when earthquakes are likely.
+**Real Example**: Market volatility spikes 5% on Fed news. Your option with vega of 0.20 gains $1.00 (5 × $0.20).
 
 #### 5. Rho (ρ) - "The Interest Rate Effect"
-
 **What it measures**: How much your option changes when interest rates change by 1%
-
-**Business Translation**: 
-- Usually the least important Greek
-- Matters more for long-term options
+**Business Translation**: Usually the least important Greek. Matters more for long-term options.
 
 ### Implementation Architecture
 
 **For Technical Readers**: We use the mibian library exclusively for Black-Scholes calculations. No mock fallbacks in production - if we can't calculate real Greeks, we flag the position for manual review.
 
 **For Business Readers**: We use industry-standard Nobel Prize-winning formulas (Black-Scholes) to calculate these sensitivities accurately.
+
+### Known Issues & Current Status ⚠️
+
+**Options Data Challenge**: 
+- **Issue**: We currently lack access to options chain data (strike prices, expiration dates, implied volatility)
+- **Impact**: Greeks show as 0.0000 for all options positions in demo portfolios
+- **What This Means**: The Greeks calculation engine is built but not fully tested with real data
+- **Workaround**: Manual entry of options parameters when available
+- **Timeline**: Full functionality pending options data provider integration (Phase 2.8)
+
+**Why This Matters**:
+- Cannot accurately measure options risk without Greeks
+- Stress tests assume linear behavior (missing gamma/convexity effects)
+- Options P&L attribution incomplete (can't separate time decay from price moves)
+- Delta-adjusted exposures default to estimates rather than actual calculations
 
 ---
 
@@ -341,12 +301,44 @@ Think of a football game:
 
 **What is Delta Adjustment?**
 
-For options, we need to convert them to "stock equivalent" exposure. It's like converting different currencies to USD for comparison.
+Delta adjustment scales the dollar value of options positions by their delta to reflect their actual market sensitivity. Since options don't move dollar-for-dollar with the underlying stock, we multiply their market value by delta to get the "effective" dollar exposure.
 
-**Example**: 
-- You own 10 call options with delta 0.5
-- Each contract = 100 shares
-- Stock equivalent = 10 × 100 × 0.5 = 500 shares equivalent
+**Why It Matters**:
+- Options with $100,000 market value might only have $50,000 of effective exposure (if delta = 0.5)
+- Without adjustment, portfolio risk appears larger than reality
+- Allows accurate comparison of risk between stocks and options
+
+**How It Works for Mixed Portfolios (Stocks + Options)**:
+
+1. **Stocks**: Delta = 1.0 (full dollar exposure)
+   - $100,000 stock position = $100,000 delta-adjusted exposure
+   
+2. **Options**: Delta varies (0 to 1 for calls, 0 to -1 for puts)
+   - $100,000 call option position with delta 0.5 = $50,000 delta-adjusted exposure
+   - $50,000 put option position with delta -0.3 = -$15,000 delta-adjusted exposure
+
+**Real Portfolio Example**:
+```
+Position 1: Long 1,000 shares of AAPL at $150/share
+  → Market Value = $150,000
+  → Delta-adjusted exposure = $150,000 × 1.0 = $150,000
+
+Position 2: Long 10 AAPL call options (market value $20,000, delta = 0.6)
+  → Market Value = $20,000
+  → Delta-adjusted exposure = $20,000 × 0.6 = $12,000
+
+Position 3: Long 5 AAPL put options (market value $10,000, delta = -0.3)
+  → Market Value = $10,000
+  → Delta-adjusted exposure = $10,000 × (-0.3) = -$3,000
+
+Total Portfolio Market Value = $180,000
+Total Delta-Adjusted Exposure = $150,000 + $12,000 - $3,000 = $159,000
+```
+
+**What This Tells You**:
+- Your $180,000 portfolio has an effective market exposure of $159,000
+- The options provide less exposure than their market value suggests
+- If AAPL rises 10%, your portfolio gains approximately $15,900 (not $18,000)
 
 ---
 
@@ -356,19 +348,74 @@ For options, we need to convert them to "stock equivalent" exposure. It's like c
 
 Factor analysis is like understanding what makes your car go fast. Is it the engine (market factor)? The aerodynamics (momentum)? The weight (value)? Similarly, we analyze what drives your portfolio's performance.
 
+### How Investors Use Factor Analysis
+
+**Investment Decision Making:**
+- **Risk Assessment**: "Am I too exposed to tech growth stocks? Should I diversify?"
+- **Performance Attribution**: "Did I make money because I picked good stocks or because tech went up?"
+- **Style Drift Detection**: "Is my 'value' manager secretly buying growth stocks?"
+- **Hedging Decisions**: "Which factors should I hedge to reduce risk?"
+
+**What We Actually Calculate:**
+
+We calculate factor sensitivities at two levels:
+
+1. **Position Level** (Each Individual Holding):
+   - How sensitive is Apple stock to the market factor? (Maybe 1.2x)
+   - How much "growth" characteristics does Tesla have? (High growth beta)
+   - Does this bank stock behave more like value or momentum?
+
+2. **Portfolio Level** (All Holdings Combined):
+   - What's my overall market sensitivity? (Portfolio market beta)
+   - Am I tilted toward value or growth overall?
+   - How exposed am I to small-cap risk?
+
+### Understanding the Terminology
+
+**The Three Confusing Terms Explained:**
+
+**1. Factor Beta** (The Sensitivity Number)
+- **What it is**: A number showing how sensitive you are to a factor
+- **Example**: Market beta of 1.5 means when the market rises 10%, you expect to rise 15%
+- **Range**: Usually -3 to +3 (we cap at these limits)
+- **Think of it as**: Your amplification factor
+
+**2. Factor Exposure** (The Dollar Amount)
+- **What it is**: How many dollars you have exposed to each factor
+- **Example**: $500,000 exposure to growth factor means you have $500k worth of "growth-ness"
+- **Calculation**: Portfolio Value × Factor Beta = Factor Exposure
+- **Think of it as**: Your dollar commitment to that investment style
+
+**3. Factor Loading** (Same as Beta)
+- **What it is**: Just another name for factor beta (used interchangeably)
+- **Why two names**: Academic papers say "loading," practitioners say "beta"
+- **Think of it as**: How much of that factor you're "loading up on"
+
+**Real Example to Tie It Together:**
+```
+Your $1,000,000 Portfolio Analysis:
+- Market Beta (loading): 1.3
+- Market Exposure: $1,000,000 × 1.3 = $1,300,000
+
+What this means:
+- You're 30% more sensitive to market moves than the S&P 500
+- It's like having $1.3M invested in the market (leveraged exposure)
+- If the market drops 10%, you expect to lose $130,000 (not $100,000)
+```
+
 ### The Seven Market Factors
 
-Think of factors as different "flavors" of market risk:
+Think of factors as different "flavors" of market risk. We measure each factor using Exchange-Traded Funds (ETFs) that represent these investment styles:
 
-| Factor | What It Represents | Real-World Example |
-|--------|-------------------|-------------------|
-| **Market** | Overall stock market movement | "When the S&P 500 moves 1%, how much does my portfolio move?" |
-| **Value** | Cheap stocks based on fundamentals | Companies trading below their book value |
-| **Growth** | Fast-growing companies | Tech companies with high revenue growth |
-| **Momentum** | Stocks on winning streaks | Stocks that have risen strongly recently |
-| **Quality** | Profitable, stable companies | Companies with consistent earnings |
-| **Size** | Smaller company premium | Small-cap vs. large-cap performance |
-| **Low Volatility** | Stable, defensive stocks | Utilities and consumer staples |
+| Factor | ETF Proxy | What It Represents | Real-World Example |
+|--------|-----------|-------------------|-------------------|
+| **Market** | SPY | Overall stock market movement | "When the S&P 500 moves 1%, how much does my portfolio move?" |
+| **Value** | VTV | Cheap stocks based on fundamentals | Companies trading below their book value |
+| **Growth** | VUG | Fast-growing companies | Tech companies with high revenue growth |
+| **Momentum** | MTUM | Stocks on winning streaks | Stocks that have risen strongly recently |
+| **Quality** | QUAL | Profitable, stable companies | Companies with consistent earnings |
+| **Size** | SIZE | Smaller company premium | Small-cap vs. large-cap performance |
+| **Low Volatility** | USMV | Stable, defensive stocks | Utilities and consumer staples |
 
 ### Critical Discovery: The Correlation Problem
 
@@ -434,7 +481,20 @@ Correlation measures how much two investments move together. It's like noting th
 
 ### How We Calculate Correlations
 
-We look at 60 days of price movements and calculate how synchronized they are. We only store correlations above 0.3 (meaningful relationships).
+**Our Pragmatic Approach (Balancing Accuracy vs. Speed):**
+
+1. **90-Day Window**: We use 90 days of price data (not 252) for faster calculations while maintaining statistical significance
+2. **Position Filtering**: We only correlate meaningful positions:
+   - Minimum value: $10,000 (skip tiny positions)
+   - Minimum weight: 1% of portfolio (skip negligible holdings)
+3. **Selective Storage**: We store ALL correlations (not just high ones) to support flexible filtering later
+4. **Clustering at 0.7 Threshold**: We identify "correlation clusters" - groups of positions that move together above 70% correlation
+5. **Weekly Calculation**: Correlations update weekly (Tuesdays), not daily, to reduce computational load
+
+**What This Means for Performance:**
+- Instead of calculating 1,000+ correlations daily, we calculate ~100 weekly
+- Results cache for 7 days, making reports instant
+- Full correlation matrix stored for drill-down analysis
 
 ---
 
@@ -444,45 +504,61 @@ We look at 60 days of price movements and calculate how synchronized they are. W
 
 Market risk is the chance of losing money due to market movements. It's like weather risk for outdoor events - you need to know the probability and impact of rain.
 
-### Key Risk Metrics Explained
+### Currently Implemented (Available Now)
 
-#### Value at Risk (VaR)
+#### Market Beta & Scenario Analysis ✅
+**What we calculate**: How your portfolio responds to market movements
+- Portfolio market beta from factor analysis (e.g., 1.3 = 30% more volatile than market)
+- Six market scenarios: ±5%, ±10%, ±20% market moves
+- P&L predictions for each scenario
 
-**What it means**: "What's the most I could lose on a normal bad day?"
+**Example**: If your portfolio has 0.96 market beta and $100,000 value:
+- Market up 10% → You gain ~$9,600
+- Market down 20% → You lose ~$19,200
 
-**The Numbers**:
-- 95% VaR of $100,000: On 95% of days, you won't lose more than $100,000
-- 99% VaR of $200,000: On 99% of days, you won't lose more than $200,000
+#### Interest Rate Sensitivity ⚠️ (Known Issues)
+**What we calculate**: How sensitive your portfolio is to interest rate changes
+- Position-level interest rate betas using Treasury yield regression
+- Four rate scenarios: ±100bp, ±200bp (basis points)
+- Uses FRED API for real Treasury data (with mock fallback)
 
-**Real-World Translation**: 
-- 95% VaR = Your typical worst day (happens ~once a month)
-- 99% VaR = Your really bad day (happens ~twice a year)
+**Current Status - Known Issues**:
+- Currently showing $0 impact in reports due to units calculation bug
+- Fix identified (yield units need correction) but deferred to Phase 2.8
+- Core calculation engine works; display layer needs adjustment
+- Workaround: Interest rate sensitivity data exists but requires manual interpretation
 
-#### Volatility
+**Example** (when fixed): Bond-heavy portfolio might lose 5% if rates rise 100bp
 
-**What it means**: How much your portfolio value swings around
+### Coming Soon (Phase 1.5)
 
-**Business Context**:
-- 10% annual volatility = calm, bond-like
-- 20% annual volatility = typical stock portfolio
-- 40% annual volatility = aggressive, high-risk
+#### Advanced Risk Metrics 🔜
+These sophisticated metrics are postponed to V1.5 for computational efficiency:
 
-#### Sharpe Ratio
+**Value at Risk (VaR)**: "What's the most I could lose on a normal bad day?"
+- 95% VaR: Your typical worst day (monthly occurrence)
+- 99% VaR: Your really bad day (twice yearly)
+- Status: Requires historical simulation engine
 
-**What it means**: Your return per unit of risk (bang for your buck)
+**Portfolio Volatility**: How much your portfolio value swings
+- Annualized standard deviation of returns
+- Status: Needs 252-day return history
 
-**The Scale**:
-- Below 0: Losing money
-- 0-1: Okay performance
-- 1-2: Good performance
-- Above 2: Excellent performance
+**Sharpe Ratio**: Your return per unit of risk
+- Measures risk-adjusted performance
+- Status: Requires return history and risk-free rate integration
 
-#### Maximum Drawdown
+**Maximum Drawdown**: Worst peak-to-valley loss
+- Tracks largest historical decline
+- Status: Needs complete return history
 
-**What it means**: The worst peak-to-valley loss in history
+### Why the Phased Approach?
 
-**Example**: Your portfolio grew from $1M to $1.5M, then fell to $1.1M
-- Maximum Drawdown = -26.7% (from $1.5M to $1.1M)
+We prioritized scenario analysis (what-if) over historical metrics (what-was) because:
+1. **Immediate Value**: Scenario analysis helps with today's decisions
+2. **Data Requirements**: Historical metrics need extensive return data
+3. **Computational Efficiency**: Scenarios calculate quickly; VaR requires simulations
+4. **User Priority**: Users wanted stress testing before risk metrics
 
 ---
 
@@ -519,14 +595,60 @@ Stress testing is like crash-testing a car - we simulate various disasters to se
 1. **Pandemic 2.0**: Global shutdown scenario
 2. **Systemic Crisis**: Banking system stress
 
-### How Correlation Makes Things Worse
+### Our Two-Phase Stress Testing Methodology
 
-When one factor crashes, correlated factors often follow. It's like dominoes - push one, others fall.
+We use a sophisticated two-phase approach that captures both direct shocks and ripple effects through the market:
 
-**Example**: In a market crash:
-- Stocks fall 20% (direct impact)
-- High-correlation factors fall 15% (sympathetic impact)
-- Your total loss might be 30%+ (combined impact)
+#### Phase 1: Direct Impact Calculation
+First, we calculate how the shocked factors directly affect your portfolio:
+- Apply the scenario shock (e.g., -20% to Market factor)
+- Multiply by your portfolio's sensitivity (beta) to that factor
+- Result: Direct P&L impact from the primary shock
+
+#### Phase 2: Correlation-Driven Contagion
+Next, we model how shocks spread to other factors through correlations:
+- Use a 252-day correlation matrix between all factor ETFs
+- Apply exponential decay weighting (recent correlations matter more)
+- Calculate secondary shocks: `Secondary Shock = Primary Shock × Correlation`
+- Sum all correlated impacts for total scenario effect
+
+### Real-World Example: Tech Sector Crash Scenario
+
+**Scenario**: Technology sector drops 30% (primary shock)
+
+**Your Portfolio**:
+- $1,000,000 total value
+- Growth factor beta: 1.5 (high tech exposure)
+- Momentum factor beta: 0.8
+- Market factor beta: 1.1
+
+**Phase 1 - Direct Impact**:
+```
+Growth factor shocked: -30%
+Direct P&L = $1,000,000 × 1.5 × (-30%) = -$450,000
+```
+
+**Phase 2 - Correlation Contagion**:
+```
+Historical Correlations (from our factor ETF analysis):
+- Growth ↔ Momentum: 0.85 correlation
+- Growth ↔ Market: 0.92 correlation
+
+Secondary Shocks:
+- Momentum gets: -30% × 0.85 = -25.5% shock
+- Market gets: -30% × 0.92 = -27.6% shock
+
+Correlated P&L:
+- Momentum: $1,000,000 × 0.8 × (-25.5%) = -$204,000
+- Market: $1,000,000 × 1.1 × (-27.6%) = -$303,600
+
+Total Scenario Impact: -$450,000 + -$204,000 + -$303,600 = -$957,600
+```
+
+**Why This Matters**: 
+- A 30% tech crash doesn't just hit your tech stocks
+- Through correlations, it triggers a near-total portfolio loss (95.8%)
+- Without correlation modeling, you'd underestimate risk by 2x
 
 ### The 99% Loss Cap
 
@@ -540,22 +662,70 @@ We cap losses at 99% of portfolio value. Why? Because in reality, exchanges woul
 
 Daily snapshots are like taking a photograph of your portfolio every day. Over time, these create a "movie" showing how your portfolio evolved.
 
-### What We Capture Daily
+### Why We Create Snapshots
 
-Think of it as your portfolio's daily report card:
-- Total Value (what it's worth)
-- Total P&L (profit/loss)
-- Exposure Breakdown (long vs. short)
-- Position Count (number of holdings)
-- Risk Metrics (VaR, Sharpe ratio)
-- Market Beta (market sensitivity)
+**The Business Need**:
+- **Regulatory Compliance**: Prove portfolio state at any historical date
+- **Performance Measurement**: Calculate returns over any time period
+- **Risk Monitoring**: Track how risk exposures change over time
+- **Client Reporting**: Show clients their portfolio journey
+- **Anomaly Detection**: Spot unusual changes in portfolio behavior
 
-### Why Historical Snapshots Matter
+**The Technical Need**:
+- **Data Efficiency**: Pre-calculate daily values instead of re-computing history
+- **Consistency**: Ensure all reports show the same historical values
+- **Audit Trail**: Immutable record of what was calculated when
+- **Trend Analysis**: Enable time-series analytics on portfolio metrics
 
-1. **Performance Tracking**: See your journey over time
-2. **Risk Evolution**: Understand how your risk changed
-3. **Audit Trail**: Prove what you owned when
-4. **Pattern Recognition**: Identify what works
+### What We Actually Capture (Currently Implemented) ✅
+
+**Portfolio Values**:
+- Total portfolio value
+- Cash value
+- Long position value
+- Short position value
+- Gross exposure (total absolute exposure)
+- Net exposure (long minus short)
+
+**Daily Performance**:
+- Daily P&L (profit/loss in dollars)
+- Daily return (percentage change)
+- Cumulative P&L (total since inception)
+
+**Position Counts**:
+- Total number of positions
+- Number of long positions
+- Number of short positions
+
+**Aggregated Greeks** (when options data available):
+- Portfolio delta (directional exposure)
+- Portfolio gamma (convexity)
+- Portfolio theta (time decay)
+- Portfolio vega (volatility sensitivity)
+
+**Metadata**:
+- Snapshot date (only created on trading days)
+- Creation timestamp
+- Portfolio ID reference
+
+### What's Coming Soon (Phase 1.5) 🔜
+
+**Advanced Risk Metrics** (postponed for computational efficiency):
+- Value at Risk (95% and 99% confidence levels)
+- Sharpe ratio (risk-adjusted returns)
+- Sortino ratio (downside risk-adjusted returns)
+- Maximum drawdown tracking
+- Volatility (annualized standard deviation)
+- Information ratio (vs. benchmark)
+- Market beta (stored separately, not in snapshot)
+
+### Why the Phased Approach?
+
+We prioritized **essential daily metrics** over **derived analytics** because:
+1. Core values needed immediately for P&L and exposure tracking
+2. Advanced metrics require extensive historical data to be meaningful
+3. Computational efficiency - calculate complex metrics on-demand rather than daily
+4. Storage optimization - keep snapshot records lean for performance
 
 ---
 
@@ -565,15 +735,35 @@ Think of it as your portfolio's daily report card:
 
 Instead of calculating continuously (expensive and complex), we process everything once per day in a "batch" - like doing all your laundry on Sunday instead of one sock at a time.
 
-### The Daily Schedule
+### The Daily Schedule (Eastern Time)
 
-**5:15 AM**: System wakes up
-**5:20 AM**: Fetches latest market prices
-**5:30 AM**: Processes Portfolio #1
-**5:45 AM**: Processes Portfolio #2
-**6:00 AM**: Processes Portfolio #3
-**6:15 AM**: Generates reports
-**6:30 AM**: Emails sent to users
+**4:00 PM ET**: Daily batch sequence starts (after market close)
+- Fetches latest market prices
+- Updates market data cache
+
+**4:30 PM ET**: Portfolio calculations begin
+- Portfolio aggregation and exposures
+- Greeks calculations for options
+
+**5:00 PM ET**: Risk analytics
+- Factor analysis and betas
+- Market risk scenarios
+
+**5:30 PM ET**: Stress testing
+- Runs 15 stress scenarios
+- Calculates correlation effects
+
+**6:00 PM ET**: Correlation analysis
+- Position-to-position correlations
+- Correlation cluster detection
+
+**6:30 PM ET**: Daily snapshots
+- Creates portfolio snapshots
+- Calculates daily P&L
+
+**7:00 PM ET**: Market data verification
+- Quality checks on data completeness
+- Flags any missing prices
 
 ### Why Sequential Processing?
 
@@ -595,77 +785,237 @@ We process one portfolio at a time to avoid conflicts. It's like having one chef
 
 ---
 
+## Portfolio Report Generator
+
+### Overview
+
+The Portfolio Report Generator is the culmination of all calculation engines, transforming complex financial data into actionable intelligence. Completed in August 2025 (Phase 2.0), this system generates comprehensive portfolio analytics reports optimized for both human readers and AI/LLM consumption.
+
+### What Gets Generated
+
+**Three Output Formats**:
+
+1. **Markdown Report** (Human & LLM Optimized)
+   - Executive summary with key metrics
+   - Position-by-position analysis with P&L
+   - Factor exposures and sensitivities
+   - Stress test results with scenario impacts
+   - Correlation clusters and risk concentrations
+   - Daily performance tracking
+
+2. **JSON Report** (Machine-Readable)
+   - Complete structured data export
+   - All calculation engine outputs
+   - Nested hierarchical organization
+   - Metadata and timestamps
+   - Ready for API consumption
+
+3. **CSV Report** (Spreadsheet-Ready)
+   - Flat tabular format
+   - Position-level details
+   - Suitable for Excel analysis
+   - Easy pivot table creation
+
+### Report Contents
+
+**Portfolio Overview Section**:
+- Total market value and P&L
+- Gross/net exposure breakdown
+- Long vs. short positioning
+- Asset class distribution
+- Daily/cumulative returns
+
+**Position Analysis Section**:
+- Individual position P&L
+- Market values and exposures
+- Greeks (when available)
+- Factor betas per position
+- Correlation relationships
+
+**Risk Analytics Section**:
+- Factor exposures (7-factor model)
+- Market beta and sensitivities
+- Interest rate sensitivity (when fixed)
+- Portfolio-level Greeks aggregation
+- Position correlations and clusters
+
+**Stress Testing Section**:
+- 15 scenario results
+- Direct vs. correlated impacts
+- Worst-case scenarios
+- Factor contribution analysis
+
+**Performance Attribution**:
+- Daily P&L breakdown
+- Factor contribution to returns
+- Winners and losers analysis
+- Trend identification
+
+### Calculations Performed in Report Generator
+
+While the report generator primarily aggregates data from the 8 calculation engines, it performs several important calculations during report generation:
+
+**1. Signed Exposure Adjustment**:
+- Corrects the sign of exposures based on position type
+- SHORT, SC (short calls), SP (short puts) → negative exposure
+- LONG, LC (long calls), LP (long puts) → positive exposure
+- Critical for accurate net exposure calculation
+
+**2. Portfolio Exposure Aggregation**:
+- **Gross Exposure**: Sum of absolute values of all position exposures
+- **Net Exposure**: Sum of signed exposures (long - short)
+- **Long Exposure**: Sum of all positive exposures
+- **Short Exposure**: Sum of all negative exposures
+- **Options vs Stock Exposure**: Breakdown by instrument type
+- **Notional Value**: Total absolute value at market prices
+
+**3. Portfolio Greeks Aggregation**:
+- Sums individual position Greeks to portfolio level
+- Delta: Total directional exposure
+- Gamma: Total convexity exposure
+- Theta: Total time decay
+- Vega: Total volatility sensitivity
+- Rho: Total interest rate sensitivity
+
+**4. Derived Metrics for CSV Export**:
+- **Cost Basis**: Quantity × Entry Price (per position)
+- **Portfolio Weight**: Position Market Value / Gross Exposure × 100
+- **Total P&L**: Unrealized P&L + Realized P&L
+- **Days to Expiry**: Calculated for options positions
+
+**5. Data Formatting & Precision**:
+- Decimal precision management (2-6 decimal places based on metric)
+- Percentage conversions for display
+- Currency formatting for financial values
+
+### Planned Improvements (Phase 2.9)
+
+**Calculation Migration Initiative**:
+During implementation, we identified critical calculations occurring at report-time that should be migrated to core engines:
+
+1. **Bug Fix**: Signed exposure adjustment incorrectly using market_value instead of exposure
+2. **Performance**: Portfolio aggregations and Greeks summation recalculated on every report
+3. **Consistency**: Derived metrics calculated differently across report formats
+
+**Migration Plan**:
+- Move all calculations to batch processing phase
+- Persist results to database during daily batch
+- Report generator becomes pure formatting layer
+- Target: <1 second report generation time
+
+See TODO2.md Phase 2.9 for implementation details.
+
+### Technical Implementation
+
+**Architecture** (See TODO2.md Section 2.0 for details):
+- Async data collection from all 8 engines
+- Single-pass database queries with eager loading
+- Graceful degradation for missing data
+- Template-based report generation
+- On-the-fly calculations for derived metrics (to be migrated)
+
+**Performance Characteristics**:
+- Generation time: ~2-3 seconds per portfolio
+- Database queries: Optimized with selectinload
+- Memory usage: Streaming for large portfolios
+- Concurrency: Async throughout
+- Calculations: Minimal overhead (~100ms)
+
+**Requirements Document**: See `_docs/requirements/PRD_PORTFOLIO_REPORT_SPEC.md`
+
+**Implementation Status**: 100% complete with all features operational
+
+---
+
 ## Recent Enhancements
 
-### Phase 2.6: Factor Exposure Redesign (Completed)
+### Phase 2.6: Factor Exposure Redesign (Completed August 2025)
 
-**The Problem**: Factor exposures were incorrectly calculated, showing impossible numbers
-**The Solution**: Fixed the attribution math to properly allocate exposures
-**The Result**: Accurate factor breakdowns you can trust
+**The Problem**: Factor exposures showing 300-600% of gross exposure
+**The Solution**: Implemented position-level attribution (each position contributes proportionally)
+**The Result**: Factor exposures now interpretable and sum correctly
 
 ### Phase 2.6.8: Factor Beta Investigation (Completed August 2025)
 
-**The Discovery**: Factor ETFs are highly correlated (up to 95.4%)
-**The Impact**: Can't use complex multi-factor models (become unstable)
-**The Solution**: Keep simple one-factor approach (more reliable)
+**Critical Discovery**: Severe multicollinearity in factor ETFs
+- Factor correlations up to 95.4% (Value vs Size)
+- VIF values up to 39 (Quality factor)
+- Condition number 645 (numerical instability)
+**Decision**: Keep univariate regression, fix data quality issues
+**Documentation**: Created FACTOR_BETA_REDESIGN.md with empirical evidence
 
-### Phase 2.7: Factor Beta Redesign (In Progress)
+### Phase 2.3: Snapshot Array Fix (Completed August 2025)
 
-**What We're Fixing**:
-1. Removing artificial data smoothing
-2. Properly handling options with delta adjustment
-3. Using statistical winsorization instead of hard caps
-4. Requiring minimum 60 days of data for reliability
+**The Problem**: Portfolio snapshots failing with array length errors
+**The Solution**: Added defensive input handling and enum normalization
+**The Result**: 100% snapshot success rate across all portfolios
 
 ---
 
 ## Future Roadmap
 
-### Immediate Priorities (Next 3 Months)
+### Phase 2.7: Factor Beta Redesign (Next Priority)
 
-1. **Complete Factor Beta Fixes**
-   - More accurate sensitivity measurements
-   - Better handling of options
-   - Improved data quality checks
+**Status**: Ready for implementation
+**Focus**: Fix data quality issues in beta calculations
+- Remove zero-filling of returns (preserve NaN values)
+- Enforce delta adjustment for all options
+- Replace hard ±3 cap with statistical winsorization
+- Require minimum 60 days of data for reliability
+- Keep univariate approach (multivariate not viable due to multicollinearity)
 
-2. **Portfolio Report Generator**
-   - Beautiful PDF reports
-   - Interactive dashboards
-   - AI-powered insights
+### Phase 2.8: Portfolio Exposure Database Storage
 
-### Medium-Term Goals (6-12 Months)
+**Status**: Design phase
+**Focus**: Performance optimization
+- Create `portfolio_exposures` table for pre-calculated values
+- Store long/short/gross/net and delta-adjusted exposures
+- Enable historical exposure tracking
+- ~10x faster report generation
 
-1. **Faster Performance**
-   - Store calculations for instant retrieval
-   - Real-time position updates
-   - Streaming price feeds
+### Phase 1.5: Advanced Risk Metrics (Postponed)
 
-2. **Advanced Analytics**
-   - Conditional VaR (tail risk)
-   - Component VaR (risk attribution)
-   - Marginal VaR (position impact)
+**Why Postponed**: Requires extensive historical data and computational resources
+**Metrics to Add**:
+- Value at Risk (95% and 99% confidence)
+- Sharpe Ratio (risk-adjusted returns)
+- Sortino Ratio (downside risk-adjusted)
+- Maximum Drawdown tracking
+- Information Ratio (vs benchmark)
+- Conditional VaR (tail risk)
 
-3. **Real-Time Features**
+### Options Data Provider Integration
+
+**Critical Dependency**: Many features blocked by lack of options chain data
+**Needed Data**:
+- Strike prices and expiration dates
+- Implied volatility surfaces
+- Option chains for all symbols
+**Blocked Features**:
+- Full Greeks calculations
+- Options P&L attribution
+- Volatility risk scenarios
+- Gamma/convexity in stress tests
+
+### Medium-Term Enhancements (6-12 Months)
+
+1. **Real-Time Capabilities**
+   - WebSocket price feeds
    - Live P&L updates
-   - Intraday Greeks
-   - Streaming risk metrics
+   - Intraday risk calculations
+   - Streaming Greeks
 
-### Long-Term Vision (12+ Months)
-
-1. **AI Integration**
+2. **AI/ML Integration**
+   - Anomaly detection in portfolios
    - Predictive risk alerts
-   - Anomaly detection
+   - Factor timing models
    - Portfolio optimization suggestions
 
-2. **Asset Class Expansion**
-   - Bonds and fixed income
-   - Cryptocurrencies
+3. **Asset Class Expansion**
+   - Fixed income analytics
+   - Cryptocurrency support
    - Commodities and futures
-
-3. **Regulatory Compliance**
-   - Automated regulatory reports
-   - Audit trail documentation
-   - Compliance monitoring
+   - FX exposure tracking
 
 ---
 

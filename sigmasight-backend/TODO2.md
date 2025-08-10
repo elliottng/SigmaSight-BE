@@ -1235,7 +1235,7 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 - Lines 290-324: OLS regression calculating betas
 - Line 308: Beta capping at ±3 (BETA_CAP_LIMIT) - but many hitting this limit!
 
-### 2.6.8.1 Investigation Results ✅ COMPLETED (2025-01-10)
+### 2.6.8.1 Investigation Results ✅ COMPLETED (2025-08-10)
 
 1. **Beta Calculation Analysis** ✅
    - [x] Returns are correctly scaled (daily decimals)
@@ -1277,7 +1277,7 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 **Dependencies**: None
 **Design Doc**: See `_docs/requirements/FACTOR_BETA_REDESIGN.md` for full details.
 
-### Critical Discovery (2025-01-10)
+### Critical Discovery (2025-08-10)
 Investigation revealed severe multicollinearity in factor ETFs:
 - Factor correlations up to 0.954 (Size vs Value), with 17/21 pairs > 0.7
 - VIF values: Quality (39.0), Growth (27.4), Value (19.6), Size (18.8)
@@ -1466,6 +1466,116 @@ Currently, portfolio exposures (long, short, gross, net, delta-adjusted) are cal
 - Historical backfill: 0.5 days
 - Testing & validation: 1 day
 - **Total: 4.5 days**
+
+---
+
+## Phase 2.9: Report Generator Calculation Migration
+*Migrate calculations from report generator to core engines for data integrity and performance*
+**Created**: 2025-08-10
+**Status**: Planning
+
+### Background
+During Phase 2.0 Portfolio Report Generator implementation and subsequent white paper documentation, discovered that several critical calculations are happening at report-time instead of during batch processing. This creates:
+- Data integrity issues (signed exposure adjustment bug)
+- Performance bottlenecks (portfolio aggregations recalculated on every report)
+- Inconsistent data across reports if calculation logic changes
+
+### 2.9.1 Signed Exposure Adjustment Bug Fix
+**Priority**: CRITICAL - Data Integrity Issue
+**Location**: app/reports/portfolio_report_generator.py:427-430
+
+Current buggy implementation:
+```python
+# Lines 427-430: Incorrect signed exposure adjustment
+if pos.position_type in ['SHORT', 'SC', 'SP']:
+    signed_exposure = -abs(market_value)  # BUG: Should use exposure, not market_value
+else:
+    signed_exposure = abs(market_value)   # BUG: Should use exposure
+```
+
+Should be:
+```python
+signed_exposure = exposure  # Exposure already has correct sign from batch
+```
+
+#### Tasks
+- [ ] Fix signed exposure calculation in report generator
+- [ ] Verify exposure signs are correct in batch calculations
+- [ ] Add unit tests to prevent regression
+- [ ] Validate against all 3 demo portfolios
+
+### 2.9.2 Portfolio Exposure Aggregation Migration
+**Priority**: HIGH - Performance Gap
+**Current**: Calculated in report generator (lines 456-461)
+**Target**: Move to app/calculations/portfolio.py
+
+#### Tasks
+- [ ] Enhance calculate_portfolio_exposures() to persist results
+- [ ] Create PortfolioExposures database table
+- [ ] Integrate into batch_orchestrator_v2 portfolio_aggregation job
+- [ ] Update report generator to read from database
+- [ ] Add fallback to calculation if database empty
+
+### 2.9.3 Portfolio Greeks Aggregation Migration  
+**Priority**: HIGH - Performance Gap
+**Current**: Aggregated at report-time
+**Target**: Move to batch processing
+
+#### Tasks
+- [ ] Enhance aggregate_portfolio_greeks() to persist results
+- [ ] Add to PortfolioMetrics or create PortfolioGreeks table
+- [ ] Integrate into batch_orchestrator_v2 greeks_calculation job
+- [ ] Update report generator to read from database
+- [ ] Add fallback calculation for missing data
+
+### 2.9.4 Derived Metrics Standardization
+**Priority**: MEDIUM - Consistency
+**Current**: Calculated in report generator (lines 1043-1111)
+**Issue**: Business logic scattered, difficult to maintain
+
+#### Tasks
+- [ ] Create centralized derived_metrics module
+- [ ] Define standard calculations:
+  - Gross/Net/Long/Short exposures
+  - Delta-adjusted exposures
+  - Position counts by type
+  - Risk concentration metrics
+- [ ] Add comprehensive unit tests
+- [ ] Update report generator to use centralized module
+
+### 2.9.5 Data Validation Framework
+**Priority**: MEDIUM - Quality Assurance
+**Purpose**: Ensure data integrity across calculation engines
+
+#### Tasks
+- [ ] Create validation module with checks:
+  - Exposure sign consistency
+  - Greeks bounds checking
+  - Factor beta reasonableness
+  - Stress test result validation
+- [ ] Add pre/post batch validation
+- [ ] Create validation report
+- [ ] Alert on validation failures
+
+### Success Criteria
+- [ ] Zero calculation logic in report generator (only formatting)
+- [ ] All metrics pre-calculated during batch processing
+- [ ] Report generation time < 1 second per portfolio
+- [ ] 100% consistency across report formats (MD/JSON/CSV)
+- [ ] Comprehensive test coverage for all calculations
+
+### Estimated Timeline
+- Bug fixes: 0.5 days
+- Database schema: 1 day
+- Calculation migration: 2 days
+- Testing & validation: 1.5 days
+- **Total: 5 days**
+
+### References
+- White Paper Analysis: _docs/generated/Calculation_Engine_White_Paper.md (Section: Portfolio Report Generator)
+- Batch Orchestrator: app/batch/batch_orchestrator_v2.py
+- Portfolio Calculations: app/calculations/portfolio.py
+- Report Generator: app/reports/portfolio_report_generator.py
 
 ---
 
