@@ -14,12 +14,10 @@ This document details the technical rationale behind our quantitative library ch
 - **Why This Choice**: Better Python 3.11+ compatibility, no C extension dependencies
 - **Advantage**: No `_testcapi` import issues that plague py_vollib
 
-#### py_vollib (Fallback)
-- **Purpose**: Options pricing and Greeks calculations (Fallback only)
-- **Implementation**: Black-Scholes model with analytical Greeks
-- **Institutional Heritage**: Created by Gammon Capital Management
-- **Limitation**: Has `_testcapi` compatibility issues on Python 3.11+
-- **Why Not Primary**: Dependency on `py_lets_be_rational` causes import errors
+#### py_vollib (Deprecated)
+- **Status**: Removed from the codebase due to Python 3.11+ incompatibilities
+- **Reason**: Dependency on `py_lets_be_rational` triggers `_testcapi` import errors
+- **Action**: No fallback to `py_vollib` remains; `mibian` is the sole library for Greeks
 
 #### empyrical  
 - **Purpose**: Portfolio risk and performance metrics
@@ -48,9 +46,9 @@ This document details the technical rationale behind our quantitative library ch
 - **Purpose**: Real-time and historical market data
 - **Why**: Institutional-grade data quality, reasonable pricing
 
-#### yfinance
-- **Purpose**: GICS sector/industry classification only
-- **Limitation**: Not for pricing data (use Polygon)
+#### fredapi
+- **Purpose**: Macro data series and risk-free rates (e.g., 3M T-bill)
+- **Note**: `yfinance` is not used in the current codebase and has been removed from dependencies
 
 ## Calculation Methodology Alignment
 
@@ -62,9 +60,9 @@ This document details the technical rationale behind our quantitative library ch
 - Growth (VUG) - Growth factor
 - Momentum (MTUM) - Carhart momentum
 - Quality (QUAL) - Quality factor (profitability/earnings)
-- Size (SLY) - Fama-French size factor
+- Size (SIZE) - Fama-French size factor
 - Low Volatility (USMV) - Low vol anomaly
-- Short Interest - Custom factor
+# Short Interest factor postponed to V1.5 (not in current 7-factor model)
 ```
 
 ### Greeks Calculation (Black-Scholes Standard)
@@ -77,6 +75,7 @@ This document details the technical rationale behind our quantitative library ch
 - 95% and 99% VaR (regulatory standard)
 - Sharpe ratio with risk-free rate parameter
 - Maximum drawdown (peak-to-trough)
+- Status: `empyrical` is included as a dependency, but risk metrics integration is pending in the current codebase
 
 ## Implementation Patterns from Hedge Funds
 
@@ -85,8 +84,7 @@ This document details the technical rationale behind our quantitative library ch
 Market Data → Core Calculations → Risk Aggregation → Reporting
      ↓              ↓                    ↓              ↓
   Polygon        mibian            empyrical      Database
-              statsmodels            numpy
-              (py_vollib fallback)
+               statsmodels            numpy
 ```
 
 ### 2. Fallback Pattern (Production Best Practice)
@@ -109,7 +107,6 @@ except:
   - Bloomberg Terminal OVDV function
   - Interactive Brokers option analytics
   - CBOE published theoretical values
-- Fallback to py_vollib when mibian unavailable (with compatibility warnings)
 
 ### Factor Model Validation
 - Regression methodology matches:
@@ -153,42 +150,55 @@ except:
 
 ### Library Priority Changes
 - **Primary**: `mibian` v0.1.3 - Stable, pure Python Black-Scholes implementation
-- **Fallback**: `py_vollib` v1.0.1 - Kept for compatibility but has known issues
-- **Issue**: `py_vollib` dependency `py_lets_be_rational` imports `_testcapi` (private CPython testing module)
-- **Solution**: Use `mibian` as primary with `py_vollib` fallback pattern
+- **Removed**: `py_vollib` due to `_testcapi` import issues via `py_lets_be_rational`
+- **Decision**: `mibian`-only implementation; no `py_vollib` fallback remains in the codebase
 
-### Hybrid Calculation Pattern
+### Greeks Calculation Pattern (Mibian-only)
 ```python
+# Expired options → zero Greeks; stocks → no Greeks; options → mibian
+if is_expired_option(position):
+    return {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
+
+if not is_options_position(position):
+    return None  # Stocks: Greeks not applicable
+
 try:
-    # Try mibian first (primary)
-    return calculate_with_mibian(params)
-except ImportError:
-    try:
-        # Fallback to py_vollib
-        return calculate_with_py_vollib(params)
-    except ImportError:
-        # Final fallback to mock values
-        return get_mock_greeks(position_type)
+    return calculate_real_greeks_with_mibian(...)
+except Exception:
+    # On error, return None (no mock or py_vollib fallback in V1.4)
+    return None
 ```
+
+### Rate Limiter (Polygon.io) — Implemented
+- **Class**: `app/services/rate_limiter.py` → `TokenBucket`, `PolygonRateLimiter`, `ExponentialBackoff`
+- **Plans**: free (5/min), starter (100/min), developer (1000/min), advanced (10000/min)
+- **Config**: `settings.POLYGON_PLAN` controls plan; global `polygon_rate_limiter` instance
+- **Behavior**: Token bucket pacing; exponential backoff for 429s (base 1s, factor 2x, max 300s)
+
+### Portfolio Aggregation Engine — Completed (V1.4)
+- **Module**: `app/calculations/portfolio.py`
+- **Capabilities**: Gross/net/long/short exposures; portfolio Greeks aggregation; delta-adjusted exposures; tag and underlying grouping
+- **Precision**: Greeks 4 d.p.; monetary 2 d.p.; percentages 2 d.p. (`app/constants/portfolio.py`)
+- **Caching**: In-memory caching with TTL 60s (`AGGREGATION_CACHE_TTL`)
+- **Performance**: <1s for 10k positions (vectorized operations)
 
 ## Appendix: Library Version Requirements
 
 ```toml
 [project.dependencies]
-# Core Calculations (V1.4 Hybrid Engine)
-mibian = ">=0.1.3"          # Primary: Black-Scholes Greeks calculations
-py-vollib = ">=1.0.1"       # Fallback: Has _testcapi compatibility issues on Python 3.11+
-empyrical = ">=0.5.5"       # Risk metrics (Sharpe, VaR, etc.)
-statsmodels = ">=0.14.0"    # Factor regression analysis
+# Core Calculations (V1.4)
+mibian = ">=0.1.3"           # Black-Scholes Greeks (sole library)
+empyrical = ">=0.5.5"        # Risk metrics (planned integration)
+statsmodels = ">=0.14.0"     # Factor regression analysis
 
-# Data Infrastructure  
+# Data Infrastructure
 pandas = ">=2.1.0"
 numpy = ">=1.25.0"
 scipy = ">=1.11.0"
 
 # Market Data
 polygon-api-client = ">=1.14.0"
-yfinance = ">=0.2.28"
+fredapi = ">=0.5.1"
 ```
 
 ## References

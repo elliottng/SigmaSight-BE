@@ -3,9 +3,9 @@
 ## 🎯 Test-Driven Development for Section 1.4.2: Options Greeks Calculations
 
 ### Overview
-This section implements the **V1.4 Hybrid Greeks Calculation** approach:
-- **Real calculations** using `py_vollib` and `mibian` libraries
-- **Mock fallback values** when real calculations fail
+This section implements the **V1.4 Deterministic Greeks Calculation** approach:
+- **Real calculations** using `mibian` (pure Python Black-Scholes) only
+- **No mock fallbacks**; on error or missing inputs, store/return null and log
 - **Database integration** for market data and position updates
 
 ### 📋 Test Requirements (Write Tests First)
@@ -17,41 +17,40 @@ This section implements the **V1.4 Hybrid Greeks Calculation** approach:
 ```python
 # Test cases to implement BEFORE writing the actual functions
 # Import fixtures from tests/fixtures/greeks_fixtures.py
-from app.calculations.greeks import MOCK_GREEKS  # Import existing dict
+from app.calculations.greeks import calculate_position_greeks
 
 class TestGreeksCalculations:
     
-    def test_calculate_greeks_hybrid_long_call_real():
+    def test_calculate_position_greeks_long_call():
         """Test real Greeks calculation for long call with valid market data"""
-        # Expected: Real py_vollib calculation results
+        # Expected: Real mibian calculation results
         # Input: LC position (SQLAlchemy model or dict) with all fields
         # Market data: Dict keyed by symbol {'AAPL': {...}}
         # Output: Dict with all 5 Greeks as floats, scaled appropriately
         
-    def test_calculate_greeks_hybrid_short_put_real():
+    def test_calculate_position_greeks_short_put():
         """Test real Greeks calculation for short put with valid market data"""
         # Expected: Real calculation with negative scaling for short position
         
-    def test_calculate_greeks_hybrid_fallback_missing_data():
-        """Test fallback to mock values when market data missing"""
-        # Expected: Mock values from imported MOCK_GREEKS dict
-        # IV fallback: 0.25 (25%) if missing
+    def test_returns_none_when_market_data_missing():
+        """Test null-on-error behavior when market data missing"""
+        # Expected: Function returns None and logs a warning
         
-    def test_calculate_greeks_hybrid_fallback_calculation_error():
-        """Test fallback when py_vollib throws exception"""
-        # Expected: Mock values with appropriate logging (no error raise)
+    def test_returns_none_on_calculation_error():
+        """Test null-on-error behavior when calculation raises"""
+        # Expected: Returns None with appropriate logging (no error raise)
         
-    def test_calculate_greeks_hybrid_stock_positions():
+    def test_calculate_position_greeks_stock_positions():
         """Test that stock positions always use simple delta"""
         # Expected: LONG=1.0, SHORT=-1.0, other Greeks=0.0
         
-    def test_calculate_greeks_hybrid_expired_options():
+    def test_calculate_position_greeks_expired_options():
         """Test expired options return zero Greeks"""
         # Expected: All Greeks = 0.0 for expired positions
         
-    def test_get_mock_greeks_all_position_types():
-        """Test mock Greeks for all position types (LC, SC, LP, SP, LONG, SHORT)"""
-        # Expected: Predefined values scaled by quantity
+    def test_no_mock_fallback_used():
+        """Ensure no mock Greeks are used; None is returned instead"""
+        # Expected: No code path returns predefined mock Greek values
         
     def test_options_symbol_parsing_edge_cases():
         """Test parsing of complex option symbols"""
@@ -134,16 +133,14 @@ def test_greeks_memory_usage():
 
 **File:** `app/calculations/greeks.py`
 
-- [ ] `calculate_greeks_hybrid(position, market_data) -> Dict[str, float]`
-  - Real calculation using py_vollib/mibian
-  - Fallback to mock values on error (with logger.warning)
+- [ ] `calculate_position_greeks(position, market_data) -> Optional[Dict[str, float]]`
+  - Real calculation using `mibian` only
+  - Null-on-error: return None and log a warning
   - Position: SQLAlchemy model or dict with required fields
   - Market data: Dict keyed by symbol
-  - Returns all 5 Greeks as floats (never Decimal)
+  - Returns dict of 5 Greeks as floats, or None on failure
   
-- [ ] `get_mock_greeks(position_type, quantity) -> Dict[str, float]`
-  - Predefined mock values by position type
-  - Scaled by quantity
+- [ ] Remove any legacy mock Greeks references from tests and scripts
   
 - [ ] `update_position_greeks(db, position_id, greeks) -> None`
   - Insert/update position_greeks table
@@ -258,29 +255,24 @@ expected_greeks = {
 }
 ```
 
-#### Mock Fallback Results:
+#### Null-on-error behavior
 ```python
-# From MOCK_GREEKS['LC'] scaled by quantity=5
-fallback_greeks = {
-    'delta': 0.6 * 5,
-    'gamma': 0.02 * 5,
-    'theta': -0.05 * 5,
-    'vega': 0.15 * 5,
-    'rho': 0.08 * 5
-}
+# When inputs are missing or calculation fails
+result = calculate_position_greeks(position_missing_data, market_data)
+assert result is None  # No mock values should be returned
 ```
 
 ### 🚨 Error Scenarios to Test
 
 1. **Missing Market Data**: Position has no underlying price
-   - Action: Log warning, use last known values or mock fallback
+   - Action: Log warning and return None (skip in aggregation)
 2. **Invalid Option Parameters**: Malformed option symbol
-   - Action: Log error, return mock Greeks
+   - Action: Log error and return None
 3. **Expired Options**: Expiry date in the past
    - Action: Return all Greeks as 0.0
-4. **py_vollib Errors**: Library calculation failures
+4. **mibian Calculation Errors**: Library/input calculation failures
    - Action: `logger.warning(f"Greeks calculation failed: {e}")`
-   - Return mock values
+   - Return None
 5. **Database Errors**: Failed position updates
    - Action: Track in failed list, continue processing
 
@@ -323,7 +315,7 @@ python scripts/test_greeks.py
 
 # Expected output:
 # ✅ Real Greeks calculation: AAPL LC delta=2.6
-# ✅ Mock fallback: Invalid position uses mock values
+# ✅ Null-on-error: Invalid position yields None and is skipped
 # ✅ Database update: Position Greeks saved
 # ✅ Portfolio bulk update: 25 positions updated
 ```

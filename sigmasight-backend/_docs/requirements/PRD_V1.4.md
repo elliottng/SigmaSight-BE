@@ -110,32 +110,23 @@ Features:
 - **Error Handling**: Graceful fallback to cached prices when API fails
 - **Database Updates**: Automatic persistence of calculated values to positions table
 
-#### Position Greeks (Hybrid Real/Mock Calculations)
+#### Position Greeks (Mibian-only)
 ```
 GET /api/v1/risk/greeks?view=portfolio|longs|shorts
 ```
-**V1.4 Hybrid Approach**:
-- **Real calculations** for options using `mibian` library (primary)
-- **Fallback to mock values** if real calculation fails or data unavailable
-- Stock positions always use delta=1.0 (long) or -1.0 (short)
+**V1.4 Implementation**:
+- **Real calculations** for options using `mibian` (Black-Scholes)
+- **No mock fallback**; if calculation fails or inputs are missing, nulls are returned with warnings
+- **Stocks have no Greeks**; delta-adjusted exposure for stocks is handled in the portfolio aggregation engine, not as a Greek
 
 **📝 Implementation Note**: Originally planned to use `py_vollib` but encountered `_testcapi` import issues on Python 3.11. `mibian` provides the same Black-Scholes calculations with better compatibility.
-
-Mock Greeks Fallback Values:
-
-| Type | Delta | Gamma | Theta | Vega |
-|------|------|------|------|------|
-| Long Call (LC) | 0.6 | 0.02 | -0.5 | 0.3 |
-| Short Call (SC) | -0.4 | -0.02 | 0.5 | -0.3 |
-| Long Put (LP) | -0.4 | 0.02 | -0.5 | 0.3 |
-| Short Put (SP) | 0.3 | -0.02 | 0.5 | -0.3 |
 
 ### 3.3 Risk Analytics
 #### Factor Exposures
 ```
 GET /api/v1/risk/factors
 ```
-Eight Factors (with ETF proxies):
+Seven Factors (with ETF proxies):
 1. Market Beta (SPY)
 2. Momentum (MTUM)
 3. Value (VTV)
@@ -431,7 +422,7 @@ Our technology choices align with institutional quantitative finance practices:
 - **Library**: `statsmodels`  
 - **Rationale**: Academic-grade statistics, used by Federal Reserve and major banks
 - **Usage**: Factor regression analysis, beta calculations
-- **Method**: 60-day rolling OLS regression for factor exposures
+- **Method**: 150-day rolling OLS regression for factor exposures
 
 ##### Data Infrastructure
 - **Libraries**: `pandas`, `numpy`, `scipy`
@@ -440,10 +431,10 @@ Our technology choices align with institutional quantitative finance practices:
 
 #### Calculation Architecture Decisions
 
-1. **Hybrid Real/Mock Approach for V1.4**
-   - Real calculations: Portfolio metrics, basic risk metrics, factor betas (7/8), Greeks
-   - Mock calculations: Short interest factor, edge cases
-   - Fallback pattern: Real calculations with mock fallback for robustness
+1. **Greeks Implementation (V1.4)**
+   - Options Greeks calculated with `mibian` only (Black-Scholes)
+   - No mock fallback; on error or missing inputs, fields are null
+   - Stocks have no Greeks; expired options return zero Greeks
 
 2. **Historical Volatility Proxy**
    - Using 30-day historical volatility as implied volatility proxy
@@ -557,23 +548,23 @@ Environment variables (.env) and UV `pyproject.toml` settings are defined for da
 3. **Phase 3 – API Development (Week 3)**: endpoints, hybrid calculations, tag CRUD.
 4. **Phase 4 – Testing & Deployment (Week 4)**: tests, Railway deploy, performance.
 
-## 6. V1.4 Hybrid Calculation Approach
+## 6. Calculation Architecture Summary
 
 ### 6.1 Overview
-V1.4 implements a hybrid real/mock calculation engine that provides realistic analytics while maintaining system stability. Real calculations are used wherever possible, with mock values as fallbacks.
+V1.4 implements real calculations for core analytics with clear error handling and no mock fallbacks for Greeks. Portfolio aggregation uses a hybrid storage model (store summaries, compute details on-demand) for performance.
 
 ### 6.2 Real Calculations
 
 #### Options Greeks
-- **Libraries**: `py_vollib` (primary) or `mibian` (fallback)
+- **Libraries**: `mibian` (Black-Scholes)
 - **Inputs**: Current price, strike, expiration, volatility, risk-free rate
 - **Outputs**: Delta, Gamma, Theta, Vega, Rho
-- **Fallback**: Mock values if calculation fails or data missing
+  - Calculation errors or missing inputs yield nulls; no mock fallback
 
-#### Factor Betas (7 of 8)
+#### Factor Betas (7 Factors)
 - **Library**: `statsmodels` for OLS regression
-- **Method**: 60-day rolling regression of position returns vs factor ETF returns
-- **Factors**: Market Beta (SPY), Momentum (MTUM), Value (VTV), Growth (VUG), Quality (QUAL), Size (IWM), Low Volatility (SPLV)
+- **Method**: 150-day rolling regression of position returns vs factor ETF returns
+- **Factors**: Market Beta (SPY), Momentum (MTUM), Value (VTV), Growth (VUG), Quality (QUAL), Size (SIZE), Low Volatility (USMV)
 - **Legacy**: Leverages `factors_utils.py` calculation logic
 
 #### Risk Metrics
@@ -589,7 +580,7 @@ V1.4 implements a hybrid real/mock calculation engine that provides realistic an
 - `positions`: List[Dict] – pre-enriched by Section 1.4.1 and 1.4.2, containing:
   - `id`, `symbol`, `quantity`, `market_value`, `exposure`, `is_option`
   - `sector`, `industry`, `tags` (List[str])
-  - `greeks`: Dict[str, float] from `calculate_greeks_hybrid()` (delta, gamma, theta, vega, rho)
+  - `greeks`: Dict[str, float] from `calculate_position_greeks()` (delta, gamma, theta, vega, rho)
 
 **Core Aggregations**
 1. Gross / Net / Long / Short exposure (USD, Decimal)
@@ -635,7 +626,7 @@ V1.4 implements a hybrid real/mock calculation engine that provides realistic an
 
 - **Option Sign Conventions**
   - Use signed-by-quantity Greeks consistently
-  - Maintain mathematical correctness from `calculate_greeks_hybrid()`
+  - Maintain mathematical correctness from `calculate_position_greeks()`
   - Short call delta remains negative, short put delta remains positive
   - No overrides or transformations - preserve the signs for accurate hedging calculations
 

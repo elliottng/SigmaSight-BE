@@ -209,15 +209,14 @@ The Section 1.4.1 calculations serve as the foundation for higher-level analytic
 
 ### Section 1.4.2: Options Greeks Calculations
 
-**Purpose**: Calculate the five primary Greeks (Delta, Gamma, Theta, Vega, Rho) for options positions using a hybrid real/mock approach that ensures production reliability.
+**Purpose**: Calculate the five primary Greeks (Delta, Gamma, Theta, Vega, Rho) for options positions using a mibian-only Black-Scholes implementation with clear error handling (no mock fallbacks).
 
-#### Hybrid Calculation Architecture
+#### Implementation Overview
 
-Our Greeks calculation engine implements a three-tier fallback system:
+Our Greeks calculation engine uses a single, deterministic path:
 
-1. **Primary**: Real calculations using `mibian` Black-Scholes model
-2. **Fallback**: Real calculations using `py_vollib` (compatibility issues on Python 3.11+)
-3. **Final Fallback**: Mock values based on position type
+- **Library**: `mibian` Black-Scholes (pure Python)
+- **No mock fallbacks**: Calculation errors or missing inputs return null values with warnings
 
 #### The Five Greeks Explained
 
@@ -299,18 +298,9 @@ greeks = {
 }
 ```
 
-#### Mock Greeks Fallback System
+#### No Mock Fallbacks
 
-When real calculations fail, the system uses position-type-specific mock values:
-
-| Position Type | Delta | Gamma | Theta | Vega | Rho |
-|---------------|-------|-------|-------|------|----- |
-| Long Call (LC) | 0.6 | 0.02 | -0.05 | 0.15 | 0.08 |
-| Short Call (SC) | -0.4 | -0.02 | 0.05 | -0.15 | -0.08 |
-| Long Put (LP) | -0.4 | 0.02 | -0.05 | 0.15 | -0.08 |
-| Short Put (SP) | 0.3 | -0.02 | 0.05 | -0.15 | 0.08 |
-| Long Stock | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 |
-| Short Stock | -1.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+When real calculations fail or inputs are insufficient, Greeks are returned as null with a warning logged. This preserves data integrity and avoids introducing artificial values.
 
 #### Quantity Scaling and Sign Conventions
 
@@ -337,20 +327,15 @@ if expiration_date <= current_date:
 - **Other Greeks**: 0.0 (stocks have no time decay or volatility sensitivity)
 
 **Missing Market Data**:
-- Falls back to mock values with warning logged
-- Ensures system never fails due to data unavailability
+- Returns null values with warning logged
+- Ensures system behavior is explicit and auditable when data is unavailable
 
 #### Error Handling and Logging
 
-**Three-Tier Fallback**:
-1. **mibian calculation** → Success or ImportError
-2. **py_vollib calculation** → Success or ImportError/CalculationError
-3. **Mock values** → Always succeeds
-
-**Logging Strategy**:
+**Behavior**:
 - **Debug**: Successful calculations with values
-- **Warning**: Fallback usage with reasons
-- **Error**: Calculation failures before fallback
+- **Warning**: Missing inputs or calculation errors; Greeks set to null
+- **Error**: Unexpected exceptions during calculation
 
 #### Integration with Portfolio System
 
@@ -361,7 +346,7 @@ if expiration_date <= current_date:
 
 **Real-Time Updates**:
 - API endpoints can trigger fresh calculations
-- Uses same hybrid approach for consistency
+- Uses the same mibian-only engine for consistency
 - Market data fetched on-demand from Polygon.io
 
 **Portfolio Aggregation**:

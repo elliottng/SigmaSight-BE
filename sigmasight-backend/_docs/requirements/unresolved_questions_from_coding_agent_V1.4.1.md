@@ -2,7 +2,7 @@
 
 > **UPDATE**: The DATABASE_DESIGN_ADDENDUM_V1.4.1.md and PRD_TAGS_V1.4.1.md documents have resolved most of these questions. This document now tracks both the original questions and their resolutions.
 
-> **V1.4 HYBRID APPROACH UPDATE**: All project documentation has been updated to reflect the hybrid real/mock calculation approach. Real calculations are implemented for Greeks (py_vollib), factor betas (statsmodels), and risk metrics (empyrical) with fallback to mock values when data is unavailable or calculations fail.
+> **V1.4 CALCULATION UPDATE**: All project documentation has been updated to reflect deterministic calculations. Greeks are calculated using `mibian` (Black-Scholes) only; no `py_vollib` fallback and no mock Greeks. Factor betas use `statsmodels` OLS. Risk metrics with `empyrical` are planned but not yet implemented.
 
 ## 1. Database Schema Gaps ✅ RESOLVED
 
@@ -26,11 +26,11 @@
 - ✅ RESOLVED - Auth endpoints to be implemented in API layer
 
 ## 3. Greeks Calculation Contradiction ✅ RESOLVED
-- ✅ RESOLVED - V1.4 uses HYBRID REAL/MOCK APPROACH
-- Real calculations using `py_vollib` or `mibian` for options
-- Fallback to mock values if calculation fails or data missing
-- `/api/v1/risk/greeks/calculate` endpoint attempts real calculations first
-- Updated in PRD_V1.4.md Section 6 and DATABASE_DESIGN_ADDENDUM Section 2.2
+- ✅ RESOLVED - V1.4 uses mibian-only Greeks
+- Real calculations using `mibian` Black-Scholes for options
+- No mock fallback; on error or missing inputs, Greeks are stored as null
+- `/api/v1/risk/greeks/calculate` endpoint uses the same mibian-only path
+- Reflected in `PRD_V1.4.md` Section 6 and `DATABASE_DESIGN_ADDENDUM_V1.4.1.md` Section 2.2
 
 ## 4. Tag System Architecture ✅ RESOLVED
 - ✅ RESOLVED - Complete schema in DATABASE_DESIGN_ADDENDUM Section 1.4
@@ -41,8 +41,9 @@
 ## 5. Market Data & Batch Processing ✅ RESOLVED
 
 ### 5.1 Data Sources ✅ RESOLVED
-- ✅ RESOLVED - `data_source` field added to track 'polygon' or 'yfinance'
-- ✅ RESOLVED - Polygon.io for price data, YFinance for GICS only
+- ✅ RESOLVED - `data_source` field added; YFinance removed from active dependencies
+- ✅ RESOLVED - Polygon.io for price data; FMP introduced for ETF/historical workflows
+- Note: GICS enrichment via YFinance has been removed; temporary pause while alternatives are evaluated
 
 ### 5.2 Calculation Timing ✅ RESOLVED
 - ✅ RESOLVED - Batch processing schedule defined (Section 6):
@@ -69,9 +70,9 @@
 - Document naming convention established
 
 ## 9. Factor Calculations ✅ RESOLVED
-- ✅ RESOLVED - 8 fixed factors with ETF proxies (Section 1.3)
-- ✅ RESOLVED - "Short Interest" marked as CUSTOM calculation
-- Factor calculations to be implemented in batch processing
+- ✅ RESOLVED - 7 fixed factors with ETF proxies (Short Interest postponed)
+- ✅ RESOLVED - "Short Interest" marked as CUSTOM/postponed
+- Factor calculations implemented with a 150-day regression window in batch processing
 - Factor covariance matrix populated via batch jobs
 
 ## 10. Position Type Logic ✅ RESOLVED  

@@ -284,7 +284,7 @@ The nightly batch job (5:30 PM EST) will:
 
 ### 18. Option Sign Conventions
 **Decision**: Use signed-by-quantity Greeks consistently
-- Maintain mathematical correctness from `calculate_greeks_hybrid()`
+- Maintain mathematical correctness from `calculate_position_greeks()`
 - Short call delta remains negative, short put delta remains positive
 - No overrides or transformations - preserve the signs for accurate hedging calculations
 

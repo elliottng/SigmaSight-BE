@@ -5,7 +5,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.4.0 | 2024-06-27 | Initial | Initial V1.4 API specification |
-| 1.4.1 | 2025-08-04 | Cascade | Updated for V1.4 implementation decisions: 252-day regression, position-level factor storage, py_vollib Greeks, 7-factor model, rate limiting completion |
+| 1.4.1 | 2025-08-04 | Cascade | Updated for V1.4 implementation decisions: 150-day regression, position-level factor storage, mibian-only Greeks, 7-factor model, rate limiting completion |
 
 ## 1. Overview
 
@@ -21,16 +21,16 @@ This document specifies the REST API endpoints for SigmaSight V1.4, focusing on 
 - **Market Data Integration**: Polygon.io client with rate limiting and error handling
 
 #### IN PROGRESS Features
-- **Risk Factor Analysis**: 252-day regression window, 7-factor model implementation
-- **Greeks Calculation**: py_vollib integration with hybrid real/mock approach
+- **Risk Factor Analysis**: 150-day regression window, 7-factor model implementation
+- **Greeks Calculation**: mibian-only implementation (Black-Scholes), no py_vollib fallback
 - **Batch Processing**: Daily jobs for factor exposure calculations
 
 #### V1.4 Key Decisions
 - **Factor Model**: 7 real factors + 1 mock (Short Interest postponed to V1.5)
-- **Regression Window**: 252 trading days (12 months) with 60-day minimum
+- **Regression Window**: 150 trading days with 60-day minimum
 - **Storage Strategy**: Both position-level and portfolio-level factor exposures
-- **Greeks Library**: py_vollib (Black-Scholes) with 30-day historical volatility proxy
-- **Calculation Approach**: Hybrid real/mock with graceful fallbacks indicators included for UI rendering
+- **Greeks Library**: mibian (Black-Scholes); py_vollib deprecated
+- **Calculation Approach**: Real calculations only for options; stocks have no Greeks; expired options return zeros
 - Modeling sessions can generate broker-ready trade lists
 - Support for both synchronous and asynchronous operations (bias toward asynchronous for AI agent use)
 
@@ -579,12 +579,12 @@ GET /api/v1/risk/overview
 }
 ```
 
-### 6.2 Calculate Portfolio Greeks (V1.4 Hybrid)
+### 6.2 Calculate Portfolio Greeks (V1.4)
 ```http
 GET /api/v1/risk/greeks
 ```
 
-**V1.4 Implementation**: Uses real calculations with `py_vollib` for options, falls back to mock values if calculation fails.
+**V1.4 Implementation**: Uses real calculations with `mibian` for options. Stocks have no Greeks. Expired options return zero Greeks. On calculation errors, the service returns null values for affected fields (no mock fallback).
 
 #### 6.2.1 Query Parameters
 ```http
@@ -621,14 +621,14 @@ GET /api/v1/risk/greeks
 }
 ```
 
-### 6.3 Calculate Greeks for Modified Positions (V1.4 Hybrid)
+### 6.3 Calculate Greeks for Modified Positions (V1.4)
 ```http
 POST /api/v1/risk/greeks/calculate
 ```
 
 **V1.4 Implementation**: 
-- Attempts real-time calculation using `py_vollib` or `mibian`
-- Falls back to mock values if missing data or calculation error
+- Performs real-time calculation using `mibian` only
+- No mock fallback; if inputs are insufficient or a calculation error occurs, returns nulls with warnings
 - Requires underlying price from market data cache
 
 #### 6.3.1 Query Parameters
@@ -668,7 +668,7 @@ GET /api/v1/risk/factors/definitions
 ```
 
 **V1.4 Implementation**:
-- **7 Real Factors**: Calculated using 252-day regression with ETF proxies
+- **7 Real Factors**: Calculated using 150-day regression with ETF proxies
 - **1 Mock Factor**: Short Interest (postponed to V1.5)
 - **ETF Proxies**: Standard institutional factor ETFs
 
@@ -1618,19 +1618,18 @@ GET /api/v1/positions?page=1&limit=20
 - **Caching**: Market data cache with 24-hour TTL
 - **Error Handling**: Graceful degradation and retry logic
 
-### 19.2 In Progress Features 🚧
+### 19.2 In Progress Features 
 
 #### 19.2.1 Risk Factor Analysis
-- **Regression Window**: 252 trading days (12 months) with 60-day minimum
+- **Regression Window**: 150 trading days with 60-day minimum
 - **Factor Model**: 7 real factors using statsmodels OLS regression
 - **Storage**: Both position-level and portfolio-level exposures
 - **Mock Factor**: Short Interest (0.0 values, postponed to V1.5)
 
 #### 19.2.2 Greeks Calculation
-- **Primary Library**: py_vollib for Black-Scholes calculations
-- **Volatility Proxy**: 30-day historical volatility as implied volatility
-- **Fallback Pattern**: Mock values when real calculations fail
-- **Integration**: Hybrid real/mock approach for production reliability
+- **Primary Library**: `mibian` for Black-Scholes calculations
+- **Fallback Pattern**: None; return null values on calculation error
+- **Integration**: Real-only calculations; stocks have no Greeks; expired options return zeros
 
 #### 19.2.3 Batch Processing Framework
 - **Daily Jobs**: Factor exposure calculations and portfolio snapshots
@@ -1682,13 +1681,13 @@ GET /api/v1/positions?page=1&limit=20
 ### 19.6 Technical Architecture Decisions
 
 #### 19.6.1 Calculation Libraries
-- **py_vollib**: Options pricing and Greeks (Gammon Capital heritage)
+- **mibian**: Options pricing and Greeks (pure Python Black-Scholes)
 - **statsmodels**: Factor regression analysis (Federal Reserve usage)
 - **empyrical**: Risk metrics (Quantopian/Point72 heritage)
 - **pandas/numpy**: Data infrastructure (institutional standard)
 
 #### 19.6.2 Design Patterns
-- **Hybrid Calculations**: Real calculations with mock fallbacks
+- **Deterministic Calculations**: Real calculations only; no mock fallbacks for Greeks
 - **Batch Processing**: Heavy calculations done offline, APIs serve cached results
 - **Graceful Degradation**: System continues operating with partial data
 - **Institutional Standards**: Aligned with quantitative finance best practices

@@ -287,81 +287,59 @@ def parse_options_symbol(symbol: str) -> dict:
     }
 ```
 
-### 2.2 Hybrid Greeks Calculation (V1.4)
+### 2.2 Greeks Calculation (V1.4, Mibian-only)
 
 ```python
-import py_vollib.black_scholes_merton.greeks as bsm_greeks
 import mibian
-from typing import Optional, Dict
+from typing import Dict
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Fallback mock Greeks by position type
-MOCK_GREEKS = {
-    'LC': {'delta': 0.6, 'gamma': 0.02, 'theta': -0.05, 'vega': 0.15, 'rho': 0.08},
-    'SC': {'delta': -0.4, 'gamma': -0.02, 'theta': 0.05, 'vega': -0.15, 'rho': -0.05},
-    'LP': {'delta': -0.4, 'gamma': 0.02, 'theta': -0.05, 'vega': 0.15, 'rho': -0.06},
-    'SP': {'delta': 0.35, 'gamma': -0.02, 'theta': 0.05, 'vega': -0.15, 'rho': 0.06},
-    'LONG': {'delta': 1.0, 'gamma': 0.0, 'theta': 0.0, 'vega': 0.0, 'rho': 0.0},
-    'SHORT': {'delta': -1.0, 'gamma': 0.0, 'theta': 0.0, 'vega': 0.0, 'rho': 0.0}
-}
-
-async def calculate_greeks_hybrid(position: Dict) -> Dict[str, float]:
-    """Calculate Greeks using real calculations with fallback to mock values"""
+async def calculate_greeks(position: Dict) -> Dict[str, float]:
+    """Calculate Greeks using mibian Black-Scholes. Stocks: no Greeks. Expired options: zero Greeks. Return None values on error."""
     position_type = position['position_type']
     quantity = position['quantity']
-    
-    # Stocks always use simple delta
+
+    # Stocks: no Greeks
     if position_type in ['LONG', 'SHORT']:
-        return get_mock_greeks(position_type, quantity)
-    
-    # Try real options calculation
+        return {'delta': float(quantity > 0) - float(quantity < 0), 'gamma': 0.0, 'theta': 0.0, 'vega': 0.0, 'rho': 0.0}
+
     try:
-        # Extract option parameters
         underlying_price = position.get('underlying_price')
         strike = position.get('strike_price')
-        time_to_expiry = position.get('days_to_expiry', 0) / 365.0
+        days_to_expiry = position.get('days_to_expiry', 0)
         volatility = position.get('implied_volatility', 0.25)  # Default 25%
-        risk_free_rate = 0.05  # 5% default
-        
-        if not all([underlying_price, strike, time_to_expiry > 0]):
-            raise ValueError("Missing required option parameters")
-        
-        # Determine option type
-        is_call = position_type in ['LC', 'SC']
-        flag = 'c' if is_call else 'p'
-        
-        # Calculate using py_vollib
-        delta = bsm_greeks.delta(flag, underlying_price, strike, time_to_expiry, 
-                                 risk_free_rate, volatility)
-        gamma = bsm_greeks.gamma(flag, underlying_price, strike, time_to_expiry, 
-                                 risk_free_rate, volatility)
-        theta = bsm_greeks.theta(flag, underlying_price, strike, time_to_expiry, 
-                                 risk_free_rate, volatility) / 365  # Daily theta
-        vega = bsm_greeks.vega(flag, underlying_price, strike, time_to_expiry, 
-                               risk_free_rate, volatility) / 100  # Per 1% vol
-        rho = bsm_greeks.rho(flag, underlying_price, strike, time_to_expiry, 
-                             risk_free_rate, volatility) / 100  # Per 1% rate
-        
-        # Scale by quantity and position direction
-        scale = quantity if position_type in ['LC', 'LP'] else -quantity
-        
-        return {
-            'delta': delta * scale,
-            'gamma': gamma * scale,
-            'theta': theta * scale,
-            'vega': vega * scale,
-            'rho': rho * scale
-        }
-        
-    except Exception as e:
-        logger.warning(f"Real Greeks calculation failed for {position.get('symbol')}: {e}")
-        # Fall back to mock values
-        return get_mock_greeks(position_type, quantity)
+        risk_free_rate = 5.0  # Percent for mibian
 
-def get_mock_greeks(position_type: str, quantity: float) -> dict:
-    """Return scaled mock Greeks for a position (fallback)"""
+        if days_to_expiry <= 0:
+            return {'delta': 0.0, 'gamma': 0.0, 'theta': 0.0, 'vega': 0.0, 'rho': 0.0}
+
+        if not all([underlying_price, strike]):
+            raise ValueError("Missing required option parameters")
+
+        is_call = position_type in ['LC', 'SC']
+
+        bs = mibian.BS([underlying_price, strike, risk_free_rate, days_to_expiry], volatility=volatility * 100)
+
+        delta = bs.callDelta if is_call else bs.putDelta
+        gamma = bs.gamma
+        theta = bs.callTheta if is_call else bs.putTheta
+        vega = bs.vega
+        rho = bs.callRho if is_call else bs.putRho
+
+        scale = quantity if position_type in ['LC', 'LP'] else -quantity
+
+        return {
+            'delta': float(delta) * scale,
+            'gamma': float(gamma) * scale,
+            'theta': float(theta) * scale,
+            'vega': float(vega) * scale,
+            'rho': float(rho) * scale
+        }
+    except Exception as e:
+        logger.warning(f"Greeks calculation failed: {e}")
+        return {'delta': None, 'gamma': None, 'theta': None, 'vega': None, 'rho': None}
     base_greeks = MOCK_GREEKS[position_type].copy()
     
     # Scale by quantity (contracts for options, shares/100 for stocks)
