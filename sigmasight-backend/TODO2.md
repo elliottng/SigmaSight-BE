@@ -1199,6 +1199,73 @@ if total_direct_pnl < max_loss:
 
 ---
 
+## Phase 2.6.8: Critical Finding - Factor Beta Values Incorrect (2025-08-09)
+
+### 🔍 **DETECTIVE WORK SUMMARY**
+
+**Investigation Path:**
+1. Implemented Option B (position-level attribution) - removed feature flag ✅
+2. Ran batch calculations successfully (24/24 jobs) ✅
+3. Validation showed factor exposures STILL 3-6x gross exposure ❌
+4. Traced execution path: `batch_orchestrator_v2` → `calculate_factor_betas_hybrid` → `aggregate_portfolio_factor_exposures` ✅
+5. Created `debug_factor_calculation.py` to manually trace calculations
+6. **DISCOVERED ROOT CAUSE**: Factor betas themselves are wrong!
+
+### 📊 **Evidence Found**
+
+**Unrealistic Beta Values:**
+```
+FXNAX: Market Beta = -2.596 (should be ~-1.0 to +1.0)
+FCNTX: Market Beta = 1.585 (reasonable but high)
+NVDA:  Market Beta = -3.000 (way too negative)
+```
+
+**Factor Dollar Exposures (as % of gross):**
+- Value: 90.7% of gross exposure
+- Low Volatility: 92.5% of gross exposure
+- Quality: 84.4% of gross exposure
+- (Each factor claiming most of portfolio = wrong!)
+
+### 🎯 **Root Cause Analysis**
+
+**The Option B implementation is CORRECT** - it's properly doing position-level attribution.
+**The problem is UPSTREAM** - the betas being fed into our calculation are wrong.
+
+Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
+- Lines 290-324: OLS regression calculating betas
+- Line 308: Beta capping at ±3 (BETA_CAP_LIMIT) - but many hitting this limit!
+
+### 2.6.8.1 Investigation Tasks (Priority: CRITICAL)
+
+1. **Analyze Beta Calculation** 🔴
+   - [ ] Check if returns are scaled correctly (daily vs annualized)
+   - [ ] Verify regression window (252 days) has enough valid data
+   - [ ] Check if factor ETF returns are calculated correctly
+   - [ ] Investigate why so many betas hit the ±3 cap
+
+2. **Data Quality Issues**
+   - [ ] Missing price data for options (only 2 days available)
+   - [ ] Factor ETFs missing data points (MTUM, QUAL, SIZE, USMV, VTV, VUG)
+   - [ ] Regression warnings: "RuntimeWarning: invalid value encountered in scalar divide"
+
+3. **Potential Fixes**
+   - [ ] Fix return calculations (check for percentage vs decimal)
+   - [ ] Handle missing data better (minimum data requirements)
+   - [ ] Adjust beta cap or use winsorization instead of hard cap
+   - [ ] Consider robust regression instead of OLS
+
+### 2.6.8.2 Scripts Created for Investigation
+- `scripts/validate_option_b_implementation.py` - Validates the implementation
+- `scripts/debug_factor_calculation.py` - Deep dive into calculation details
+
+### 2.6.8.3 Next Immediate Steps
+1. Create script to analyze beta distributions
+2. Check if position returns and factor returns are on same scale
+3. Investigate the OLS regression warnings
+4. Fix beta calculation before generating reports
+
+---
+
 ## Phase 2.7: Portfolio Exposure Database Storage Enhancement
 *Store calculated portfolio exposures in database for performance and consistency*
 
