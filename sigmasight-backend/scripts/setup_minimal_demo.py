@@ -33,21 +33,21 @@ DEMO_USERS = [
         "email": "demo_individual@sigmasight.com",
         "full_name": "Demo Individual Investor",
         "password": "demo12345",
-        "portfolio_name": "Demo Individual Portfolio",
+        "portfolio_name": "Demo Individual Investor Portfolio",
         "portfolio_desc": "Balanced growth portfolio for individual investor"
     },
     {
         "email": "demo_hnw@sigmasight.com", 
         "full_name": "Demo High Net Worth Investor",
         "password": "demo12345",
-        "portfolio_name": "Demo HNW Portfolio",
+        "portfolio_name": "Demo High Net Worth Investor Portfolio",
         "portfolio_desc": "Sophisticated portfolio with alternatives and private investments"
     },
     {
         "email": "demo_hedgefundstyle@sigmasight.com",
         "full_name": "Demo Hedge Fund Style Investor",
         "password": "demo12345",
-        "portfolio_name": "Demo Hedge Fund Portfolio", 
+        "portfolio_name": "Demo Hedge Fund Style Investor Portfolio", 
         "portfolio_desc": "Long/short equity with options overlay"
     }
 ]
