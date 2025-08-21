@@ -550,9 +550,11 @@ async def _collect_report_data(
         } if snapshot else None,
         "correlation": {
             "calculation_date": correlation.calculation_date.isoformat() if correlation else None,
-            "average_correlation": correlation.average_correlation if correlation else Decimal("0"),
-            "max_correlation": correlation.max_correlation if correlation else Decimal("0"),
-            "min_correlation": correlation.min_correlation if correlation else Decimal("0"),
+            "overall_correlation": correlation.overall_correlation if correlation else Decimal("0"),
+            "correlation_concentration_score": correlation.correlation_concentration_score if correlation else Decimal("0"),
+            "effective_positions": correlation.effective_positions if correlation else Decimal("0"),
+            "data_quality": correlation.data_quality if correlation else "insufficient",
+            "positions_included": correlation.positions_included if correlation else 0,
         } if correlation else None,
         "exposures": exposures if exposures else None,  # Already Decimal from calculations
         "greeks": greeks_aggregated if greeks_aggregated else None,  # Already Decimal
@@ -672,9 +674,11 @@ def build_markdown_report(data: Mapping[str, Any]) -> str:
     if correlation:
         lines.extend([
             "### Correlation Analysis",
-            f"- **Average Correlation**: {format_correlation(correlation.get('average_correlation', 0))}",
-            f"- **Maximum Correlation**: {format_correlation(correlation.get('max_correlation', 0))}",
-            f"- **Minimum Correlation**: {format_correlation(correlation.get('min_correlation', 0))}",
+            f"- **Overall Correlation**: {format_correlation(correlation.get('overall_correlation', 0))}",
+            f"- **Correlation Concentration Score**: {format_correlation(correlation.get('correlation_concentration_score', 0))}",
+            f"- **Effective Positions**: {correlation.get('effective_positions', 0)}",
+            f"- **Data Quality**: {correlation.get('data_quality', 'N/A')}",
+            f"- **Positions Included**: {correlation.get('positions_included', 0)}",
             f"- **Calculation Date**: {correlation.get('calculation_date', 'N/A')}",
             "",
         ])
