@@ -141,7 +141,11 @@ uv run python scripts/run_batch_with_reports.py --skip-batch
 
 ## Step 6: View Generated Reports
 
-Reports are saved to `reports/` directory by default:
+The script generates reports in the `sigmasight-backend/reports/` directory. The folder is named using a slugified version of the **portfolio's name** and the report date.
+
+For example, a report for the "Demo Hedge Fund-Style Investor" portfolio on August 8, 2025, will be in: `reports/demo-hedge-fund-style-investor-portfolio_2025-08-08/`
+
+Inside this date-stamped directory, you'll find the report in three standard formats:
 
 ```bash
 # Windows - Open reports folder

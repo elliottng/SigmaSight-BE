@@ -80,7 +80,7 @@ logs/
 !alembic/versions/README
 
 # Generated reports
-reports/
+/reports/
 detailed_git_history_ending_0808.txt
 detailed_git_history_ending_0720.txt
 detailed_git_history_ending_0810.txt
