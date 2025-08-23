@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"
+    ],
+    "allow": [
+      "Bash(PYTHONIOENCODING=utf-8 uv run python run.py)"
+    ]
+  }
+}

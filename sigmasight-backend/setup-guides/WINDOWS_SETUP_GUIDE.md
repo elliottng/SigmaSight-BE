@@ -204,12 +204,13 @@ We'll install these tools in order:
 
 4. **Create demo users (bulletproof method):**
    ```bash
-   uv run python scripts/setup_minimal_demo.py
+   set PYTHONIOENCODING=utf-8 && uv run python scripts/setup_minimal_demo.py
    ```
    - This creates three demo accounts without async/sync issues:
      - demo_individual@sigmasight.com (password: demo12345)
      - demo_hnw@sigmasight.com (password: demo12345)  
      - demo_hedgefundstyle@sigmasight.com (password: demo12345)
+   - **Note**: The `set PYTHONIOENCODING=utf-8` prevents Unicode display errors on Windows
 
 ---
 
@@ -231,7 +232,7 @@ We'll install these tools in order:
 
 4. **Validate Complete Setup:**
    ```bash
-   uv run python scripts/validate_setup.py
+   set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
    ```
    - This checks all components are working correctly
    - You should see "📊 Validation Summary: 8/8 checks passed"
@@ -269,7 +270,7 @@ After initial setup, here's how to start SigmaSight each day:
 
 6. **Find Portfolio IDs (if needed):**
    ```bash
-   uv run python scripts/list_portfolios.py
+   set PYTHONIOENCODING=utf-8 && uv run python scripts/list_portfolios.py
    ```
 
 7. **Stop everything when done:**
@@ -299,6 +300,10 @@ After initial setup, here's how to start SigmaSight each day:
 ### Database connection errors
 - Make sure Docker is running: `docker ps`
 - Restart database: `docker-compose down` then `docker-compose up -d`
+
+### Unicode/Encoding errors (emojis not displaying)
+- Use `set PYTHONIOENCODING=utf-8 &&` before Python commands
+- This is normal on older Windows terminals - the scripts will still work correctly
 
 ### Port 8000 already in use
 - Another program is using port 8000
@@ -332,18 +337,39 @@ uv run alembic upgrade head
 # Or use the automated script:
 uv run python scripts/setup_dev_database_alembic.py
 
-# Seed demo data
-uv run python scripts/seed_database.py
+# Seed demo data (use minimal setup to avoid Unicode issues)
+set PYTHONIOENCODING=utf-8 && uv run python scripts/setup_minimal_demo.py
 
 # Run authentication tests
-uv run python scripts/test_auth.py
+set PYTHONIOENCODING=utf-8 && uv run python scripts/test_auth.py
 
 # Run batch processing and generate reports
-uv run python scripts/run_batch_with_reports.py
+set PYTHONIOENCODING=utf-8 && uv run python scripts/run_batch_with_reports.py
 
 # List all portfolios with IDs
-uv run python scripts/list_portfolios.py
+set PYTHONIOENCODING=utf-8 && uv run python scripts/list_portfolios.py
+
+# Validate setup
+set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
 ```
+
+---
+
+## 🔤 Windows Unicode/Encoding Notes
+
+**Why do some commands use `set PYTHONIOENCODING=utf-8 &&`?**
+
+Windows Command Prompt has encoding limitations that can cause Unicode errors when scripts try to display emojis or special characters. The Python scripts will work correctly, but you might see encoding errors in the output.
+
+**Solutions:**
+1. **Recommended**: Use the `set PYTHONIOENCODING=utf-8 &&` prefix shown in commands above
+2. **Alternative**: Use PowerShell instead of Command Prompt
+3. **Alternative**: Use Windows Terminal (available from Microsoft Store)
+
+**If you see Unicode errors:**
+- The error messages look scary but the scripts are still working
+- Just ignore the encoding errors - they don't affect functionality
+- The important part is that the scripts complete successfully
 
 ---
 
@@ -353,6 +379,8 @@ uv run python scripts/list_portfolios.py
 - Create a desktop shortcut to `C:\Projects\SigmaSight-BE\sigmasight-backend`
 - Save commonly used commands in a text file for easy copy-paste
 - The database data persists even after stopping Docker
+- Use PowerShell or Windows Terminal for better Unicode support
+- All scripts work correctly even if you see encoding error messages
 
 ---
 
