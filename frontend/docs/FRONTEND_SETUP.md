@@ -1,93 +1,140 @@
 # 🎨 Frontend Setup Guide for SigmaSight
 
-This guide covers setting up and running the React frontend with the FastAPI backend.
+This guide covers setting up and running the Next.js frontend with integrated portfolio dashboard and backend API connectivity.
 
 ## 📋 Overview
 
-- **Frontend**: Next.js with TypeScript + Tailwind CSS
-- **Backend**: FastAPI at `http://localhost:8000`
-- **Frontend URL**: `http://localhost:3000`
-- **Integration**: CORS already configured
+- **Frontend**: Next.js 15.2.4 with TypeScript + Tailwind CSS
+- **Backend**: FastAPI at `http://localhost:8000` 
+- **Frontend URL**: `http://localhost:3001` (updated port to avoid conflicts)
+- **Integration**: CORS configured, Portfolio Reports API integrated
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js installed (v18 or higher)
-- Backend already running (see Windows Setup Guide)
+- **Node.js** (v18.0.0 or higher) - Download from https://nodejs.org/
+- **npm** (comes with Node.js) - Verify: `npm --version`
+- **Backend server running** on http://localhost:8000 (see backend setup guides)
 
-### 1. Install Frontend Dependencies
+### 1. Navigate to Frontend Directory
 
-```powershell
-cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend\frontend
+```bash
+# From project root
+cd frontend
+```
+
+### 2. Install Frontend Dependencies
+
+```bash
 npm install
 ```
 
-### 2. Start Development Servers
+*This creates `node_modules/` directory with all required packages (not committed to git)*
+
+### 3. Start Development Servers
 
 **Terminal 1 - Backend:**
-```powershell
-cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend
+```bash
+# From project root
+cd backend
 uv run python run.py
 ```
 
 **Terminal 2 - Frontend:**
-```powershell
-cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend\frontend
+```bash  
+# From project root
+cd frontend
 npm run dev
 ```
 
-### 3. Access Applications
+### 4. Access Applications
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
+- **Frontend Dashboard**: http://localhost:3001
+- **Backend API**: http://localhost:8000  
 - **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
 
 ## 🔗 API Integration
 
-### Base Configuration
+### Current API Endpoints
 
-Your React frontend can make API calls to:
-- **Base URL**: `http://localhost:8000`
-- **API Endpoints**: `http://localhost:8000/api/*`
-- **Health Check**: `http://localhost:8000/health`
+The frontend integrates with these backend APIs:
+- **Portfolio Reports**: `GET /api/v1/reports/portfolios`
+- **Report Content**: `GET /api/v1/reports/portfolio/{id}/content/{format}`
+- **Health Check**: `GET /health`
+- **API Base**: `http://localhost:8000`
 
-### Example API Call
+### Implemented Features
+
+✅ **Portfolio Dashboard**
+- Real-time portfolio listing from backend
+- Portfolio metrics and metadata display
+- Connection status monitoring
+
+✅ **Report Viewer**
+- Multi-format report display (JSON, CSV, MD)
+- Interactive format switching
+- Navigation between dashboard and reports
+
+✅ **API Client**
+- Centralized API calling in `src/lib/api.ts`
+- Error handling and loading states
+- CORS properly configured for localhost:3001
+
+### Example Usage
 
 ```typescript
-// Example API call in your React components
-const fetchData = async () => {
-  try {
-    const response = await fetch('http://localhost:8000/api/portfolios');
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('API call failed:', error);
-  }
-};
+// Portfolio fetching (implemented)
+import { fetchPortfolios } from '@/lib/api';
+
+const portfolios = await fetchPortfolios();
+// Returns: Portfolio[] with id, name, formats_available, etc.
+
+// Report content fetching (implemented)
+import { fetchReportContent } from '@/lib/api';
+
+const content = await fetchReportContent(portfolioId, 'json');
+// Returns: string with report content
 ```
 
 ### CORS Configuration
 
-CORS is already configured in the FastAPI backend to allow:
-- `http://localhost:3000` (React dev server)
-- `http://localhost:5173` (Vite dev server)
+CORS is configured in the FastAPI backend to allow:
+- `http://localhost:3001` (Next.js dev server - current)
+- `http://localhost:3000` (alternate port)
 - Production domains
 
 ## 📁 Project Structure
 
 ```
-sigmasight-backend/
-├── app/                    # FastAPI backend
-├── frontend/              # Next.js React frontend
+SigmaSight/
+├── backend/                    # FastAPI backend
+│   ├── app/                   # FastAPI application
+│   ├── setup-guides/          # Backend setup documentation
+│   └── ...
+├── frontend/                   # Next.js frontend
 │   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── hooks/         # Custom hooks
-│   │   └── types/         # TypeScript types
-│   ├── package.json
-│   ├── next.config.js
-│   └── tailwind.config.ts
-└── docs/                  # Documentation
+│   │   ├── app/              # Next.js App Router
+│   │   │   ├── globals.css   # Global styles
+│   │   │   ├── layout.tsx    # Root layout
+│   │   │   └── page.tsx      # Dashboard page
+│   │   ├── components/       # React components
+│   │   │   ├── ui/           # Basic UI components
+│   │   │   └── layout/       # Layout components
+│   │   ├── lib/              # Utilities
+│   │   │   ├── api.ts        # Backend API client
+│   │   │   └── utils.ts      # Helper functions
+│   │   ├── hooks/            # Custom React hooks
+│   │   └── types/            # TypeScript definitions
+│   ├── docs/                 # Frontend documentation
+│   ├── package.json          # Dependencies (commit this)
+│   ├── package-lock.json     # Lock file (commit this)
+│   ├── next.config.js        # Next.js config
+│   └── tailwind.config.ts    # Tailwind config
+└── changelogs/                # Change documentation
 ```
+
+**Important**: `node_modules/` and `.next/` are not committed to git and must be generated locally.
 
 ## 🛠️ Development Workflow
 

@@ -12,6 +12,7 @@ SigmaSight is a sophisticated portfolio analytics platform designed for options 
 - **Quick Reference**: See [QUICK_START_WINDOWS.md](../QUICK_START_WINDOWS.md) for a one-page guide
 - **Mac Users**: See [MAC_INSTALL_GUIDE.md](MAC_INSTALL_GUIDE.md) for detailed instructions
 - **Linux Users**: Continue reading below
+- **🎨 Frontend Setup**: See [../../frontend/docs/FRONTEND_SETUP.md](../../frontend/docs/FRONTEND_SETUP.md) for React/Next.js frontend
 - **🤖 AI Agents**: See [../AI_AGENT_REFERENCE.md](../AI_AGENT_REFERENCE.md) for comprehensive codebase reference
 
 FastAPI backend for SigmaSight portfolio risk management platform.
