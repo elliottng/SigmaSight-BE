@@ -118,12 +118,12 @@ We'll install these tools in order:
 
 1. **Create a folder for projects:**
    - Open File Explorer
-   - Go to `C:\`
+   - Go to `C:\Users\BenBalbale\`
    - Right-click → New → Folder
-   - Name it `Projects`
+   - Name it `CascadeProjects`
 
-2. **Open Command Prompt in Projects folder:**
-   - Navigate to `C:\Projects` in File Explorer
+2. **Open Command Prompt in CascadeProjects folder:**
+   - Navigate to `C:\Users\BenBalbale\CascadeProjects` in File Explorer
    - Click in the address bar
    - Type `cmd` and press Enter
 
@@ -247,7 +247,7 @@ After initial setup, here's how to start SigmaSight each day:
    - Look for whale icon in system tray
 
 2. **Open Command Prompt**
-   - Navigate to project: `cd C:\Projects\SigmaSight-BE\sigmasight-backend`
+   - Navigate to project: `cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend`
 
 3. **Start the database:**
    ```bash
@@ -315,7 +315,7 @@ After initial setup, here's how to start SigmaSight each day:
 
 ```bash
 # Navigate to project
-cd C:\Projects\SigmaSight-BE\sigmasight-backend
+cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend
 
 # Start database
 docker-compose up -d
@@ -376,7 +376,7 @@ Windows Command Prompt has encoding limitations that can cause Unicode errors wh
 ## 💡 Tips
 
 - Keep Docker Desktop running in the background
-- Create a desktop shortcut to `C:\Projects\SigmaSight-BE\sigmasight-backend`
+- Create a desktop shortcut to `C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend`
 - Save commonly used commands in a text file for easy copy-paste
 - The database data persists even after stopping Docker
 - Use PowerShell or Windows Terminal for better Unicode support
