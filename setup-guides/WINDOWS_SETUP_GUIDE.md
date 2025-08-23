@@ -122,21 +122,21 @@ We'll install these tools in order:
    - Right-click → New → Folder
    - Name it `CascadeProjects`
 
-2. **Open Command Prompt in CascadeProjects folder:**
+2. **Open PowerShell in CascadeProjects folder:**
    - Navigate to `C:\Users\BenBalbale\CascadeProjects` in File Explorer
-   - Click in the address bar
-   - Type `cmd` and press Enter
+   - Hold Shift and right-click in the folder
+   - Select "Open PowerShell window here"
 
 3. **Download the code:**
    - Copy and paste this command:
-   ```bash
+   ```powershell
    git clone https://github.com/elliottng/SigmaSight-BE.git
    ```
    - Press Enter
    - Wait for download to complete
 
 4. **Navigate to the project:**
-   ```bash
+   ```powershell
    cd SigmaSight-BE\sigmasight-backend
    ```
 
@@ -145,30 +145,32 @@ We'll install these tools in order:
 ## Step 6: Set Up the Project 🔧
 
 1. **Install Python packages:**
-   ```bash
+   ```powershell
    uv sync
    ```
    - This creates a virtual environment and installs all dependencies
    - Wait for "Installed X packages" message
 
 2. **Create clean configuration file:**
-   ```bash
-   echo # Database Configuration > .env
-   echo DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db >> .env
-   echo. >> .env
-   echo # Market Data API Keys >> .env
-   echo POLYGON_API_KEY=your_polygon_api_key_here >> .env
-   echo FMP_API_KEY=your_fmp_api_key_here >> .env
-   echo TRADEFEEDS_API_KEY=your_tradefeeds_api_key_here >> .env
-   echo FRED_API_KEY=your_fred_api_key_here >> .env
-   echo. >> .env
-   echo # JWT Configuration >> .env
-   echo SECRET_KEY=your_generated_secret_key_here >> .env
-   echo. >> .env
-   echo # Application Settings >> .env
-   echo DEBUG=true >> .env
-   echo ENVIRONMENT=development >> .env
-   echo LOG_LEVEL=INFO >> .env
+   ```powershell
+   @"
+# Database Configuration
+DATABASE_URL=postgresql+asyncpg://sigmasight:sigmasight_dev@localhost:5432/sigmasight_db
+
+# Market Data API Keys
+POLYGON_API_KEY=your_polygon_api_key_here
+FMP_API_KEY=your_fmp_api_key_here
+TRADEFEEDS_API_KEY=your_tradefeeds_api_key_here
+FRED_API_KEY=your_fred_api_key_here
+
+# JWT Configuration
+SECRET_KEY=your_generated_secret_key_here
+
+# Application Settings
+DEBUG=true
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+"@ | Out-File -FilePath .env -Encoding UTF8
    ```
    - This creates a clean configuration file without conflicts
 
@@ -182,20 +184,20 @@ We'll install these tools in order:
 ## Step 7: Start the Database 🗄️
 
 1. **Start PostgreSQL database:**
-   ```bash
+   ```powershell
    docker-compose up -d
    ```
    - This starts the database in the background
    - First time may take a few minutes to download
 
 2. **Verify database is running:**
-   ```bash
+   ```powershell
    docker ps
    ```
    - You should see a container named `sigmasight-backend_postgres_1` or similar
 
 3. **Set up database tables (Professional Approach):**
-   ```bash
+   ```powershell
    uv run python scripts/setup_dev_database_alembic.py
    ```
    - This uses proper Alembic migrations for professional development
@@ -203,21 +205,21 @@ We'll install these tools in order:
    - Provides proper database versioning and rollback capabilities
 
 4. **Create demo users (bulletproof method):**
-   ```bash
-   set PYTHONIOENCODING=utf-8 && uv run python scripts/setup_minimal_demo.py
+   ```powershell
+   $env:PYTHONIOENCODING="utf-8"; uv run python scripts/setup_minimal_demo.py
    ```
    - This creates three demo accounts without async/sync issues:
      - demo_individual@sigmasight.com (password: demo12345)
      - demo_hnw@sigmasight.com (password: demo12345)  
      - demo_hedgefundstyle@sigmasight.com (password: demo12345)
-   - **Note**: The `set PYTHONIOENCODING=utf-8` prevents Unicode display errors on Windows
+   - **Note**: The `$env:PYTHONIOENCODING="utf-8"` prevents Unicode display errors on Windows
 
 ---
 
 ## Step 8: Start SigmaSight 🚀
 
 1. **Start the application:**
-   ```bash
+   ```powershell
    uv run python run.py
    ```
 
@@ -231,8 +233,8 @@ We'll install these tools in order:
    - You'll see all available API endpoints
 
 4. **Validate Complete Setup:**
-   ```bash
-   set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
+   ```powershell
+   $env:PYTHONIOENCODING="utf-8"; uv run python scripts/validate_setup.py
    ```
    - This checks all components are working correctly
    - You should see "📊 Validation Summary: 8/8 checks passed"
@@ -246,21 +248,21 @@ After initial setup, here's how to start SigmaSight each day:
 1. **Start Docker Desktop** (if not already running)
    - Look for whale icon in system tray
 
-2. **Open Command Prompt**
+2. **Open PowerShell**
    - Navigate to project: `cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend`
 
 3. **Start the database:**
-   ```bash
+   ```powershell
    docker-compose up -d
    ```
 
 4. **Option A: Start API Server Only**
-   ```bash
+   ```powershell
    uv run python run.py
    ```
 
 5. **Option B: Run Batch Processing and Generate Reports**
-   ```bash
+   ```powershell
    # Process all portfolios and generate reports
    uv run python scripts/run_batch_with_reports.py
    
@@ -269,12 +271,12 @@ After initial setup, here's how to start SigmaSight each day:
    ```
 
 6. **Find Portfolio IDs (if needed):**
-   ```bash
-   set PYTHONIOENCODING=utf-8 && uv run python scripts/list_portfolios.py
+   ```powershell
+   $env:PYTHONIOENCODING="utf-8"; uv run python scripts/list_portfolios.py
    ```
 
 7. **Stop everything when done:**
-   - Press `Ctrl + C` in Command Prompt to stop SigmaSight
+   - Press `Ctrl + C` in PowerShell to stop SigmaSight
    - Run `docker-compose down` to stop the database
 
 ---
@@ -294,26 +296,26 @@ After initial setup, here's how to start SigmaSight each day:
 - Wait for whale icon to turn green in system tray
 
 ### "uv is not recognized"
-- Close and reopen Command Prompt after UV installation
-- Try running in PowerShell instead
+- Close and reopen PowerShell after UV installation
+- Restart PowerShell with a fresh session
 
 ### Database connection errors
 - Make sure Docker is running: `docker ps`
 - Restart database: `docker-compose down` then `docker-compose up -d`
 
 ### Unicode/Encoding errors (emojis not displaying)
-- Use `set PYTHONIOENCODING=utf-8 &&` before Python commands
+- Use `$env:PYTHONIOENCODING="utf-8";` before Python commands in PowerShell
 - This is normal on older Windows terminals - the scripts will still work correctly
 
 ### Port 8000 already in use
 - Another program is using port 8000
-- Stop SigmaSight with Ctrl+C and try again
+- Stop SigmaSight with Ctrl+C in PowerShell and try again
 
 ---
 
 ## 🎯 Quick Commands Reference
 
-```bash
+```powershell
 # Navigate to project
 cd C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend
 
@@ -338,19 +340,19 @@ uv run alembic upgrade head
 uv run python scripts/setup_dev_database_alembic.py
 
 # Seed demo data (use minimal setup to avoid Unicode issues)
-set PYTHONIOENCODING=utf-8 && uv run python scripts/setup_minimal_demo.py
+$env:PYTHONIOENCODING="utf-8"; uv run python scripts/setup_minimal_demo.py
 
 # Run authentication tests
-set PYTHONIOENCODING=utf-8 && uv run python scripts/test_auth.py
+$env:PYTHONIOENCODING="utf-8"; uv run python scripts/test_auth.py
 
 # Run batch processing and generate reports
-set PYTHONIOENCODING=utf-8 && uv run python scripts/run_batch_with_reports.py
+$env:PYTHONIOENCODING="utf-8"; uv run python scripts/run_batch_with_reports.py
 
 # List all portfolios with IDs
-set PYTHONIOENCODING=utf-8 && uv run python scripts/list_portfolios.py
+$env:PYTHONIOENCODING="utf-8"; uv run python scripts/list_portfolios.py
 
 # Validate setup
-set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
+$env:PYTHONIOENCODING="utf-8"; uv run python scripts/validate_setup.py
 ```
 
 ---
@@ -362,9 +364,9 @@ set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
 Windows Command Prompt has encoding limitations that can cause Unicode errors when scripts try to display emojis or special characters. The Python scripts will work correctly, but you might see encoding errors in the output.
 
 **Solutions:**
-1. **Recommended**: Use the `set PYTHONIOENCODING=utf-8 &&` prefix shown in commands above
-2. **Alternative**: Use PowerShell instead of Command Prompt
-3. **Alternative**: Use Windows Terminal (available from Microsoft Store)
+1. **Recommended**: Use the `$env:PYTHONIOENCODING="utf-8";` prefix shown in PowerShell commands above
+2. **Alternative**: Use Windows Terminal (available from Microsoft Store) for better Unicode support
+3. **Alternative**: Use VS Code integrated terminal
 
 **If you see Unicode errors:**
 - The error messages look scary but the scripts are still working
@@ -379,7 +381,8 @@ Windows Command Prompt has encoding limitations that can cause Unicode errors wh
 - Create a desktop shortcut to `C:\Users\BenBalbale\CascadeProjects\SigmaSight-BE\sigmasight-backend`
 - Save commonly used commands in a text file for easy copy-paste
 - The database data persists even after stopping Docker
-- Use PowerShell or Windows Terminal for better Unicode support
+- PowerShell provides better Unicode support than Command Prompt
+- Use Windows Terminal for the best experience
 - All scripts work correctly even if you see encoding error messages
 
 ---
