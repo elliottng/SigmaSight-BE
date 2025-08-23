@@ -1,0 +1,98 @@
+[project]
+name = "sigmasight-backend"
+version = "0.1.0"
+description = "FastAPI backend for SigmaSight portfolio risk management platform"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Elliott Ng", email = "elliott.ng@gmail.com"}
+]
+keywords = ["fastapi", "portfolio", "risk-management", "finance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: FastAPI",
+]
+dependencies = [
+    # Core FastAPI
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "pydantic[email]>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    # Database
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "alembic>=1.13.0",
+    # Authentication
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.6",
+    # Market Data
+    "polygon-api-client>=1.14.0",
+    # "yfinance>=0.2.28",  # Removed - FMP primary architecture
+    "fredapi>=0.5.1",
+    "pandas>=2.1.0",
+    "numpy>=1.25.0",
+    # Options Calculations (V1.4 Simplified Engine)
+    "scipy>=1.11.0",
+    "mibian>=0.1.3", # Black-Scholes Greeks calculations
+    "statsmodels>=0.14.0", # Factor regression analysis
+    "empyrical>=0.5.5", # Risk metrics (Sharpe, VaR, etc.)
+    "pandas_market_calendars>=4.0.0", # Trading calendar for market days
+    # Utils
+    "httpx>=0.25.0",
+    "aiohttp>=3.9.0",
+    "python-dateutil>=2.8.2",
+    "psycopg2-binary>=2.9.10",
+    "brotli>=1.1.0",
+    "apscheduler>=3.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
