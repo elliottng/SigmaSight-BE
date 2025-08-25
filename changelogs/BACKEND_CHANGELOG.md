@@ -2,6 +2,170 @@
 
 ---
 
+## 2025-08-25 - GPT Agent Integration Foundation
+
+### Summary
+Backend preparation and integration points established for GPT agent system integration, ensuring data consistency and API compatibility across the three-service architecture.
+
+### GPT Agent Integration Readiness
+
+#### 1. Database Model Alignment
+**GPT Agent Tool Mapping to Backend Models**:
+- `get_portfolio_snapshot` → `PortfolioSnapshot` model (backend/app/models/users.py:45)
+- `get_positions` → `Position` model with sector/industry data (backend/app/models/users.py:67)
+- `get_factor_exposures` → `PositionFactorExposure` model (backend/app/models/users.py:125)
+- `get_var_es` → Risk calculation results from portfolio analytics
+- `run_stress_test` → Backend stress testing engine outputs
+
+#### 2. API Endpoint Compatibility
+**Backend API Endpoints for GPT Agent Integration**:
+- Portfolio summaries: Backend calculations → GPT interpretation
+- Factor exposures: Database-stored exposures → GPT factor analysis
+- Risk metrics: Backend VaR/ES calculations → GPT risk commentary
+- Stress testing: Backend scenario results → GPT scenario analysis
+- Position analytics: Database positions → GPT position insights
+
+#### 3. Demo Portfolio Data Availability
+**GPT Agent Test Data**:
+- Portfolio UUID: `a3209353-9ed5-4885-81e8-d4bbc995f96c` (Demo Individual Investor)
+- Portfolio UUID: `14e7f420-b096-4e2e-8cc2-531caf434c05` (Demo High Net Worth)
+- Portfolio UUID: `cf890da7-7b74-4cb4-acba-2205fdd9dff4` (Demo Hedge Fund-Style)
+
+All portfolios have complete position data, sector classifications, and factor exposures stored in the backend database for GPT agent consumption.
+
+#### 4. Backend-GPT Agent Data Contract
+**Critical Integration Principle**: 
+- **Backend Role**: Performs all financial calculations, risk analytics, factor modeling, and database operations
+- **GPT Agent Role**: Interprets backend results, provides narrative analysis, identifies gaps in data
+- **No Computation Overlap**: GPT agent never recalculates metrics that backend already provides
+
+**Data Flow Pattern**:
+```
+Backend Database → Backend API Calculation → GPT Agent Tool → GPT Analysis → Frontend Display
+```
+
+#### 5. Authentication Integration
+**JWT Token Consistency**:
+- Backend JWT secret: Configured in `backend/app/config.py`
+- GPT Agent: Will use same JWT secret for backend API authentication
+- Frontend: Will receive tokens validated by both backend and GPT agent
+- Session management: Unified across all three services
+
+### Database Schema Enhancements for GPT Integration
+
+#### 1. Factor Exposure Models
+**Enhanced PositionFactorExposure Model**:
+- Factor beta values stored as calculated by backend quantitative engine
+- GPT agent will interpret these betas, not recalculate them
+- Factor contribution percentages available for GPT narrative generation
+
+#### 2. Risk Metrics Storage
+**Backend Risk Calculations Available for GPT**:
+- Portfolio VaR and Expected Shortfall values
+- Stress test scenario results
+- Monte Carlo simulation outputs
+- Historical simulation results
+- All stored in backend, interpreted by GPT agent
+
+#### 3. Portfolio Analytics Pipeline
+**Backend Provides**:
+- Position-level P&L attribution
+- Sector/industry exposure calculations  
+- Factor model regression results
+- Risk decomposition analysis
+- Performance attribution metrics
+
+**GPT Agent Consumes**:
+- Takes backend calculations as authoritative
+- Provides qualitative analysis and insights
+- Identifies missing data or calculation gaps
+- Suggests portfolio adjustments based on quantitative results
+
+### API Integration Points
+
+#### 1. Backend API Extensions for GPT Agent
+**New Internal API Endpoints** (backend-to-GPT communication):
+- `GET /internal/v1/portfolio/{id}/snapshot` - Complete portfolio state
+- `GET /internal/v1/portfolio/{id}/factors` - Factor exposure details
+- `GET /internal/v1/portfolio/{id}/risk` - Risk metrics and scenarios
+- `POST /internal/v1/portfolio/{id}/stress-test` - Trigger stress testing
+
+#### 2. Error Handling and Data Gaps
+**Backend Gap Detection**:
+- Missing market data identification
+- Incomplete position information flagging
+- Factor model coverage gaps
+- Risk calculation limitations
+
+**GPT Agent Gap Reporting**:
+- Receives backend gap analysis
+- Provides user-friendly gap explanations
+- Suggests data acquisition or calculation improvements
+- Never attempts to fill gaps with computed estimates
+
+### Performance and Scalability
+
+#### 1. Caching Strategy
+**Backend Caching for GPT Agent**:
+- Portfolio snapshot data cached for 5 minutes
+- Factor exposures cached for 1 hour
+- Risk calculations cached until market close
+- Reduces database load from frequent GPT agent queries
+
+#### 2. Rate Limiting
+**Backend Rate Limits for GPT Agent**:
+- Higher rate limits for GPT agent service authentication
+- Bulk data endpoints for efficient GPT agent data retrieval
+- Optimized queries for common GPT agent access patterns
+
+### Security Considerations
+
+#### 1. Service-to-Service Authentication
+**GPT Agent Backend Access**:
+- Dedicated service account for GPT agent
+- Scoped permissions for GPT-required data access
+- Audit logging of all GPT agent backend requests
+- Network-level security between services
+
+#### 2. Data Privacy
+**Sensitive Data Handling**:
+- GPT agent receives anonymized/aggregated data where possible
+- Personal identifiers filtered before GPT processing
+- Portfolio names and user data handled with appropriate privacy controls
+
+### Documentation and Developer Experience
+
+#### 1. Backend API Documentation Updates
+**GPT Agent Integration Docs**:
+- Complete API endpoint documentation for GPT agent tools
+- Data schema specifications matching GPT agent expectations
+- Example requests and responses for each GPT tool
+- Error handling patterns for GPT agent consumption
+
+#### 2. Testing Framework
+**GPT Agent Backend Testing**:
+- Mock backend responses for GPT agent development
+- Integration tests with real demo portfolio data
+- Performance benchmarks for backend-GPT agent interactions
+- End-to-end testing across three-service architecture
+
+### Future Backend Enhancements for GPT Integration
+
+#### 1. Real-time Data Pipeline
+**Planned Backend Improvements**:
+- WebSocket endpoints for real-time portfolio updates to GPT agent
+- Event-driven notifications when portfolio data changes
+- Streaming calculation results for long-running analytics
+
+#### 2. Enhanced Analytics
+**Backend Calculation Expansion**:
+- More sophisticated factor models for GPT interpretation
+- Extended stress testing scenarios
+- Advanced attribution analysis
+- Enhanced risk decomposition methods
+
+---
+
 ## 2025-08-23 (Session 3) - Windows Setup Guide Improvements & Backend Startup Process
 
 ### Summary
