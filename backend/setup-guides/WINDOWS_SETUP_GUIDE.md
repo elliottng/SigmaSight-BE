@@ -222,6 +222,15 @@ LOG_LEVEL=INFO
    ```powershell
    uv run python run.py
    ```
+   - ⚠️ **Important**: Always use `uv run` to ensure the virtual environment is activated
+   - The server will start on http://0.0.0.0:8000 (accessible at http://localhost:8000)
+   - You'll see messages like:
+     ```
+     INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+     INFO:     Started reloader process [####] using WatchFiles
+     INFO:     Started server process [####]
+     INFO:     Application startup complete.
+     ```
 
 2. **Verify it's working:**
    - Open your web browser
@@ -260,6 +269,8 @@ After initial setup, here's how to start SigmaSight each day:
    ```powershell
    uv run python run.py
    ```
+   - ⚠️ **Critical**: Always use `uv run` - don't use `python run.py` directly
+   - This ensures the virtual environment and dependencies are properly loaded
 
 5. **Option B: Run Batch Processing and Generate Reports**
    ```powershell
