@@ -2,6 +2,193 @@
 
 ---
 
+## 2025-08-25 (Session 5) - Complete User-Based Frontend Architecture & Authentication
+
+### Summary
+Built a complete user-based frontend architecture with authentication, personalized dashboards, and flexible GPT integration supporting both direct and agent modes. Transformed from demo portfolio viewer to production-ready user-specific portfolio management system.
+
+### Major Implementation Completed
+
+#### 1. User Authentication System ✅
+**Login System** (`pages/login.tsx`):
+- Professional demo user selection interface
+- Three distinct investor profiles (Individual, High Net Worth, Hedge Fund)
+- Secure password authentication with backend fallback
+- User profile descriptions and portfolio context
+- Automatic redirect to personalized dashboard
+
+**Authentication API** (`pages/api/auth/login.ts`):
+- Backend authentication with graceful fallback to demo mode
+- JWT token generation and user profile matching
+- Portfolio ID assignment per user
+- Error handling with user-friendly messages
+- Demo user validation and security
+
+#### 2. User-Specific Dashboard ✅ 
+**Personal Dashboard** (`pages/dashboard.tsx`):
+- Personalized welcome with user's investment profile
+- User-specific portfolio overview and description
+- Direct navigation to user's portfolio analytics
+- Portfolio-aware chat integration
+- Professional user management (logout, profile display)
+- Feature roadmap with current/coming soon status
+
+**User Profile Integration**:
+- Individual Investor: Diversified portfolio with ETFs and stocks
+- High Net Worth: Advanced strategies with options and alternatives  
+- Hedge Fund Manager: Complex long/short institutional portfolio
+- Dynamic user type detection and profile customization
+
+#### 3. Flexible GPT Integration Architecture ✅
+**GPT Service Abstraction** (`src/hooks/useGPTService.ts`):
+- Dual-mode support: Direct OpenAI integration + GPT Agent (when ready)
+- Environment-based service mode switching
+- Consistent API interface for both integration types
+- Portfolio context injection with user-specific data
+- Comprehensive error handling and fallback strategies
+
+**Enhanced GPT API** (`pages/api/gpt/analyze.ts`):
+- Structured response format with machine-readable data
+- Portfolio context integration with real backend data
+- OpenAI API integration with portfolio-specific prompts
+- Fallback to intelligent demo responses
+- Enhanced metadata including risk metrics and recommendations
+
+#### 4. Portfolio Context System ✅
+**Portfolio Context Hook** (`src/hooks/usePortfolioContext.ts`):
+- Comprehensive portfolio data fetching via SWR
+- Backend API integration (summary, attribution, factors, VaR)
+- Real-time portfolio context generation for GPT
+- Date range controls and portfolio selection
+- Error handling and loading states management
+
+**Portfolio Analytics Dashboard** (`pages/portfolio/[id].tsx`):
+- Complete portfolio analytics with real backend data
+- Interactive visualizations for factor exposures  
+- Risk metrics display (VaR, Expected Shortfall)
+- Attribution analysis (top contributors/detractors)
+- Integrated GPT analysis with portfolio context
+- Professional navigation and user experience
+
+#### 5. Secure Homepage & Navigation ✅
+**Updated Homepage** (`pages/index.tsx`):
+- User-profile focused instead of direct portfolio access
+- Login-required architecture with security-first design
+- Backend connectivity monitoring with health checks
+- Professional feature overview and value propositions
+- Clear user onboarding flow with demo account information
+
+**Navigation Security**:
+- No direct access to portfolios without authentication
+- User-specific routing with portfolio ID validation
+- Session management with localStorage integration
+- Secure logout functionality across all pages
+
+### Technical Architecture Improvements
+
+#### Authentication Flow
+```
+Homepage → Login Selection → Backend Auth → User Dashboard → Portfolio Analytics
+    ↓              ↓              ↓              ↓               ↓
+No Portfolio   User Profile   JWT Token    Personal View   User's Data Only
+  Access       Selection      Generated      & Context      & Analytics
+```
+
+#### GPT Integration Flexibility
+```javascript
+// Supports both modes seamlessly
+const gptService = useGPTService({ 
+  mode: process.env.NEXT_PUBLIC_GPT_MODE || 'direct',
+  defaultPortfolioId: user.portfolioId 
+});
+
+// Direct mode: Frontend → OpenAI API (current)
+// Agent mode: Frontend → GPT Agent → Backend (future)
+```
+
+#### User-Specific Data Flow
+```
+User Login → Portfolio ID → Backend APIs → GPT Context → Personalized Analysis
+     ↓             ↓            ↓              ↓              ↓
+Demo User    a3209353-...   Real Portfolio   User Context   User's Analysis
+Selection      (UUID)         Data Only        String          Only
+```
+
+### User Experience Enhancements
+
+#### Professional Demo System
+- **User Selection**: Choose from 3 distinct investor profiles
+- **Contextual Experience**: Each user sees content tailored to their investment style
+- **Seamless Navigation**: Intuitive flow from login to analytics
+- **Secure Access**: No portfolio data visible without proper authentication
+
+#### Personalized Dashboards
+- **Dynamic Content**: User profile determines dashboard content and language
+- **Portfolio Integration**: Direct access to user's specific portfolio only
+- **Feature Roadmap**: Clear indication of current vs. future capabilities
+- **Professional Design**: Clean, modern interface suitable for financial professionals
+
+#### Enhanced Chat Experience
+- **Portfolio Awareness**: GPT chat includes user's specific portfolio context
+- **URL Parameters**: Support for portfolio-specific chat via URL parameters  
+- **User Context**: Chat responses tailored to user's investment profile
+- **Fallback Handling**: Graceful degradation when GPT services unavailable
+
+### Security & Data Isolation
+
+#### User Data Protection
+- **Portfolio Isolation**: Users can only access their assigned portfolio
+- **Session Management**: Secure token storage and automatic expiration
+- **Authentication Required**: All portfolio features require valid login
+- **Demo Mode Safety**: Fallback authentication maintains security boundaries
+
+#### Backend Integration
+- **Health Monitoring**: Real-time backend connectivity status
+- **API Error Handling**: Comprehensive error recovery and user notifications
+- **Data Validation**: Portfolio ID validation and user authorization
+- **Graceful Degradation**: System remains functional during backend issues
+
+### Performance & Scalability
+
+#### Optimized Loading
+- **SWR Integration**: Intelligent caching and revalidation for portfolio data
+- **Lazy Loading**: Portfolio analytics load on-demand per user
+- **Background Updates**: Health checks and data refresh without UI blocking
+- **Error Boundaries**: Isolated error handling prevents system-wide failures
+
+#### Development Experience
+- **Type Safety**: Comprehensive TypeScript interfaces for all user and portfolio data
+- **Modular Architecture**: Clean separation of concerns across authentication, data, and UI layers
+- **Environment Flexibility**: Easy switching between development and production configurations
+- **Testing Ready**: Mock data systems and API fallbacks for development testing
+
+### Demo User Profiles
+
+#### Complete User System
+| Profile | Email | Portfolio Focus | ID |
+|---------|-------|----------------|-----|
+| **Individual Investor** | `demo_individual@sigmasight.com` | Diversified ETFs & stocks | `a3209353-...` |
+| **High Net Worth** | `demo_hnw@sigmasight.com` | Advanced strategies | `14e7f420-...` |
+| **Hedge Fund Manager** | `demo_hedgefundstyle@sigmasight.com` | Long/short complex | `cf890da7-...` |
+
+**Authentication**: All users use password `demo12345` with backend fallback to demo mode
+
+### Future-Ready Architecture
+
+#### GPT Agent Integration Path
+- **Current**: Direct OpenAI integration working perfectly
+- **Future**: GPT Agent service integration via mode switching
+- **Migration**: Zero frontend changes required when GPT Agent ready
+- **Flexibility**: Supports both approaches simultaneously
+
+#### Scalability Considerations
+- **Multi-User Ready**: Architecture supports unlimited demo and real users
+- **Real Authentication**: Backend integration ready for production auth systems
+- **Data Expansion**: Portfolio context system extensible for additional data sources
+- **Feature Growth**: Dashboard framework supports unlimited feature additions
+
+---
+
 ## 2025-08-25 (Session 2) - Production-Ready GPT Integration & Core Components Implementation
 
 ### Summary

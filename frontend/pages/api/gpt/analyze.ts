@@ -1,5 +1,33 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+// GPT Response format for consistency
+interface GPTResponse {
+  summary_markdown?: string;
+  machine_readable?: {
+    snapshot?: {
+      total_value?: number;
+      net_exposure_pct?: number;
+      gross_exposure_pct?: number;
+      daily_pnl?: number;
+    };
+    concentration?: {
+      top1?: number;
+      hhi?: number;
+      largest_positions?: Array<{ symbol: string; weight: number; }>;
+    };
+    factors?: Array<{
+      name: string;
+      exposure: number;
+      description?: string;
+    }>;
+    gaps?: string[];
+    actions?: string[];
+    next_steps?: string[];
+  };
+  success?: boolean;
+  response?: string; // Backward compatibility
+}
+
 const DEMO_RESPONSES = [
   "Based on your portfolio analysis, I can see you have a well-diversified mix of assets. Your risk-adjusted returns look strong, but I'd recommend considering some defensive positions given current market volatility.",
   "Looking at your factor exposures, you have significant exposure to growth factors. This could be beneficial in a bull market, but consider adding some value exposure to balance your risk profile.",
@@ -8,7 +36,7 @@ const DEMO_RESPONSES = [
   "Your Greek exposures indicate you're positioned for moderate market moves. Consider adding some volatility protection if you expect increased market turbulence."
 ];
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse<GPTResponse>) {
   console.log('API called with method:', req.method);
   
   if (req.method !== 'POST') {
@@ -96,8 +124,39 @@ USER QUESTION: ${message}
         const aiResponse = data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
         
         console.log('Got response from OpenAI API successfully');
+        
+        // Enhanced response with structured data
         return res.status(200).json({ 
-          response: aiResponse + " 🤖"
+          success: true,
+          summary_markdown: aiResponse,
+          machine_readable: {
+            snapshot: portfolioData?.content ? {
+              total_value: portfolioData.content.total_value,
+              net_exposure_pct: portfolioData.content.net_exposure_percent,
+              gross_exposure_pct: portfolioData.content.gross_exposure_percent,
+              daily_pnl: portfolioData.content.daily_pnl,
+            } : undefined,
+            concentration: portfolioData?.content?.top_positions ? {
+              top1: portfolioData.content.top_positions[0]?.weight_percent / 100,
+              largest_positions: portfolioData.content.top_positions.slice(0, 5).map((pos: any) => ({
+                symbol: pos.symbol,
+                weight: pos.weight_percent / 100,
+              })),
+            } : undefined,
+            factors: portfolioData?.content?.factor_exposures ? 
+              Object.entries(portfolioData.content.factor_exposures).slice(0, 5).map(([factor, exposure]: [string, any]) => ({
+                name: factor,
+                exposure: parseFloat(exposure) || 0,
+                description: `Exposure to ${factor} factor`,
+              })) : undefined,
+            gaps: portfolioData ? [] : ['portfolio_data_unavailable'],
+            actions: [
+              "Review portfolio concentration in top holdings",
+              "Consider factor exposure balance",
+              "Monitor correlation risks across positions"
+            ],
+          },
+          response: aiResponse + " 🤖" // Backward compatibility
         });
       } else {
         const errorData = await openaiResponse.json();

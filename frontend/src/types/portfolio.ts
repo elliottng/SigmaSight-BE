@@ -126,3 +126,128 @@ export interface PortfolioReport {
     stock_count: number;
   };
 }
+
+// Extended types for portfolio dashboard and GPT integration
+export interface PortfolioListItem {
+  id: string;
+  name: string;
+  total_value?: number;
+  daily_pnl?: number;
+  daily_return?: number;
+  position_count?: number;
+  report_folder?: string;
+  generated_date?: string;
+  formats_available?: string[];
+}
+
+// Portfolio Summary for API integration (aligned with API contracts)
+export interface PortfolioSummaryAPI {
+  portfolioId: string;
+  asOf: string;
+  window: string;
+  equity: number;
+  cash: number;
+  grossExposurePct: number;
+  netExposurePct: number;
+  longExposurePct: number;
+  shortExposurePct: number;
+  returnPct: number;
+  annVolPct: number;
+  sharpe: number;
+  drawdownPct: number;
+  benchmark?: {
+    name: string;
+    returnPct: number;
+    annVolPct: number;
+  };
+}
+
+// Attribution Analysis
+export interface AttributionItem {
+  key: string;
+  contributionPct: number;
+}
+
+export interface Attribution {
+  groupBy: 'security' | 'sector' | 'industry';
+  items: AttributionItem[];
+  topContributors: string[];
+  topDetractors: string[];
+}
+
+// Extended Factor Analysis
+export interface FactorAnalysis {
+  asOf: string;
+  model: string;
+  exposures: Array<{
+    factor: string;
+    beta: number;
+  }>;
+  riskContribution: Array<{
+    factor: string;
+    pctOfTotalVariance: number;
+  }>;
+}
+
+// Risk Analysis
+export interface VaRAnalysis {
+  method: string;
+  conf: number;
+  horizon: string;
+  varAmount: number;
+  esAmount: number;
+  notes: string;
+}
+
+// Portfolio Context for GPT Integration
+export interface PortfolioContext {
+  portfolio: {
+    id: string;
+    name: string;
+    total_value?: number;
+    position_count?: number;
+  };
+  date_range: {
+    asOf?: string;
+    window?: string;
+  };
+  summary?: {
+    equity: number;
+    cash: number;
+    net_exposure: number;
+    gross_exposure: number;
+    return_pct: number;
+    volatility: number;
+    sharpe: number;
+    drawdown: number;
+  };
+  attribution?: {
+    top_contributors: string[];
+    top_detractors: string[];
+    items: AttributionItem[];
+  };
+  factors?: {
+    model: string;
+    key_exposures: Array<{
+      factor: string;
+      beta: number;
+    }>;
+  };
+  risk?: {
+    var_1d: number;
+    es_1d: number;
+    method: string;
+  };
+}
+
+// Portfolio View Configuration for UI controls
+export interface PortfolioViewConfig {
+  portfolioId: string;
+  dateRange: {
+    asOf: Date;
+    window: '1d' | '1w' | '1m' | '3m' | '6m' | '1y' | 'ytd';
+  };
+  view: 'portfolio' | 'longs' | 'shorts';
+  groupBy: 'security' | 'sector' | 'industry' | 'factor';
+  selectedPositions?: string[];
+}

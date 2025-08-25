@@ -1,9 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function ChatPage() {
+  const router = useRouter();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Array<{text: string, sender: 'user' | 'bot'}>>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedPortfolio, setSelectedPortfolio] = useState<string>('');
+
+  // Handle portfolio parameter from URL
+  useEffect(() => {
+    if (router.query.portfolio && typeof router.query.portfolio === 'string') {
+      setSelectedPortfolio(router.query.portfolio);
+      // Add initial context message
+      const portfolioNames: Record<string, string> = {
+        'a3209353-9ed5-4885-81e8-d4bbc995f96c': 'Demo Individual Portfolio',
+        '14e7f420-b096-4e2e-8cc2-531caf434c05': 'Demo High Net Worth Portfolio',
+        'cf890da7-7b74-4cb4-acba-2205fdd9dff4': 'Demo Hedge Fund Portfolio',
+      };
+      const portfolioName = portfolioNames[router.query.portfolio] || 'Selected Portfolio';
+      setMessages([{
+        text: `I'm ready to analyze ${portfolioName}. What would you like to know about this portfolio's performance, risk profile, or investment strategy?`,
+        sender: 'bot'
+      }]);
+    }
+  }, [router.query.portfolio]);
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
@@ -14,11 +35,14 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // Call GPT agent API
+      // Call GPT service API (currently direct integration)
       const response = await fetch('/api/gpt/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage })
+        body: JSON.stringify({ 
+          message: userMessage,
+          portfolio_id: selectedPortfolio || undefined
+        })
       });
       
       const data = await response.json();
