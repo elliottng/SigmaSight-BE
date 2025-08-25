@@ -1,21 +1,21 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SigmaSight - Portfolio Risk Management',
-  description: 'Advanced portfolio risk analytics and management platform',
-};
+  title: 'SigmaSight GPT Agent',
+  description: 'Portfolio analysis with GPT Agent',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900 antialiased">
+      <body className="antialiased">
         {children}
       </body>
     </html>
-  );
+  )
 }
