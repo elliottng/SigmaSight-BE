@@ -2,6 +2,119 @@
 
 ---
 
+## 2025-08-25 (Session 3) - Setup Guide Improvements & Windows Compatibility
+
+### Summary
+Enhanced setup documentation and resolved Windows-specific installation issues to improve developer experience and reduce setup friction.
+
+### Setup Guide Enhancements ✅
+
+#### 1. Windows-Specific Setup Issues Resolved
+**Problem Identified**: 
+- Root-level `npm run dev` fails on Windows due to `pnpm` dependency
+- PowerShell commands hanging during installation process
+- TypeScript build failures preventing service startup
+
+**Solutions Implemented**:
+```bash
+# Windows-compatible setup process
+cd packages/schemas && npm install && npm run build
+cd ../analysis-agent && npm install && npm run build
+cd ../../apps/api && npm install && npm run dev
+```
+
+#### 2. Documentation Updates
+**Enhanced SETUP_GUIDE.md**:
+- Added prominent Windows compatibility warning
+- Updated dependency installation order with individual package builds
+- Improved troubleshooting section with specific error messages
+- Added PowerShell command hanging solutions
+- Updated OpenAI API key format examples (`sk-proj-...`)
+
+#### 3. Troubleshooting Section Expansion
+**New Issues Documented**:
+- **TypeScript Build Failures**: Marked as "MOST COMMON" issue with step-by-step solutions
+- **Service Won't Start**: Direct API directory startup instructions
+- **Windows PowerShell Hanging**: Specific Windows PowerShell compatibility issues
+- **pnpm vs npm**: Root cause explanation and workarounds
+
+#### 4. Improved Quick Start Instructions
+**Updated Quick Start Process**:
+- Added Windows-specific build steps in main workflow
+- Recommended starting from `apps/api` directory instead of root
+- Added individual package installation steps
+- Enhanced error context and solution paths
+
+### Technical Fixes Applied ✅
+
+#### 1. Package Build Process
+**Resolved Dependencies**:
+- Built `@sigmasight/schemas` package successfully
+- Built `@sigmasight/analysis-agent` package successfully  
+- Installed dependencies in each package directory individually
+- Verified TypeScript compilation for all packages
+
+#### 2. Service Startup Process
+**Working Startup Sequence**:
+1. PostgreSQL database running in Docker (port 5432)
+2. Backend service running (port 8000)
+3. GPTAgent service running (port 8787) via `apps/api/npm run dev`
+
+#### 3. Environment Configuration
+**Validated Configuration**:
+- OpenAI API key properly configured in `.env` file
+- Backend URL connectivity confirmed
+- JWT secret alignment between services
+- Port configuration verified
+
+### Developer Experience Improvements
+
+#### 1. Error Prevention
+**Proactive Issue Prevention**:
+- Clear Windows compatibility warnings upfront
+- Step-by-step build process documentation
+- Alternative startup methods for different environments
+- Specific error message matching with solutions
+
+#### 2. Setup Validation
+**Verification Steps Added**:
+- Health check endpoint testing instructions
+- Service connectivity validation
+- Browser preview setup for immediate feedback
+- Integration testing guidance
+
+#### 3. Future Setup Reliability
+**Documentation Quality**:
+- Real error messages included in troubleshooting
+- Multiple solution paths for common issues
+- Environment-specific instructions (Windows/Mac/Linux)
+- Clear dependency relationship explanations
+
+### Lessons Learned & Applied
+
+#### 1. Windows Development Environment
+**Key Insights**:
+- `pnpm` not commonly installed on Windows development machines
+- PowerShell command chaining can cause hanging issues
+- Individual package builds more reliable than monorepo builds
+- Direct API directory startup more predictable than root-level scripts
+
+#### 2. Setup Process Optimization
+**Best Practices Established**:
+- Build packages in dependency order (schemas → analysis-agent → api)
+- Install dependencies in each package directory
+- Start services from specific directories rather than root
+- Provide multiple startup options for different environments
+
+#### 3. Documentation Standards
+**Improved Documentation Approach**:
+- Include actual error messages users will encounter
+- Provide multiple solution paths for common issues
+- Add environment-specific warnings and instructions
+- Test all documented procedures on target platforms
+
+---
+
 ## 2025-08-25 (Session 2) - Frontend Integration Support & API Alignment
 
 ### Summary

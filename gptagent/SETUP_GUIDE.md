@@ -24,6 +24,16 @@ The GPT Agent requires a **three-service architecture**:
 
 ## 🚀 Quick Start (Development)
 
+### ⚠️ Windows Users - Read This First!
+
+If you're on Windows, the standard `npm run dev` from root **will fail** because it requires `pnpm`. Follow these steps instead:
+
+1. **Build packages individually** (required first-time setup)
+2. **Start from API directory** (not root)
+3. **Install dependencies in each package**
+
+See "Windows-Specific Setup" section below for detailed steps.
+
 ### 1. **Start Backend Service** 
 ```bash
 # Terminal 1: Backend (MUST START FIRST)
@@ -40,6 +50,13 @@ uv run python run.py
 ```bash
 # Terminal 2: GPT Agent (START SECOND)
 cd gptagent
+
+# IMPORTANT: If using Windows, build packages individually first:
+cd packages/schemas && npm run build
+cd ../analysis-agent && npm run build
+cd ../../apps/api
+
+# Then start the service:
 npm run dev
 
 # Expected output:
@@ -126,25 +143,36 @@ cd gptagent
 
 #### Step 2: Install Dependencies
 ```bash
-# Install Node.js dependencies
+# Install Node.js dependencies in root
 npm install
 
-# Build TypeScript packages
-npm run build  # This may fail if pnpm is not available, that's OK
+# Install dependencies in API directory
+cd apps/api && npm install
+cd ../..
+
+# Install dependencies in packages
+cd packages/schemas && npm install
+cd ../analysis-agent && npm install
+cd ../..
+
+# Build TypeScript packages (REQUIRED STEP)
+npm run build  # This will fail if pnpm is not available
 ```
 
-If build fails, build packages individually:
+**⚠️ IMPORTANT**: If build fails (common on Windows), build packages individually:
 ```bash
+# Build packages in correct order
 cd packages/schemas && npm run build
-cd ../analysis-agent && npm run build  
+cd ../analysis-agent && npm run build
 cd ../../apps/api && npm run build
+cd ..
 ```
 
 #### Step 3: Configure Environment
 Create `gptagent/.env`:
 ```bash
 # OpenAI Configuration
-OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_API_KEY=sk-proj-your-openai-api-key-here
 
 # Backend Integration
 BACKEND_URL=http://localhost:8000
@@ -172,6 +200,11 @@ DEMO_HEDGE_FUND_PORTFOLIO_ID=cf890da7-7b74-4cb4-acba-2205fdd9dff4
 
 #### Step 4: Start GPT Agent Server
 ```bash
+# Option 1: From root directory (may fail without pnpm)
+npm run dev
+
+# Option 2: Direct from API directory (RECOMMENDED for Windows)
+cd apps/api
 npm run dev
 ```
 
@@ -304,21 +337,34 @@ The backend includes three demo portfolios for testing:
 ```
 **Solution**: 
 - Set `OPENAI_API_KEY` in `gptagent/.env`
-- Verify key format: `sk-...`
+- Verify key format: `sk-proj-...` or `sk-...`
 
-#### 3. **TypeScript Build Failures**
+#### 3. **TypeScript Build Failures (MOST COMMON)**
 ```
 npm error Lifecycle script `build` failed
+'pnpm' is not recognized as an internal or external command
 ```
-**Solution**:
+**Root Cause**: The project uses `pnpm` but most systems have `npm` installed.
+
+**Solution (REQUIRED for Windows)**:
 ```bash
-# Build packages individually
-cd packages/schemas && npm run build
-cd ../analysis-agent && npm run build
-cd ../../apps/api && npm run build
+# Build packages individually in correct order
+cd packages/schemas && npm install && npm run build
+cd ../analysis-agent && npm install && npm run build
+cd ../../apps/api && npm install
 ```
 
-#### 4. **Port Already in Use**
+#### 4. **Service Won't Start After Build**
+```
+npm error Lifecycle script `dev` failed
+```
+**Solution**: Start from API directory directly:
+```bash
+cd apps/api
+npm run dev
+```
+
+#### 5. **Port Already in Use**
 ```
 Error: listen EADDRINUSE: address already in use :::8787
 ```
@@ -331,13 +377,21 @@ npx kill-port 8787
 PORT=8788
 ```
 
-#### 5. **JWT Token Mismatch**
+#### 6. **JWT Token Mismatch**
 ```
 401 Unauthorized
 ```
 **Solution**: 
 - Ensure `JWT_SECRET` matches between backend and GPT agent
 - Verify token format in requests: `Authorization: Bearer <token>`
+
+#### 7. **Windows PowerShell Command Hanging**
+**Issue**: Commands hang or don't complete on Windows PowerShell
+
+**Solution**: 
+- Use individual commands instead of chained commands
+- Navigate to specific directories before running commands
+- Use `cd apps/api` then `npm run dev` instead of root-level scripts
 
 ### Debug Commands
 
