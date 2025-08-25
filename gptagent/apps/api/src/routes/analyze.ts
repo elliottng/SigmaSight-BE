@@ -17,8 +17,20 @@ export const analyzeRoute: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
 
-    const agent = new SigmaSightAgent(process.env.OPENAI_API_KEY || "");
-    const result = await agent.run(parsed.data);
-    return reply.send(result);
+    try {
+      const agent = new SigmaSightAgent(process.env.OPENAI_API_KEY || "", {
+        backendUrl: process.env.BACKEND_URL || "http://localhost:8000",
+        authToken: req.headers.authorization?.replace("Bearer ", "")
+      });
+      
+      const result = await agent.run(parsed.data);
+      return reply.send(result);
+    } catch (error) {
+      app.log.error(`Analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      return reply.code(500).send({ 
+        error: "Analysis failed", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
   });
 };
