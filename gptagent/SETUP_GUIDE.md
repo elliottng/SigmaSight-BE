@@ -24,7 +24,49 @@ The GPT Agent requires a **three-service architecture**:
 
 ## 🚀 Quick Start (Development)
 
-### ⚠️ Windows Users - Read This First!
+### 🎯 Two Setup Options Available:
+
+#### **Option A: Direct ChatGPT Integration (Recommended for Quick Setup)**
+✅ **Fastest setup** - Bypass GPT agent service complexities  
+✅ **Production-ready** - Real OpenAI API with portfolio data  
+✅ **Windows-compatible** - No build issues or dependency conflicts  
+
+#### **Option B: Full GPT Agent Service (Advanced Setup)**
+🔧 **Complete architecture** - Full three-service integration  
+⚠️ **Windows complexity** - Requires individual package builds  
+🛠️ **Development focus** - For GPT agent service development  
+
+---
+
+### ⚡ **Option A: Direct ChatGPT Integration Setup**
+
+**Perfect for**: Quick testing, immediate functionality, production demos
+
+```bash
+# Terminal 1: Start Backend (REQUIRED)
+cd backend
+uv run python run.py  # Port 8000
+
+# Terminal 2: Start Frontend with Direct Integration
+cd frontend
+PORT=4003 OPENAI_API_KEY="sk-proj-your-key-here" npm run dev  # Port 4003
+
+# 🎉 Ready! Visit: http://localhost:4003/chat
+```
+
+**What you get:**
+- ✅ Real-time chat interface with GPT-4o-mini
+- ✅ Actual portfolio data integration from backend
+- ✅ Professional portfolio analysis and insights
+- ✅ No complex service dependencies
+
+---
+
+### ⚙️ **Option B: Full GPT Agent Service Setup**
+
+**Perfect for**: GPT agent development, service architecture testing
+
+#### ⚠️ Windows Users - Read This First!
 
 If you're on Windows, the standard `npm run dev` from root **will fail** because it requires `pnpm`. Follow these steps instead:
 
@@ -32,7 +74,7 @@ If you're on Windows, the standard `npm run dev` from root **will fail** because
 2. **Start from API directory** (not root)
 3. **Install dependencies in each package**
 
-See "Windows-Specific Setup" section below for detailed steps.
+See "Full GPT Agent Service Setup" section below for detailed steps.
 
 ### 1. **Start Backend Service** 
 ```bash
@@ -80,6 +122,73 @@ curl http://localhost:8787/health
 ```
 
 ## 📦 Detailed Setup Instructions
+
+### **Option A: Direct ChatGPT Integration - Complete Guide**
+
+This approach bypasses the GPT agent service and connects the frontend directly to OpenAI's API while pulling real portfolio data from the SigmaSight backend.
+
+#### Prerequisites
+- Backend service running (PostgreSQL + FastAPI)
+- OpenAI API key (`sk-proj-...` format)
+- Node.js 18+ for frontend
+
+#### Step-by-Step Setup
+
+##### 1. Backend Service (Same as Option B)
+```bash
+cd backend
+
+# Start database
+docker-compose up -d
+
+# Start backend API
+uv run python run.py  # Port 8000
+```
+
+##### 2. Frontend Service with Direct Integration
+```bash
+cd frontend
+
+# Install dependencies (if needed)
+npm install
+
+# Set environment variables and start
+export OPENAI_API_KEY="sk-proj-your-openai-api-key-here"
+export PORT=4003
+npm run dev
+
+# OR in one command:
+PORT=4003 OPENAI_API_KEY="sk-proj-your-key-here" npm run dev
+```
+
+##### 3. Verify Setup
+```bash
+# Test frontend
+curl http://localhost:4003
+
+# Test GPT integration
+curl -X POST http://localhost:4003/api/gpt/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is my portfolio risk profile?"}'
+```
+
+#### How It Works
+1. **Frontend** (`localhost:4003/chat`) - Clean chat interface
+2. **API Route** (`/api/gpt/analyze`) - Fetches portfolio data from backend
+3. **OpenAI API** - Processes portfolio context + user question
+4. **Response** - Real portfolio insights with GPT analysis
+
+#### Advantages of Direct Integration
+- ✅ **No build complexity** - Standard Next.js setup
+- ✅ **Real portfolio data** - Live backend integration
+- ✅ **Production OpenAI** - gpt-4o-mini model
+- ✅ **Windows compatible** - No pnpm/build issues
+- ✅ **Fast iteration** - Direct API calls, easy debugging
+- ✅ **Immediate results** - Working chat in minutes
+
+---
+
+### **Option B: Full GPT Agent Service Setup**
 
 ### Backend Service Setup (Port 8000)
 
