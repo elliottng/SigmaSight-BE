@@ -92,6 +92,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const restoreAuth = async () => {
       try {
+        // Skip authentication in demo mode or if backend is not available
+        const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+        const isAuthEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED !== 'false';
+        
+        if (!isAuthEnabled || isDemoMode) {
+          // Set up a mock authenticated state for demo
+          dispatch({ 
+            type: 'RESTORE_AUTH', 
+            payload: { 
+              user: { id: 'demo', email: 'demo@sigmasight.com', username: 'demo', full_name: 'Demo User', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_active: true }, 
+              token: 'demo-token' 
+            } 
+          });
+          return;
+        }
+        
         const token = localStorage.getItem('auth_token');
         if (token) {
           const user = await apiClient.getCurrentUser();

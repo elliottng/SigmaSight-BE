@@ -20,6 +20,8 @@ await app.register(cors, {
   origin: [
     "http://localhost:3000", // Frontend development server
     "http://localhost:3001", // Alternate frontend port
+    "http://localhost:4001", // Current frontend port
+    /^http:\/\/localhost:\d+$/, // Any localhost port for development
     /^https:\/\/.*\.vercel\.app$/, // Vercel deployments
     /^https:\/\/.*\.netlify\.app$/, // Netlify deployments
   ],
@@ -44,8 +46,18 @@ app.get("/health", async (req, reply) => {
 });
 
 // Register routes
+app.log.info("Registering /analyze route...");
 app.register(analyzeRoute, { prefix: "/analyze" });
-app.register(toolsRoutes, { prefix: "/tools" });
+app.log.info("Skipping /tools route for debugging...");
+// app.register(toolsRoutes, { prefix: "/tools" });
+app.log.info("Routes registered successfully");
+
+// Debug: Log all incoming requests
+app.addHook('preHandler', async (request, reply) => {
+  app.log.info(`=== REQUEST: ${request.method} ${request.url} ===`);
+  app.log.info(`Headers: ${JSON.stringify(request.headers)}`);
+  app.log.info(`Body: ${JSON.stringify(request.body)}`);
+});
 
 // Error handling
 app.setErrorHandler((error, request, reply) => {

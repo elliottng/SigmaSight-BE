@@ -1,11 +1,52 @@
 # SigmaSight GPT Agent - Developer Setup Guide
 
 **Date:** 2025-08-25  
-**Version:** 1.0
+**Version:** 2.0  
+**Updated:** Added working ChatGPT integration configuration
 
 ## Overview
 
-This guide helps developers set up the SigmaSight GPT Agent system that integrates with the existing SigmaSight backend application. The GPT agent acts as an analysis copilot, consuming backend-calculated metrics and providing narrative insights.
+This guide helps developers set up the SigmaSight GPT Agent system that integrates with the existing SigmaSight backend application. The system includes both the original GPT agent service and a working direct ChatGPT integration implemented through the frontend.
+
+## Current Working Configuration
+
+⚠️ **IMPORTANT**: The fastest way to get GPT chat functionality working is through the direct ChatGPT integration, not the GPT agent service.
+
+### Quick Start - Working ChatGPT Integration
+
+**Step 1: Start Backend**
+```bash
+cd backend && uv run python run.py  # Port 8000
+```
+
+**Step 2: Start Frontend with ChatGPT Integration**
+```bash
+cd frontend 
+export OPENAI_API_KEY="your-openai-api-key-here"
+export PORT=4003
+npm install && npm run dev
+```
+
+**Step 3: Access Chat Interface**
+- Navigate to `http://localhost:4003/chat`
+- Test with portfolio questions like "What's my portfolio risk?"
+- Real portfolio data will be analyzed by GPT-4o-mini
+
+### Working Configuration Details
+
+**Architecture:**
+- **Backend**: Port 8000 (existing SigmaSight backend)
+- **Frontend**: Port 4003 (Next.js with direct OpenAI integration)
+- **No GPT Agent Service**: Bypassed due to technical issues
+
+**Key Files:**
+- `frontend/pages/chat.tsx` - Chat interface
+- `frontend/pages/api/gpt/analyze.ts` - Direct OpenAI integration with portfolio data
+- Portfolio data fetched from: `http://localhost:8000/api/v1/reports/portfolio/{id}/content/json`
+
+## Alternative: GPT Agent Service Setup
+
+The original GPT agent service is preserved but currently has technical issues. Use this setup if you want to work on the service-based architecture:
 
 ## Prerequisites
 
@@ -17,7 +58,7 @@ This guide helps developers set up the SigmaSight GPT Agent system that integrat
 - **Git** (version control)
 
 ### Required API Keys
-- **OpenAI API Key** (for gpt-5-thinking model)
+- **OpenAI API Key** (for gpt-4o-mini model) - Format: `sk-proj-...`
 - **SigmaSight Backend Access** (same API keys as backend)
 
 ### Backend Dependencies

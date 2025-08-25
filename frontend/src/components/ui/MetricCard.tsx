@@ -7,7 +7,8 @@ import { cn, formatCurrency, getTrend, getTrendColor } from '@/lib/utils';
 interface MetricCardProps {
   title: string;
   value: number | string;
-  trend?: number | string;
+  subtitle?: string;
+  trend?: 'positive' | 'negative' | 'neutral' | number | string;
   threshold?: number;
   className?: string;
   loading?: boolean;
@@ -16,15 +17,16 @@ interface MetricCardProps {
 export default function MetricCard({ 
   title, 
   value, 
+  subtitle,
   trend, 
   threshold,
   className,
   loading = false
 }: MetricCardProps) {
   const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-  const trendValue = trend ? (typeof trend === 'string' ? parseFloat(trend) : trend) : 0;
-  const trendDirection = getTrend(trendValue);
-  const trendColorClass = getTrendColor(trendValue);
+  const trendValue = trend ? (typeof trend === 'number' ? trend : typeof trend === 'string' && !isNaN(parseFloat(trend)) ? parseFloat(trend) : 0) : 0;
+  const trendDirection = typeof trend === 'string' && ['positive', 'negative', 'neutral'].includes(trend) ? trend : getTrend(trendValue);
+  const trendColorClass = getTrendColor(trendDirection as 'positive' | 'negative' | 'neutral');
   
   if (loading) {
     return (
