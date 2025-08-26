@@ -4,7 +4,7 @@
 
 **Target Audience**: AI agents (Claude, ChatGPT, etc.) working on SigmaSight backend development
 
-**Last Updated**: 2025-08-09
+**Last Updated**: 2025-08-26
 
 ---
 
@@ -28,7 +28,10 @@ app/
 │   ├── factors.py    - Factor exposure analysis
 │   ├── correlations.py - Position correlations
 │   └── market_risk.py - Market risk scenarios
-├── api/v1/endpoints/ - FastAPI REST endpoints
+├── api/v1/           - FastAPI REST endpoints
+│   ├── auth.py       - Authentication (login, logout, JWT)
+│   ├── data.py       - Raw Data APIs (/data/ namespace) ✅ COMPLETE
+│   └── router.py     - Main API router
 ├── core/             - Core utilities (config, logging, auth)
 ├── db/               - Database utilities and seeding
 │   └── seed_demo_portfolios.py - Demo data creation
@@ -49,8 +52,9 @@ docker-compose.yml    - PostgreSQL database (Redis removed)
 pyproject.toml       - Dependencies (mibian, not py_vollib)
 .env                 - Environment variables (no REDIS_URL)
 alembic/             - Database migrations
-TODO1.md             - Phase 1 implementation status
-TODO2.md             - Phase 2+ planning
+TODO3.md             - Phase 3.0+ API development (CURRENT)
+TODO1.md             - Phase 1 implementation (COMPLETE)
+TODO2.md             - Phase 2 implementation (COMPLETE)
 ```
 
 ---
@@ -98,7 +102,30 @@ from app.config import settings
 from app.core.logging import get_logger
 
 # Authentication  
-from app.core.auth import get_password_hash
+from app.core.auth import get_password_hash, verify_password, create_token_response
+from app.core.dependencies import get_current_user
+```
+
+### **API Endpoints (Phase 3.0)**
+```python
+# Authentication endpoints (✅ COMPLETE)
+POST /api/v1/auth/login       # JWT login
+POST /api/v1/auth/logout      # Logout
+POST /api/v1/auth/refresh     # Token refresh
+GET  /api/v1/auth/me          # Current user info
+
+# Raw Data APIs (✅ COMPLETE - optimized for LLM consumption)
+GET /api/v1/data/portfolio/{id}/complete      # Full portfolio snapshot
+GET /api/v1/data/portfolio/{id}/data-quality  # Data completeness assessment
+GET /api/v1/data/positions/details            # Position details with P&L
+GET /api/v1/data/prices/historical/{id}       # Historical prices
+GET /api/v1/data/prices/quotes                # Real-time quotes
+GET /api/v1/data/factors/etf-prices          # Factor ETF prices (mock)
+
+# Analytics APIs (⏳ NOT IMPLEMENTED)
+# Management APIs (⏳ NOT IMPLEMENTED)
+# Export APIs (⏳ NOT IMPLEMENTED)
+# System APIs (⏳ NOT IMPLEMENTED)
 ```
 
 ---
@@ -192,12 +219,13 @@ print("Batch orchestrator ready!")
 
 ### **Demo Portfolios (3 Main)**
 ```python
-# Email addresses for demo users
+# Demo user credentials (all use same password)
 DEMO_USERS = [
     "demo_individual@sigmasight.com",     # Balanced Individual Investor
     "demo_hnw@sigmasight.com",           # High Net Worth Investor  
     "demo_hedgefundstyle@sigmasight.com" # Hedge Fund Style Investor
 ]
+# Password for all demo users: "demo12345"
 
 # Portfolio names
 "Balanced Individual Investor Portfolio"      # 16 positions
@@ -541,8 +569,8 @@ portfolio_delta = delta.quantize(Decimal("0.00"))  # 2 dp for storage
 - ~~**py_vollib**~~ - REMOVED due to `_testcapi` import issues ❌
 
 ### **Cache Implementation** 🔄
-**Current Status:**
-- `timed_lru_cache` decorator with 60-second TTL (lines 36-65 in `app/calculations/portfolio.py`)
+**Status:** Implemented
+- `timed_lru_cache` decorator with 60-second TTL in `app/calculations/portfolio.py`
 - `clear_portfolio_cache()` function at lines 638-652 in `app/calculations/portfolio.py`
 - Clears cache for all aggregation functions via `.cache_clear()` method
 - Note: Currently no functions use `@timed_lru_cache` decorator - caching ready but not active
@@ -674,7 +702,7 @@ else:
 3. Check TODO1.md Section 1.6.14 for known issues
 4. Use graceful degradation for missing data
 
-### **Working with Portfolio Reports** (Phase 2.0)
+### **Working with Portfolio Reports** (Phase 2.0 ✅ COMPLETE)
 1. Reference `_docs/requirements/PRD_PORTFOLIO_REPORT_SPEC.md`
 2. Use existing calculation data (even if incomplete)
 3. Implement graceful degradation for missing calculation engines
@@ -810,8 +838,11 @@ All functions in `app/calculations/portfolio.py`:
 - Database schema complete (except stress_test_results)
 - Basic infrastructure solid
 
-### **Phase 2.0: Portfolio Report Generator** ⏳ **CURRENT**
-- Generate LLM-optimized reports (MD, JSON, CSV formats)
+### **Phase 3.0: API Development** ⏳ **CURRENT**
+- Raw Data APIs (/data/) ✅ COMPLETE (6/6 endpoints)
+- Analytics APIs (/analytics/) - 0% complete
+- Management APIs (/management/) - 0% complete
+- Overall: 30% complete (12/39 endpoints)
 - Use existing calculation data with graceful degradation
 - Target: 3 demo portfolios
 - Known issues documented in TODO1.md 1.6.14
@@ -825,7 +856,7 @@ All functions in `app/calculations/portfolio.py`:
 
 ## 💡 AI Agent Efficiency Tips
 
-1. **Always check TODO1.md and TODO2.md first** for current status and known issues
+1. **Always check TODO3.md first** for current work, TODO1.md and TODO2.md for historical reference
 2. **Use existing demo data** rather than creating new test data
 3. **Implement graceful degradation** for missing calculation data
 4. **Reference this guide** instead of exploring file structure
