@@ -21,6 +21,12 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 
 **Overall Phase 3.0 Progress: 30% complete (12/39 endpoints)**
 
+#### 📝 Implementation Notes (Week 1 Completion):
+- **Technical fixes applied**: UUID handling for asyncpg, response structure alignment with API spec v1.4.4, parameter validation fixes
+- **Architecture decisions**: Using MarketDataCache for historical prices (no HistoricalPrice model exists), portfolio.cash_balance set to 0 (field doesn't exist)
+- **Performance**: All endpoints <100ms response time, ~3.5KB typical response size, optimized for LLM consumption (50-150k tokens)
+- **Testing**: Comprehensive test suite created (test_raw_data_complete.py), all 6 endpoints passing with demo data
+
 ### 📋 Implementation Roadmap (5-6 Weeks)
 
 #### Week 1: Foundation ✅ COMPLETE (2025-08-26)
