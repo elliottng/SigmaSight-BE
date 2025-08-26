@@ -41,7 +41,6 @@ async def calculate_position_market_value(
 ) -> Dict[str, Decimal]:
     """
     Calculate current market value and exposure for a position
-    Based on legacy logic: market_value = abs(quantity) × price × multiplier
     
     Args:
         position: Position object
@@ -49,8 +48,8 @@ async def calculate_position_market_value(
         
     Returns:
         Dictionary with:
-        - market_value: Always positive (abs(quantity) × price × multiplier)
-        - exposure: Signed value (quantity × price × multiplier) 
+        - market_value: Signed value (negative for shorts, positive for longs)
+        - exposure: Same as market_value (quantity × price × multiplier) 
         - unrealized_pnl: Current value - cost basis
         - cost_basis: Entry price × quantity × multiplier
         - price_per_share: Current price per share/contract
@@ -61,12 +60,13 @@ async def calculate_position_market_value(
     # Stocks: multiplier = 1
     multiplier = Decimal('100') if is_options_position(position) else Decimal('1')
     
-    # Market value is always positive (legacy: abs(quantity) × price)
-    market_value = abs(position.quantity) * current_price * multiplier
+    # Market value should be signed - negative for shorts, positive for longs
+    # For SHORT positions: negative quantity × positive price = negative market value
+    # For LONG positions: positive quantity × positive price = positive market value
+    market_value = position.quantity * current_price * multiplier
     
-    # Exposure is signed (legacy: quantity × price)
-    # Negative for short positions, positive for long positions
-    exposure = position.quantity * current_price * multiplier
+    # Exposure is the same as market value (signed)
+    exposure = market_value
     
     # Cost basis calculation
     cost_basis = position.quantity * position.entry_price * multiplier

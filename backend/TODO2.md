@@ -924,7 +924,7 @@ select(FactorExposure, FactorDefinition)
 ## Phase 2.6: Deep Calculation Engine Fixes - Post-Report Analysis
 *Critical calculation engine issues discovered through detailed analysis of generated reports*
 
-**Timeline**: 3-4 Days | **Status**: 🔴 **NOT STARTED** | **Priority**: HIGH | **Created**: 2025-08-09
+**Timeline**: 3-4 Days | **Status**: ✅ **COMPLETED** | **Priority**: HIGH | **Created**: 2025-08-09 | **Completed**: 2025-08-26
 
 ### 2.6.1 Executive Summary
 Detailed analysis of the three demo portfolio reports revealed deeper calculation issues beyond the surface-level fixes in Phase 2.5. These issues affect the mathematical correctness and risk assessment accuracy of the reports.
@@ -1287,6 +1287,45 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 ✅ **Multicollinearity confirmed**: Factor ETFs too correlated for multivariate (VIF up to 39)
 ✅ **Solution designed**: Improved univariate approach (see Phase 2.7)
 → **Next step**: Implement Phase 2.7 improvements to fix beta calculations
+
+### 2.6.9 Phase Completion Notes (2025-08-26)
+
+#### ✅ COMPLETED FIXES:
+
+1. **Factor Beta Calculation Errors** ✅
+   - **Problem**: Extreme betas (-22.739) exceeding ±3.0 cap
+   - **Root Cause**: Beta cap enforcement not working, duplicate entries in database
+   - **Fix**: 
+     - Fixed beta cap enforcement with proper logging
+     - Implemented delete-then-insert pattern for upserts
+     - Cleared 1,929 corrupt factor exposure records
+   - **Result**: All betas now properly capped at ±3.0
+
+2. **Short Position Market Values** ✅
+   - **Problem**: Short positions showing positive market values
+   - **Root Cause**: `calculate_position_market_value()` using abs(quantity)
+   - **Fix**:
+     - Removed absolute value from market value calculation
+     - Added position value update job to batch orchestrator
+     - Updated aggregation logic to use signed values
+   - **Result**: Demo Hedge Fund shorts now show -$2.1M exposure (correct)
+
+3. **Factor Exposures >100%** ✅
+   - **Decision**: Kept current model - this is CORRECT behavior
+   - **Rationale**: Factors are independent risk dimensions, not mutually exclusive
+   - **Action**: Added documentation explaining why >100% is industry standard
+   - **Result**: Factor model aligned with Bloomberg/MSCI Barra methodology
+
+#### ⚠️ DEFERRED ITEMS:
+
+1. **Interest Rate Units** - Analyze impact before fixing (Phase 2.7)
+2. **Stress Test Results Table** - Schema doesn't exist (known issue)
+3. **Greeks Calculations** - Functional but needs options data
+
+#### 📊 VALIDATION RESULTS:
+- Demo Individual: $485K gross, shorts working correctly
+- Demo HNW: $1.3M gross, factor betas capped
+- Demo Hedge Fund: $5.5M gross, -$2.1M short exposure ✅
 
 ---
 

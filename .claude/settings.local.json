@@ -5,7 +5,10 @@
       "Bash(uv run:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(grep:*)",
+      "Bash(PYTHONIOENCODING=utf-8 uv run python scripts/debug_factor_calculation.py)",
+      "Bash(PYTHONIOENCODING=utf-8 uv run python:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"

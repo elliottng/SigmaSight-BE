@@ -171,6 +171,7 @@ class BatchOrchestratorV2:
         # Define job sequence with dependencies
         job_sequence = [
             ("market_data_update", self._update_market_data, []),
+            ("position_values_update", self._update_position_values, [portfolio_id]),
             ("portfolio_aggregation", self._calculate_portfolio_aggregation, [portfolio_id]),
             ("greeks_calculation", self._calculate_greeks, [portfolio_id]),
             ("factor_analysis", self._calculate_factors, [portfolio_id]),
@@ -331,6 +332,65 @@ class BatchOrchestratorV2:
         
         return combined_results
     
+    async def _update_position_values(self, db: AsyncSession, portfolio_id: str):
+        """Update market values for all positions in portfolio"""
+        from app.calculations.market_data import update_position_market_values
+        from app.models.positions import Position
+        from app.services.market_data_service import market_data_service
+        from sqlalchemy import select
+        from decimal import Decimal
+        
+        # Get portfolio positions
+        stmt = select(Position).where(
+            Position.portfolio_id == portfolio_id,
+            Position.deleted_at.is_(None),
+            Position.exit_date.is_(None)
+        )
+        result = await db.execute(stmt)
+        positions = result.scalars().all()
+        
+        if not positions:
+            return {'message': 'No active positions', 'updated': 0}
+        
+        updated_count = 0
+        errors = []
+        
+        for position in positions:
+            try:
+                # Get cached price from market data cache
+                prices = await market_data_service.get_cached_prices(
+                    db, 
+                    [position.symbol]
+                )
+                
+                current_price = prices.get(position.symbol) if prices else None
+                
+                if current_price:
+                    # Update position market value
+                    await update_position_market_values(
+                        db, 
+                        position, 
+                        Decimal(str(current_price))
+                    )
+                    updated_count += 1
+                else:
+                    logger.warning(f"No price available for {position.symbol}")
+                    
+            except Exception as e:
+                error_msg = f"Failed to update {position.symbol}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+        
+        # Commit the updates
+        await db.commit()
+        
+        return {
+            'portfolio_id': portfolio_id,
+            'positions_updated': updated_count,
+            'positions_total': len(positions),
+            'errors': errors
+        }
+    
     async def _calculate_portfolio_aggregation(self, db: AsyncSession, portfolio_id: str):
         """Portfolio aggregation job"""
         from app.calculations.portfolio import calculate_portfolio_exposures
@@ -356,11 +416,9 @@ class BatchOrchestratorV2:
             market_value = float(pos.market_value) if pos.market_value else 0
             quantity = float(pos.quantity)
             
-            # For short positions, exposure should be negative
-            if pos.position_type and pos.position_type.value in ['SHORT', 'SC', 'SP']:
-                exposure = -abs(market_value)
-            else:
-                exposure = abs(market_value)
+            # Market value is already signed (negative for shorts, positive for longs)
+            # So exposure equals market value
+            exposure = market_value
             
             position_dict = {
                 'symbol': pos.symbol,
