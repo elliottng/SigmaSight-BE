@@ -3,7 +3,9 @@
     "allow": [
       "Bash(PYTHONIOENCODING=utf-8 uv run python run.py)",
       "Bash(uv run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"
