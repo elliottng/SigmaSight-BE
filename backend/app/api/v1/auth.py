@@ -16,7 +16,7 @@ from app.core.logging import auth_logger
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 async def login(user_login: UserLogin, db: AsyncSession = Depends(get_db)):
     """Authenticate user and return JWT token"""
     auth_logger.info(f"Login attempt for email: {user_login.email}")
@@ -51,7 +51,12 @@ async def login(user_login: UserLogin, db: AsyncSession = Depends(get_db)):
     token_data = create_token_response(str(user.id), user.email)
     auth_logger.info(f"Login successful for user: {user.email}")
     
-    return TokenResponse(**token_data)
+    # Return simple token response (not TokenResponse schema which expects user field)
+    return {
+        "access_token": token_data["access_token"],
+        "token_type": token_data["token_type"],
+        "expires_in": token_data["expires_in"]
+    }
 
 
 @router.post("/register", response_model=UserResponse)
@@ -113,7 +118,7 @@ async def get_current_user_info(current_user: CurrentUser = Depends(get_current_
     return current_user
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh")
 async def refresh_token(current_user: CurrentUser = Depends(get_current_user)):
     """Refresh JWT token (for V1, just return a new token)"""
     auth_logger.info(f"Token refresh requested: {current_user.email}")
@@ -121,4 +126,18 @@ async def refresh_token(current_user: CurrentUser = Depends(get_current_user)):
     # For V1, we just create a new token with the same data
     token_data = create_token_response(str(current_user.id), current_user.email)
     
-    return TokenResponse(**token_data)
+    return {
+        "access_token": token_data["access_token"],
+        "token_type": token_data["token_type"],
+        "expires_in": token_data["expires_in"]
+    }
+
+
+@router.post("/logout")
+async def logout(current_user: CurrentUser = Depends(get_current_user)):
+    """Logout endpoint - invalidates session (client should discard token)"""
+    auth_logger.info(f"Logout requested: {current_user.email}")
+    
+    # For JWT-based auth, logout is handled client-side by discarding the token
+    # In V2, we could add token blacklisting if needed
+    return {"message": "Successfully logged out", "success": True}
