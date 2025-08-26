@@ -59,7 +59,7 @@ The application follows a multi-layered architecture within `backend/`:
 
 ```
 app/
-├── api/v1/endpoints/     # FastAPI REST endpoints
+├── api/v1/               # FastAPI REST endpoints (auth, data, router)
 ├── models/               # SQLAlchemy ORM models
 ├── services/             # Business logic layer
 ├── batch/                # Batch processing orchestration
@@ -102,15 +102,16 @@ from app.core.logging import get_logger
 ## Important Context
 
 ### Current Status
-- **Phase**: 2.0 - Portfolio Report Generator implementation
-- **Calculation Engines**: 5/6 operational (83.3% functional)
+- **Phase**: 3.0 - API Development (30% complete, Raw Data APIs done)
+- **APIs Ready**: Authentication + Raw Data endpoints (12/39 endpoints)
 - **Demo Data**: 3 portfolios with 63 positions ready for testing
-- **Known Issues**: See `backend/TODO1.md` Section 1.6.14 for batch processing issues
+- **Ready for**: Frontend and LLM agent development
 
 ### Key Documentation
 - **`backend/AI_AGENT_REFERENCE.md`**: Comprehensive codebase reference (READ FIRST)
-- **`backend/TODO1.md`**: Phase 1 status and known issues
-- **`backend/TODO2.md`**: Current phase planning and tasks
+- **`backend/TODO3.md`**: Current Phase 3.0 API development (ACTIVE)
+- **`backend/TODO1.md`**: Phase 1 complete (reference only)
+- **`backend/TODO2.md`**: Phase 2 complete (reference only)
 - **`backend/_docs/requirements/`**: Product requirements and specifications
 
 ### Environment Variables
@@ -128,22 +129,22 @@ FRED_API_KEY=your_fred_key  # Optional
 2. **UUID Handling**: Convert string UUIDs to UUID objects when needed
 3. **Missing Tables**: stress_test_results table doesn't exist (known issue)
 4. **Import Errors**: Use diagnostic commands from AI_AGENT_REFERENCE.md
-5. **Demo Data**: Always test with existing demo portfolios first
+5. **Demo Data**: Always test with existing demo portfolios first (password: demo12345)
 
 ### Testing Approach
 - Use existing demo data (don't create new test data)
 - Run diagnostic commands to verify imports
 - Test with graceful degradation for missing data
-- Update TODO files with completion status
+- Update TODO3.md with completion status
 
 ## Development Workflow
 
 1. **Before Starting**: Read `backend/AI_AGENT_REFERENCE.md`
-2. **Check Status**: Review TODO1.md and TODO2.md for context
+2. **Check Status**: Review TODO3.md for current work, TODO1/TODO2 for history
 3. **Test Imports**: Use diagnostic commands to verify setup
 4. **Implement**: Follow async patterns, handle errors gracefully
 5. **Update Docs**: Document new patterns in AI_AGENT_REFERENCE.md
-6. **Mark Complete**: Update TODO status with detailed results
+6. **Mark Complete**: Update TODO3.md status with detailed results
 
 ## Key Commands for Debugging
 
@@ -161,8 +162,25 @@ uv run python scripts/test_batch_with_reports.py
 uv run python scripts/verify_demo_portfolios.py
 ```
 
+## API Endpoints Ready for Use
+
+### Authentication (✅ Complete)
+- `POST /api/v1/auth/login` - JWT token generation
+- `POST /api/v1/auth/logout` - Session invalidation  
+- `POST /api/v1/auth/refresh` - Token refresh
+- `GET /api/v1/auth/me` - Current user info
+
+### Raw Data APIs (✅ Complete)
+- `GET /api/v1/data/portfolio/{id}/complete` - Full portfolio snapshot
+- `GET /api/v1/data/portfolio/{id}/data-quality` - Data completeness
+- `GET /api/v1/data/positions/details` - Position details with P&L
+- `GET /api/v1/data/prices/historical/{id}` - Historical prices
+- `GET /api/v1/data/prices/quotes` - Real-time market quotes
+- `GET /api/v1/data/factors/etf-prices` - Factor ETF prices
+
 ## Notes
 - Main application code is in `backend/` subdirectory
 - Always work from the `backend/` directory when running commands
 - Update `backend/AI_AGENT_REFERENCE.md` when discovering new patterns
 - Prefer simple, correct implementations over complex feature flags
+- Backend is ready for frontend/agent development - no additional APIs needed for MVP
