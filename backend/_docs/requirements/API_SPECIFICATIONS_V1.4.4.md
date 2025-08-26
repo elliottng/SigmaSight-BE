@@ -1,4 +1,4 @@
-# SigmaSight API Endpoints Specification v1.4.3
+# SigmaSight API Endpoints Specification v1.4.4
 
 ## Document Version Control
 
@@ -8,12 +8,13 @@
 | 1.4.1 | 2025-08-04 | Cascade | Updated for V1.4 implementation decisions: 150-day regression, position-level factor storage, mibian-only Greeks, 7-factor model, rate limiting completion |
 | 1.4.2 | 2025-08-26 | Elliott/Claude | Added Section 2: Raw Data Mode APIs for LLMs (5 new endpoints). Renumbered all subsequent sections (2→3, 3→4, etc.) to accommodate new Raw Data Mode priority |
 | 1.4.3 | 2025-08-26 | Elliott/Claude | Major namespace reorganization for clarity: /data/ for raw data, /analytics/ for calculations, /management/ for CRUD, /export/ for outputs, /system/ for utilities. Removed /simulation/, /market/, and /ai/ endpoints. |
+| 1.4.4 | 2025-08-26 | Elliott/Claude | Added scenario analysis endpoint (/analytics/risk/{id}/scenarios) and market quotes endpoint (/data/prices/quotes) to support frontend requirements. |
 
 ## 1. Overview
 
-This document specifies the REST API endpoints for SigmaSight V1.4.3, with a refined namespace organization that clearly distinguishes between raw data access and calculated analytics.
+This document specifies the REST API endpoints for SigmaSight V1.4.4, with a refined namespace organization that clearly distinguishes between raw data access and calculated analytics.
 
-### 1.1 Strategic Direction (V1.4.3)
+### 1.1 Strategic Direction (V1.4.4)
 
 #### Namespace Philosophy
 - **`/data/`**: Raw, unprocessed data for LLM consumption
@@ -234,9 +235,61 @@ Provides complete historical price data for all portfolio positions.
 }
 ```
 
-### 2.4 Factor Data
+### 2.4 Market Quotes
 
-#### 2.4.1 Get Factor ETF Prices
+#### 2.4.1 Get Current Market Quotes
+```http
+GET /api/v1/data/prices/quotes
+```
+
+Returns current market prices for specified symbols. Used for real-time position value updates.
+
+**Query Parameters**:
+- `symbols` (string, required) - Comma-separated list of ticker symbols
+- `include_options` (boolean, default: false) - Include options chains for symbols
+
+**Response (200 OK)**:
+```json
+{
+  "data": {
+    "quotes": [
+      {
+        "symbol": "AAPL",
+        "last_price": 189.25,
+        "bid": 189.24,
+        "ask": 189.26,
+        "bid_size": 100,
+        "ask_size": 200,
+        "volume": 48087688,
+        "day_change": 1.57,
+        "day_change_percent": 0.84,
+        "day_high": 189.95,
+        "day_low": 187.04,
+        "timestamp": "2024-06-27T15:30:00Z"
+      },
+      {
+        "symbol": "MSFT",
+        "last_price": 425.30,
+        "bid": 425.28,
+        "ask": 425.32,
+        "bid_size": 50,
+        "ask_size": 75,
+        "volume": 22543210,
+        "day_change": -2.15,
+        "day_change_percent": -0.50,
+        "day_high": 428.00,
+        "day_low": 424.50,
+        "timestamp": "2024-06-27T15:30:00Z"
+      }
+    ],
+    "last_update": "2024-06-27T15:30:00Z"
+  }
+}
+```
+
+### 2.5 Factor Data
+
+#### 2.5.1 Get Factor ETF Prices
 ```http
 GET /api/v1/data/factors/etf-prices
 ```
@@ -460,6 +513,95 @@ Performs real-time Greeks calculation for specified positions.
       "expiration": "2025-12-19"
     }
   ]
+}
+```
+
+#### 3.3.4 Run Scenario Analysis
+```http
+GET /api/v1/analytics/risk/{portfolio_id}/scenarios
+```
+
+Runs predefined stress test scenarios and returns portfolio impact.
+
+**Query Parameters**:
+- `scenarios` (string, optional) - Comma-separated scenario IDs. If omitted, runs all standard scenarios
+- `view` (string) - portfolio|longs|shorts
+
+**Response (200 OK)**:
+```json
+{
+  "data": {
+    "scenarios": [
+      {
+        "id": "market_up_10",
+        "name": "Market Up 10%",
+        "description": "S&P 500 rises 10%",
+        "impact": {
+          "dollar_impact": 48500,
+          "percentage_impact": 10.0,
+          "new_portfolio_value": 533500
+        },
+        "severity": "positive"
+      },
+      {
+        "id": "market_down_10",
+        "name": "Market Down 10%",
+        "description": "S&P 500 falls 10%",
+        "impact": {
+          "dollar_impact": -48500,
+          "percentage_impact": -10.0,
+          "new_portfolio_value": 436500
+        },
+        "severity": "moderate"
+      },
+      {
+        "id": "rates_up_25bp",
+        "name": "Rates Up 0.25%",
+        "description": "Federal Reserve raises rates by 25 basis points",
+        "impact": {
+          "dollar_impact": -2425,
+          "percentage_impact": -0.5,
+          "new_portfolio_value": 482575
+        },
+        "severity": "mild"
+      },
+      {
+        "id": "rates_down_25bp",
+        "name": "Rates Down 0.25%",
+        "description": "Federal Reserve cuts rates by 25 basis points",
+        "impact": {
+          "dollar_impact": 2425,
+          "percentage_impact": 0.5,
+          "new_portfolio_value": 487425
+        },
+        "severity": "positive"
+      },
+      {
+        "id": "oil_up_5",
+        "name": "Oil Up 5%",
+        "description": "Crude oil prices rise 5%",
+        "impact": {
+          "dollar_impact": -1212,
+          "percentage_impact": -0.25,
+          "new_portfolio_value": 483788
+        },
+        "severity": "mild"
+      },
+      {
+        "id": "oil_down_5",
+        "name": "Oil Down 5%",
+        "description": "Crude oil prices fall 5%",
+        "impact": {
+          "dollar_impact": 1212,
+          "percentage_impact": 0.25,
+          "new_portfolio_value": 486212
+        },
+        "severity": "positive"
+      }
+    ],
+    "portfolio_value": 485000,
+    "calculation_date": "2024-06-27T15:30:00Z"
+  }
 }
 ```
 
@@ -1205,7 +1347,7 @@ Invalidates current session.
 - Market data cached for 1 minute
 - Factor calculations updated daily
 
-## 11. V1.4.3 Summary
+## 11. V1.4.4 Summary
 
 This specification represents a major reorganization of the API namespace structure to provide:
 
@@ -1214,5 +1356,10 @@ This specification represents a major reorganization of the API namespace struct
 3. **Self-documenting** endpoint paths
 4. **Consistent** namespace depth and organization
 5. **Simplified** architecture without unnecessary complexity
+
+### Key Updates in v1.4.4:
+- **Added**: Scenario analysis endpoint at `/api/v1/analytics/risk/{id}/scenarios` to support frontend risk analysis tab
+- **Added**: Market quotes endpoint at `/api/v1/data/prices/quotes` for real-time price updates
+- **Supports**: All features in V0_V5_FRONT_END_PROTOTYPE_FEATURES.md and DEMO_SCRIPT_V1.4.md (except ProForma modeling)
 
 The new structure supports both traditional frontend applications and LLM-based analysis tools, with a clear distinction between data access and analytical capabilities.
