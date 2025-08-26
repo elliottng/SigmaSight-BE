@@ -278,10 +278,10 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 
 ## Phase 4: Advanced Features & Frontend Integration (Future)
 
-### 4.0 Developer Experience & Onboarding
+### 4.1 Developer Experience & Onboarding
 *Make the project easy to set up and contribute to*
 
-#### 4.0.1 Developer Onboarding Improvements ⏳ **PLANNED**
+#### 4.1.1 Developer Onboarding Improvements ⏳ **PLANNED**
 *Streamline project setup to reduce friction for new contributors*
 
 **Timeline**: 2-3 Days | **Priority**: High (Developer Productivity)
@@ -347,10 +347,10 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 
 ---
 
-### 4.1 Code Quality & Technical Debt
+### 4.2 Code Quality & Technical Debt
 *Refactoring, deprecations, and technical improvements*
 
-#### 4.1.1 Greeks Calculation Simplification
+#### 4.2.1 Greeks Calculation Simplification
 - [x] **Remove py_vollib dependency and fallback logic** - **COMPLETED**
   - [x] Remove `py-vollib>=1.0.1` from `pyproject.toml`
   - [x] Remove py_vollib imports and fallback code in `app/calculations/greeks.py`
@@ -369,7 +369,7 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
     - Failed calculations return `None` with error logging
     - Options calculations use mibian-only (same quality, no fallbacks)
 
-#### 4.1.2 Stress Test Model Architectural Improvement 🔴 **CRITICAL**
+#### 4.2.2 Stress Test Model Architectural Improvement 🔴 **CRITICAL**
 *Redesign stress test calculation to fix fundamental exposure multiplication issue*
 
 **Timeline**: 3-5 Days | **Priority**: CRITICAL | **Created**: 2025-08-09
@@ -432,7 +432,7 @@ exposure_dollar = float(beta_value) * float(portfolio_value)
 - Results align with industry standard stress tests
 - Historical scenarios produce believable losses
 
-#### 4.0.2 Production Job Scheduling Architecture Decision ⏳ **RESEARCH NEEDED**
+#### 4.2.3 Production Job Scheduling Architecture Decision ⏳ **RESEARCH NEEDED**
 *Evaluate and select production-ready job scheduling solution*
 
 **Timeline**: 1-2 Days | **Priority**: High (Production Readiness)
@@ -474,7 +474,7 @@ exposure_dollar = float(beta_value) * float(portfolio_value)
 
 **Notes**: Current MemoryJobStore works for development but lacks production reliability. Decision should balance immediate needs vs. long-term architecture goals.
 
-#### 4.0.3 UUID Serialization Root Cause Investigation
+#### 4.2.4 UUID Serialization Root Cause Investigation
 - [ ] **Investigate asyncpg UUID serialization issue** 
   - **Background**: Multiple batch jobs fail with `'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'`
   - **Current Status**: Working with pragmatic workaround (detects error and treats job as successful)
@@ -502,7 +502,7 @@ exposure_dollar = float(beta_value) * float(portfolio_value)
   - **Priority**: Low (system is fully functional with workaround, all 8/8 jobs working)
   - **Reference**: Section 1.6.11 for comprehensive debugging history
 
-#### 4.0.4 Technical Debt & Cleanup (Future)
+#### 4.3 Technical Debt & Cleanup (Future)
 - [ ] Standardize error handling patterns across all services
 - [ ] Remove deprecated code comments and TODOs
 - [ ] Consolidate similar utility functions
