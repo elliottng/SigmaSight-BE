@@ -1024,11 +1024,15 @@ if total_direct_pnl < max_loss:
 
 #### 2.6.2.2 Missing Features - Never Implemented ⚠️
 
-##### 4. **Interest Rate Beta Calculation** 🟡
+##### 4. **Interest Rate Beta Calculation** 🔵 **DEFERRED** 
 **Evidence**: All rate scenarios show $0.00 impact across all portfolios
-**Status**: HYPOTHESIS - Engine likely never implemented
-**Impact**: Cannot assess rate sensitivity for REITs, utilities, financials
-**Priority**: MEDIUM - Important for complete risk assessment
+**Analysis Completed (2025-08-26)**: 
+- ✅ **Units are CORRECT**: Shocks properly sized (25bp=0.0025, 100bp=0.01, 300bp=0.03)
+- ❌ **Feature not implemented**: Interest Rate Beta not calculated in factor analysis
+- Missing factor mapping: Would need Treasury/TLT ETF data for beta calculation
+**Impact**: Cannot assess rate sensitivity, but NO calculation errors
+**Status**: ⏸️ **DEFERRED until after Phase 3.0** - Feature enhancement, not a bug
+**Priority**: LOW - Not critical for MVP
 
 ##### 5. **Correlation Analysis** 🟡
 **Evidence**: `correlation_analysis: { "available": false }` in all reports
@@ -1327,15 +1331,45 @@ Located in: `app/calculations/factors.py::calculate_factor_betas_hybrid()`
 - Demo HNW: $1.3M gross, factor betas capped
 - Demo Hedge Fund: $5.5M gross, -$2.1M short exposure ✅
 
+### 2.6.10 Interest Rate Units Analysis (2025-08-26)
+
+#### Investigation Summary
+Analyzed whether the 10x multiplier issue in interest rate scenarios was causing calculation errors.
+
+#### Findings:
+1. **Configuration Review** (`app/config/stress_scenarios.json`):
+   - 25 basis points: `0.0025` (0.25%) ✅ CORRECT
+   - 100 basis points: `0.01` (1.0%) ✅ CORRECT  
+   - 300 basis points: `0.03` (3.0%) ✅ CORRECT
+   - **Conclusion**: Units are properly configured, no 10x error
+
+2. **Root Cause Identified**:
+   - Interest Rate Beta is not calculated in factor analysis
+   - Missing from `FACTOR_ETFS` configuration
+   - Would require Treasury yield data or rate ETF (e.g., TLT)
+   - Factor mapping exists but points to non-existent data
+
+3. **Impact Assessment**:
+   - Stress tests show "No exposure found for Interest_Rate" 
+   - Scenarios run but skip interest rate shocks
+   - No miscalculation of risk - just missing one factor type
+   - Low priority for MVP
+
+#### Decision: ⏸️ DEFER until after Phase 3.0
+- This is a missing feature, not a bug
+- Units are correct, calculations would be accurate if implemented
+- Can be added as enhancement when Treasury data integration is available
+
 ---
 
 ## Phase 2.7: Factor Beta Redesign (Improved Univariate)
 *Enhance univariate beta estimation with data quality improvements to produce stable, realistic factor betas.*
 
-**Status**: READY FOR IMPLEMENTATION
-**Priority**: High
+**Status**: ⏸️ **DEFERRED** (until after Phase 3.0)
+**Priority**: Medium (lowered - current ±3.0 cap is functional)
 **Dependencies**: None
 **Design Doc**: See `_docs/requirements/FACTOR_BETA_REDESIGN.md` for full details.
+**Deferral Reason**: Current beta calculations with ±3.0 cap are functional. Focus on API development first.
 
 ### Critical Discovery (2025-08-10)
 Investigation revealed severe multicollinearity in factor ETFs:
