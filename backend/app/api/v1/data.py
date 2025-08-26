@@ -209,6 +209,13 @@ async def get_portfolio_data_quality(
         response = {
             "portfolio_id": str(portfolio_id),
             "assessment_date": date.today().isoformat(),
+            "summary": {
+                "total_positions": len(portfolio.positions),
+                "complete_data": len(complete_history),
+                "partial_data": len(partial_history),
+                "insufficient_data": len(insufficient_data),
+                "data_coverage_percent": (len(complete_history) / len(portfolio.positions) * 100) if portfolio.positions else 0
+            },
             "position_data_quality": {
                 "complete_history": complete_history,
                 "partial_history": partial_history,
@@ -534,10 +541,14 @@ async def get_market_quotes(
                 except Exception as e:
                     logger.warning(f"Failed to fetch quote for {symbol}: {e}")
         
+        # Return structure matching API spec
         return {
-            "data": {
-                "quotes": quotes_data,
-                "last_update": datetime.utcnow().isoformat() + "Z"
+            "quotes": quotes_data,
+            "metadata": {
+                "requested_symbols": symbol_list,
+                "successful_quotes": len(quotes_data),
+                "failed_quotes": len(symbol_list) - len(quotes_data),
+                "timestamp": datetime.utcnow().isoformat() + "Z"
             }
         }
 
