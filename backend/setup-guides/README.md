@@ -2,8 +2,9 @@
 
 SigmaSight is a sophisticated portfolio analytics platform designed for options traders, providing real-time risk metrics, portfolio-level Greeks calculations, and comprehensive position management.
 
-**Version**: 1.4.1  
-**Status**: In Development  
+**Version**: 1.4.4  
+**Status**: Phase 3.0 - API Development (30% complete)
+**API Status**: Raw Data APIs 100% operational  
 **Tech Stack**: FastAPI, PostgreSQL, Python 3.11+
 
 ## 📖 Setup Guides
@@ -12,7 +13,7 @@ SigmaSight is a sophisticated portfolio analytics platform designed for options 
 - **Quick Reference**: See [QUICK_START_WINDOWS.md](../QUICK_START_WINDOWS.md) for a one-page guide
 - **Mac Users**: See [MAC_INSTALL_GUIDE.md](MAC_INSTALL_GUIDE.md) for detailed instructions
 - **Linux Users**: Continue reading below
-- **🤖 AI Agents**: See [../AI_AGENT_REFERENCE.md](../AI_AGENT_REFERENCE.md) for comprehensive codebase reference
+- **🤖 AI Agents**: See [../AI_AGENT_REFERENCE.md](../AI_AGENT_REFERENCE.md) and [../CLAUDE.md](../CLAUDE.md) for comprehensive codebase reference
 
 FastAPI backend for SigmaSight portfolio risk management platform.
 

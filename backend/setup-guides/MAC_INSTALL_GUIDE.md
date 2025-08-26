@@ -1,5 +1,9 @@
 # SigmaSight Backend - Mac Installation Guide for AI Agents
 
+> **Last Updated**: 2025-08-26
+> **Current Phase**: 3.0 - API Development (30% complete)
+> **API Status**: Raw Data APIs 100% operational at `/api/v1/data/`
+
 This guide provides complete step-by-step instructions for setting up the SigmaSight Backend on macOS for development and testing. Each step includes verification commands to ensure successful execution.
 
 ## 📋 System Requirements
@@ -284,7 +288,7 @@ with engine.connect() as conn:
 
 ### Step 7: Start the Application Server
 
-**Note**: If you encounter import errors about missing schema files, this is a known issue. The server may fail with `ImportError: cannot import name 'TokenResponse' from 'app.schemas.auth'`.
+**Note**: The auth schemas are already implemented. If you see import errors, they're likely from cached files - try restarting the terminal.
 
 ```bash
 # First, check if auth schemas exist (common missing file)
@@ -368,9 +372,9 @@ if lsof -i :8000 >/dev/null 2>&1; then
     fi
 fi
 
-# Start FastAPI server
+# Start FastAPI server (use run.py for better error handling)
 echo "Starting FastAPI server..."
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+uv run python run.py &
 
 # Wait for server to start and verify
 sleep 7
@@ -386,7 +390,19 @@ curl -s http://localhost:8000/health | python -m json.tool || echo "❌ Server n
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs | grep -q "200" && echo "✅ API docs available at http://localhost:8000/docs" || echo "❌ API docs not accessible"
 ```
 
-### Step 8: Validate Complete Setup
+### Step 8: Test API Endpoints
+
+```bash
+# Test authentication
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo_individual@sigmasight.com", "password": "demo12345"}'
+
+# Save the token from response for testing other endpoints
+# The Raw Data APIs are 100% complete and ready for use
+```
+
+### Step 9: Validate Complete Setup
 
 Run our comprehensive setup validation:
 

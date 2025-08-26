@@ -1,5 +1,9 @@
 # 🪟 Windows Setup Guide for SigmaSight Backend
 
+> **Last Updated**: 2025-08-26
+> **Current Phase**: 3.0 - API Development (30% complete)  
+> **API Status**: Raw Data APIs 100% operational at `/api/v1/data/`
+
 This guide will help you set up the SigmaSight backend on Windows with minimal technical knowledge.
 
 ## 📋 What You'll Need
@@ -163,7 +167,7 @@ We'll install these tools in order:
    echo FRED_API_KEY=your_fred_api_key_here >> .env
    echo. >> .env
    echo # JWT Configuration >> .env
-   echo SECRET_KEY=your_generated_secret_key_here >> .env
+   echo JWT_SECRET_KEY=your_generated_secret_key_here >> .env
    echo. >> .env
    echo # Application Settings >> .env
    echo DEBUG=true >> .env
@@ -214,23 +218,40 @@ We'll install these tools in order:
 
 ---
 
-## Step 8: Start SigmaSight 🚀
+## Step 8: Start SigmaSight API Server 🚀
 
-1. **Start the application:**
+1. **Start the FastAPI application:**
    ```bash
    uv run python run.py
+   ```
+   
+   **Expected output:**
+   ```
+   INFO:     Started server process [12345]
+   INFO:     Waiting for application startup.
+   INFO:     Application startup complete.
+   INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
    ```
 
 2. **Verify it's working:**
    - Open your web browser
-   - Go to http://localhost:8000
-   - You should see: `{"message": "SigmaSight Backend API", "version": "1.0.0"}`
+   - Go to http://localhost:8000/health
+   - You should see: `{"status": "healthy"}`
 
 3. **View API Documentation:**
    - Go to http://localhost:8000/docs
    - You'll see all available API endpoints
+   - The Raw Data APIs (`/api/v1/data/`) are 100% complete and ready for testing
 
-4. **Validate Complete Setup:**
+4. **Test Authentication:**
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/auth/login" ^
+     -H "Content-Type: application/json" ^
+     -d "{\"email\": \"demo_individual@sigmasight.com\", \"password\": \"demo12345\"}"
+   ```
+   - Save the `access_token` from the response for testing other endpoints
+
+5. **Validate Complete Setup:
    ```bash
    set PYTHONIOENCODING=utf-8 && uv run python scripts/validate_setup.py
    ```
