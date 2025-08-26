@@ -6,103 +6,263 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 
 ---
 
-## Phase 3.0: API Development
-*All REST API endpoints for exposing backend functionality*
+## Phase 3.0: API Development (Based on v1.4.4 Specification)
+*Implementation of REST API endpoints following the refined namespace organization from API_SPECIFICATIONS_V1.4.4.md*
 
-### 3.0.1 Batch Processing Admin APIs (from Section 1.6.8)
-*Manual trigger endpoints for batch job execution and monitoring*
+**Updated 2025-08-26**: Restructured to align with v1.4.4 namespace organization
 
-- [ ] **POST /api/v1/admin/batch/run-all** - Execute complete daily sequence
-- [ ] **POST /api/v1/admin/batch/market-data** - Update market data only
-- [ ] **POST /api/v1/admin/batch/aggregations** - Run portfolio aggregations
-- [ ] **POST /api/v1/admin/batch/greeks** - Calculate Greeks only
-- [ ] **POST /api/v1/admin/batch/factors** - Run factor analysis
-- [ ] **POST /api/v1/admin/batch/risk-scenarios** - Execute risk scenarios
-- [ ] **POST /api/v1/admin/batch/stress-tests** - Run stress testing
-- [ ] **POST /api/v1/admin/batch/snapshots** - Generate snapshots
-- [ ] **POST /api/v1/admin/batch/correlations** - Calculate correlations
-- [ ] **GET /api/v1/admin/batch/status** - View job execution status
-- [ ] **GET /api/v1/admin/batch/history** - View recent job execution history
-- [ ] **GET /api/v1/admin/batch/schedule** - View upcoming scheduled jobs
+### 📋 Implementation Roadmap (5-6 Weeks)
 
-### 3.0.2 Portfolio Management APIs (from Section 1.7)
-- [ ] **GET /api/v1/portfolio** - Portfolio summary with exposures
-- [ ] **GET /api/v1/portfolio/exposures** - Time-series exposure data
-- [ ] **GET /api/v1/portfolio/performance** - P&L and performance metrics
-- [ ] **POST /api/v1/portfolio/upload** - CSV upload endpoint
-- [ ] Implement CSV parsing based on SAMPLE_CSV_FORMAT.md
-- [ ] Add position type detection logic
-- [ ] Implement exposure calculations (notional & delta-adjusted) - COMPLETED in Section 1.4.3
+#### Week 1: Foundation
+- Authentication endpoints (JWT setup)
+- Begin Raw Data APIs (/data/portfolio, /data/positions)
 
-### 3.0.3 Position Management APIs (from Section 1.8)
-- [ ] **GET /api/v1/positions** - List positions with filtering
-- [ ] **GET /api/v1/positions/grouped** - Grouped positions (by type/strategy)
-- [ ] **GET /api/v1/positions/{id}** - Individual position details
-- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
-- [ ] **GET /api/v1/tags** - Tag management
-- [ ] **POST /api/v1/tags** - Create new tags
-- [ ] **GET /api/v1/strategies** - Strategy groupings
-- [ ] Implement position grouping logic
+#### Week 2: Raw Data & Analytics
+- Complete Raw Data APIs (/data/prices, /data/factors)
+- Begin Analytics APIs (/analytics/portfolio, /analytics/risk)
 
-### 3.0.4 Risk Analytics APIs (from Section 1.9)
-- [ ] **GET /api/v1/risk/greeks** - Portfolio Greeks summary
-- [ ] **POST /api/v1/risk/greeks/calculate** - Calculate Greeks on-demand
-- [ ] **GET /api/v1/risk/factors** - Portfolio factor exposures (7-factor model)
-- [ ] **GET /api/v1/risk/factors/positions** - Position-level factor exposures
-- [ ] **GET /api/v1/risk/metrics** - Risk metrics (POSTPONED TO V1.5)
-- [ ] Create Greeks aggregation logic (completed in Section 1.4.3)
-- [ ] Implement delta-adjusted exposure calculations (completed in Section 1.4.3)
-- [ ] Integrate Greeks with factor calculations (delta-adjusted exposures)
+#### Week 3: Analytics & Management
+- Complete Analytics APIs (factors, correlations, scenarios)
+- Begin Management APIs (portfolios, positions)
 
-### 3.0.5 Correlation & Stress Testing APIs (from Section 1.9.5)
-*API endpoints for Section 1.4.7 stress testing and Section 1.4.8 correlation features*
+#### Week 4: Management & Export
+- Complete Management APIs (strategies, tags, alerts)
+- Implement Export APIs (portfolio, reports, trades)
+- System APIs (jobs, UI sync)
 
-#### Factor Correlation APIs
-- [ ] **GET /api/v1/risk/correlations/factors/matrix** - Factor correlation matrix with metadata
-- [ ] **POST /api/v1/risk/correlations/factors/calculate** - Calculate factor correlations on-demand
+#### Week 5: Integration & Testing
+- Batch processing admin endpoints
+- API documentation generation
+- Integration testing with frontend
+- Performance optimization
 
-#### Stress Testing APIs
-- [ ] **GET /api/v1/risk/stress-testing/scenarios** - List available stress test scenarios
-- [ ] **POST /api/v1/risk/stress-testing/direct-impact** - Calculate direct stress impact
-- [ ] **POST /api/v1/risk/stress-testing/correlated-impact** - Calculate correlated stress impact
-- [ ] **POST /api/v1/risk/stress-testing/comprehensive** - Run comprehensive stress test
-- [ ] **GET /api/v1/risk/stress-testing/results/{portfolio_id}** - Get latest stress test results
+#### Week 6: Polish & Demo Prep
+- Bug fixes from frontend integration
+- Demo data quality verification
+- Performance tuning (<200ms responses)
+- Final documentation
 
-#### Position Correlation APIs
-- [ ] **GET /api/v1/risk/correlations/positions/metrics** - Portfolio-level correlation metrics
-- [ ] **GET /api/v1/risk/correlations/positions/matrix** - Full pairwise correlation matrix  
-- [ ] **POST /api/v1/risk/correlations/positions/calculate** - Trigger position correlation calculation
+### 🎯 Implementation Priority:
+1. **Authentication** - Required for all endpoints
+2. **Raw Data APIs** (/data/) - Foundation for LLM testing  
+3. **Analytics APIs** (/analytics/) - Leverage existing calculations
+4. **Management APIs** (/management/) - CRUD operations
+5. **Export APIs** (/export/) - Reports and data export
+6. **System APIs** (/system/) - Jobs and utilities
 
-### 3.0.6 Factor Analysis APIs (from Section 1.10)
-- [ ] **GET /api/v1/factors/definitions** - List factor definitions (completed in Section 1.2)
-- [ ] **GET /api/v1/factors/exposures/{portfolio_id}** - Portfolio factor exposures
-- [ ] **GET /api/v1/factors/exposures/{portfolio_id}/positions** - Position-level factor exposures
-- [ ] **POST /api/v1/factors/calculate** - Calculate factor exposures (252-day regression)
-- [ ] Implement 252-day regression factor calculations (7-factor model)
-- [ ] Create factor regression analysis using statsmodels OLS
-- [ ] Add factor performance attribution
-- [ ] Store both position-level and portfolio-level factor exposures
+### ✅ What's Already Complete:
+- All 8 batch calculation engines operational
+- Demo data with 3 portfolios (63 positions)
+- Rate limiting infrastructure
+- Database models and relationships
+- Market data integration (Polygon, FMP)
 
-### 3.0.7 Tag Management APIs (from Section 1.11)
-- [ ] **GET /api/v1/tags** - List all tags
-- [ ] **POST /api/v1/tags** - Create new tag
-- [ ] **PUT /api/v1/positions/{id}/tags** - Update position tags
-- [ ] **DELETE /api/v1/tags/{id}** - Delete tag
-- [ ] Implement tag validation and limits
+### 🔑 Key Success Factors:
+- **Use existing calculations** - Don't recreate, just expose
+- **Test with demo data** - 3 portfolios ready to use
+- **Support frontend** - Ensure compatibility with prototype
+- **Enable LLM testing** - Complete raw data in /data/ endpoints
 
-### 3.0.8 API Infrastructure (from Section 1.12)
-- [ ] Add user activity logging
-- [ ] Create data validation middleware
-- [x] Add rate limiting (100 requests/minute per user) - COMPLETED
-- [x] Polygon.io API rate limiting with token bucket algorithm - COMPLETED
-- [ ] Set up request/response logging
+### 3.0.1 Authentication APIs (Foundation - Week 1)
+*Required for all other endpoints*
 
-**Phase 2 Implementation Notes:**
-- All calculation engines are ALREADY COMPLETE (Phase 1)
-- APIs simply expose existing functionality
-- Focus on clean REST design and proper error handling
-- Implement pagination for list endpoints
-- Add filtering and sorting capabilities
+- [ ] **POST /api/v1/auth/login** - JWT token generation
+- [ ] **POST /api/v1/auth/refresh** - Token refresh
+- [ ] **POST /api/v1/auth/logout** - Session invalidation
+- [ ] Implement JWT middleware for protected routes
+- [ ] Add user context to request state
+- [ ] Set up CORS configuration
+
+### 3.0.2 Raw Data APIs (/data/) (Week 1-2)
+*Unprocessed data for LLM consumption - Priority for testing LLM capabilities*
+
+#### Portfolio Raw Data
+- [ ] **GET /api/v1/data/portfolio/{portfolio_id}/complete** - Complete portfolio data
+  - [ ] Return positions, market values, cash balance
+  - [ ] Include data quality indicators
+  - [ ] No calculations, just raw data
+- [ ] **GET /api/v1/data/portfolio/{portfolio_id}/data-quality** - Data availability assessment
+  - [ ] Check position price history completeness
+  - [ ] Evaluate calculation feasibility
+  - [ ] Return eligible positions per calculation type
+
+#### Position Raw Data  
+- [ ] **GET /api/v1/data/positions/details** - Detailed position information
+  - [ ] Return entry prices, dates, cost basis
+  - [ ] Include current market values
+  - [ ] Support filtering by portfolio or position IDs
+
+#### Price Data
+- [ ] **GET /api/v1/data/prices/historical/{portfolio_id}** - Historical price series
+  - [ ] Return daily OHLCV data for all positions
+  - [ ] Include factor ETF prices when requested
+  - [ ] Align dates across all symbols
+- [ ] **GET /api/v1/data/prices/quotes** - Current market quotes *(Added in v1.4.4)*
+  - [ ] Real-time prices for specified symbols
+  - [ ] Include bid/ask spreads and daily changes
+  - [ ] Support for options chains (future)
+
+#### Factor Data
+- [ ] **GET /api/v1/data/factors/etf-prices** - Factor ETF price data
+  - [ ] Return prices for 7-factor model ETFs
+  - [ ] Include returns calculations
+  - [ ] Provide model metadata
+
+### 3.0.3 Analytics APIs (/analytics/) (Week 2-3)
+*Calculated metrics leveraging existing batch processing engines*
+
+#### Portfolio Analytics
+- [ ] **GET /api/v1/analytics/portfolio/{id}/overview** - Portfolio metrics
+  - [ ] Use existing aggregation engine results
+  - [ ] Return exposures, P&L, totals
+- [ ] **GET /api/v1/analytics/portfolio/{id}/performance** - Performance metrics
+  - [ ] Returns over various periods
+  - [ ] Sharpe/Sortino ratios
+  - [ ] Maximum drawdown
+
+#### Position Analytics
+- [ ] **GET /api/v1/analytics/positions/attribution** - P&L attribution
+  - [ ] Position-level P&L breakdown
+  - [ ] Group by position, tag, or type
+
+#### Risk Analytics
+- [ ] **GET /api/v1/analytics/risk/{id}/overview** - Risk metrics
+  - [ ] Beta, volatility, correlations
+  - [ ] Use existing calculation results
+- [ ] **GET /api/v1/analytics/risk/{id}/greeks** - Portfolio Greeks
+  - [ ] Aggregate Greeks from batch calculations
+  - [ ] Support after-expiry views
+- [ ] **POST /api/v1/analytics/risk/greeks/calculate** - On-demand Greeks
+  - [ ] Real-time calculation using mibian
+- [ ] **GET /api/v1/analytics/risk/{id}/scenarios** - Stress scenarios *(Added in v1.4.4)*
+  - [ ] Use existing stress test engine
+  - [ ] Return impacts for standard scenarios
+
+#### Factor Analytics
+- [ ] **GET /api/v1/analytics/factors/{id}/exposures** - Factor exposures
+  - [ ] Return 7-factor model results
+  - [ ] Portfolio and position level views
+- [ ] **GET /api/v1/analytics/factors/definitions** - Factor definitions
+  - [ ] ETF proxies and descriptions
+
+#### Correlation Analytics
+- [ ] **GET /api/v1/analytics/correlation/{id}/matrix** - Correlation matrix
+  - [ ] Position pairwise correlations
+  - [ ] Use existing correlation engine
+
+### 3.0.4 Management APIs (/management/) (Week 3-4)
+*CRUD operations for portfolios, positions, and configurations*
+
+#### Portfolio Management
+- [ ] **GET /api/v1/management/portfolios** - List user portfolios
+- [ ] **POST /api/v1/management/portfolios** - Create new portfolio
+- [ ] **POST /api/v1/management/portfolios/upload** - CSV upload
+  - [ ] Parse CSV based on SAMPLE_CSV_FORMAT.md
+  - [ ] Detect position types automatically
+  - [ ] Create positions in database
+
+#### Position Management
+- [ ] **GET /api/v1/management/positions** - List positions
+  - [ ] Support grouping by type/strategy/tag
+  - [ ] Include filtering and pagination
+- [ ] **POST /api/v1/management/positions** - Add position
+- [ ] **PUT /api/v1/management/positions/{id}** - Update position
+- [ ] **DELETE /api/v1/management/positions/{id}** - Delete position
+- [ ] **PUT /api/v1/management/positions/{id}/tags** - Update tags
+
+#### Strategy Management
+- [ ] **GET /api/v1/management/strategies** - List strategies
+  - [ ] Group positions by strategy tags
+
+#### Tag Management
+- [ ] **GET /api/v1/management/tags** - List all tags
+- [ ] **POST /api/v1/management/tags** - Create tag
+- [ ] Tag validation and limits
+
+#### Alert Management
+- [ ] **GET /api/v1/management/alerts** - List active alerts
+- [ ] **POST /api/v1/management/alerts/rules** - Create alert rules
+
+### 3.0.5 Export APIs (/export/) (Week 4)
+*Data export and report generation*
+
+#### Portfolio Export
+- [ ] **GET /api/v1/export/portfolio/{id}** - Export portfolio data
+  - [ ] Support CSV, Excel, JSON formats
+  - [ ] Include selected data sections
+
+#### Report Generation
+- [ ] **POST /api/v1/export/reports/generate** - Generate report
+  - [ ] Async job creation
+  - [ ] Support PDF format (future)
+- [ ] **GET /api/v1/export/reports/templates** - Report templates
+- [ ] **POST /api/v1/export/reports/schedule** - Schedule reports
+
+#### Trade Lists
+- [ ] **POST /api/v1/export/trades** - Export trade list
+  - [ ] CSV and JSON formats
+  - [ ] Broker-compatible formatting
+
+### 3.0.6 System APIs (/system/) (Week 4)
+*System utilities and job management*
+
+#### Job Management
+- [ ] **GET /api/v1/system/jobs/{job_id}** - Job status
+- [ ] **GET /api/v1/system/jobs/{job_id}/result** - Job result
+- [ ] **POST /api/v1/system/jobs/{job_id}/cancel** - Cancel job
+- [ ] Implement async job tracking
+- [ ] Add job timeout handling
+
+#### UI Synchronization
+- [ ] **POST /api/v1/system/ui/navigate** - UI navigation
+- [ ] **POST /api/v1/system/ui/highlight** - Highlight elements
+- [ ] **POST /api/v1/system/ui/filter** - Apply filters
+
+### 3.0.7 Batch Processing Admin APIs (Week 5)
+*Manual trigger endpoints for batch job execution - Lower priority*
+
+- [ ] **POST /api/v1/system/batch/run-all** - Execute complete sequence
+- [ ] **POST /api/v1/system/batch/market-data** - Update market data
+- [ ] **POST /api/v1/system/batch/aggregations** - Run aggregations
+- [ ] **POST /api/v1/system/batch/greeks** - Calculate Greeks
+- [ ] **POST /api/v1/system/batch/factors** - Run factor analysis
+- [ ] **POST /api/v1/system/batch/stress-tests** - Run stress testing
+- [ ] **GET /api/v1/system/batch/status** - View job status
+- [ ] **GET /api/v1/system/batch/history** - Job history
+
+### 3.0.8 API Infrastructure (Ongoing)
+*Cross-cutting concerns for all endpoints*
+
+- [x] **Rate limiting** - 100 requests/minute per user (COMPLETED)
+- [x] **Polygon.io rate limiting** - Token bucket algorithm (COMPLETED)
+- [ ] **Request validation** - Pydantic schemas for all endpoints
+- [ ] **Error handling** - Consistent error response format
+- [ ] **Logging** - Request/response logging with correlation IDs
+- [ ] **Pagination** - Standard pagination for list endpoints
+- [ ] **Filtering** - Query parameter filtering support
+- [ ] **API documentation** - OpenAPI/Swagger generation
+
+### 3.0.9 Implementation Notes for v1.4.4
+
+**Key Principles:**
+1. **Leverage existing engines** - All 8 batch calculation engines are complete
+2. **Raw vs Calculated separation** - /data/ returns raw, /analytics/ returns calculated
+3. **LLM optimization** - Complete datasets in single responses for /data/ endpoints
+4. **No pagination for /data/** - Return full datasets (50-150k tokens typical)
+5. **Standard REST patterns** - For /management/ and /export/ endpoints
+
+**Dependencies:**
+- Authentication must be implemented first
+- Raw data endpoints enable LLM testing
+- Analytics endpoints use batch calculation results
+- Management endpoints for CRUD operations
+- Export endpoints for data extraction
+
+**Testing Strategy:**
+- Use 3 existing demo portfolios
+- Test with existing calculation data
+- Verify LLM can consume /data/ endpoints
+- Ensure frontend compatibility
 
 ---
 
