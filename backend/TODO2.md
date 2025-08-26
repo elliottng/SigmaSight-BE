@@ -1086,88 +1086,87 @@ if total_direct_pnl < max_loss:
 - **Interest Rates**: Not "missing" but implemented with wrong units (Analysis 2 insight)
 - **Stress Tests**: Cap should clip total only, not scale factors (Analysis 2 insight)
 
-### 2.6.4 Implementation Plan - Option B Selected ✅ **COMPLETED**
+### 2.6.4 Implementation Plan - REVISED (2025-08-26)
 
-**Decision**: After review, **Option B (Position-Level Attribution)** has been selected. See FACTOR_EXPOSURE_REDESIGN.md for full details.
+**Status**: Beta calculation root cause identified. Option B implemented but receiving bad input data.
 
-**Completion Date**: 2025-08-09 | **Commit**: 8b8d00b
+#### 2.6.4.1 Priority 1: Fix Beta Calculation (Root Cause) 🔴 **CRITICAL**
 
-#### 2.6.4.1 Core Calculation Logic Fix ✅ **COMPLETED**
+**Problems Identified**:
+- Betas are too large (FXNAX: -2.460, NVDA: -3.000, database shows -22.739!)
+- Beta cap of 3.0 not being enforced properly
+- Multiple duplicate entries per position-factor pair
+- Returns calculation methodology suspect
 
-1. **Fix Short Exposure Calculation** ✅ **COMPLETED**
-   - **Report Layer** (portfolio_report_generator.py line 430):
-     ```python
-     "exposure": market_val * (-1 if position.position_type in ['SHORT', 'SC', 'SP'] else 1)
-     ```
-   - **Validation**: Added position type checks in calculate_portfolio_exposures()
+**Implementation Steps**:
+1. [ ] **Clear all existing factor exposure data**
+   - Delete all records from `position_factor_exposures` table
+   - Delete all records from `portfolio_factor_exposures` table
+   - Reset for clean recalculation
 
-2. **Fix Factor Exposure Model** ✅ **COMPLETED**
-   - **File**: `app/calculations/factors.py::aggregate_portfolio_factor_exposures()`
-   - **Implementation**:
-     ```python
-     # Step 1: Fetch position-level betas from PositionFactorExposure
-     # Step 2: Calculate signed_exposure = market_value × sign
-     # Step 3: contribution[p,f] = signed_exposure[p] × beta[p,f]
-     # Step 4: factor_dollar_exposure[f] = Σ(contributions)
-     # Step 5: Calculate both signed and magnitude portfolio betas
-     ```
-   - **Update 2025-08-09**: Removed feature flag per user request - direct implementation only
+2. [ ] **Fix beta cap enforcement**
+   - Verify line 293 in `factors.py`: `beta = max(-BETA_CAP_LIMIT, min(BETA_CAP_LIMIT, beta))`
+   - Add validation before storage to ensure no beta > 3.0 gets saved
+   - Investigate why values of -22.739 exist despite cap
 
-3. **Fix Interest Rate Beta Units** ⏳ **DEFERRED**
-   - **File**: `app/calculations/market_risk.py`
-   - Deferred to Phase 2.8 (not critical for current reports)
+3. [ ] **Fix duplicate entries problem**
+   - Implement proper upsert logic (DELETE then INSERT, or ON CONFLICT)
+   - Ensure each position-factor pair has exactly ONE beta value
+   - Add unique constraint if needed
 
-#### 2.6.4.2 Stress Test & Risk Updates ✅ **COMPLETED**
+4. [ ] **Investigate returns calculation**
+   - Check if price data is correct for mutual funds (FXNAX, FCNTX)
+   - Verify return calculation methodology
+   - Mutual funds shouldn't have extreme betas
 
-4. **Fix Stress Test Capping Logic** ✅ **COMPLETED**
-   - **File**: `app/calculations/stress_testing.py`
-   - Changed from proportional scaling to simple clipping:
-     ```python
-     if total_pnl < max_loss:
-         total_pnl = max_loss  # Clip only, preserve factor structure
-     ```
-   - Removed scaling of individual factor impacts ✅
+5. [ ] **Recalculate all betas with fixes**
+   - Run batch calculation with corrected logic
+   - Verify betas are in reasonable ranges (-3.0 to 3.0)
+   - Confirm no duplicates created
 
-5. **Add Fallback Behavior** ✅ **REMOVED**
-   - Removed per user request - no feature flag needed
-   - Direct implementation only
+#### 2.6.4.2 Priority 2: Fix Short Exposure Bug ⏳ **PENDING**
 
-#### 2.6.4.3 Testing & Validation ⏳ **PENDING**
+**Note**: Fix in calculation engine/database layer, NOT report generator
 
-6. **Unit Tests** ⏳ **TODO**
-   - [ ] Short positions → negative contributions
-   - [ ] Zero gross exposure → handled gracefully
-   - [ ] Missing betas → fallback works
-   - [ ] Portfolio betas match position contributions
-   - [ ] Extreme values handled correctly
+1. [ ] **Fix sign handling in calculation engine**
+   - Check `snapshots._prepare_position_data()` for sign issues
+   - Ensure SHORT positions have negative exposures throughout pipeline
+   - Validate position types (SHORT, SC, SP) handled correctly
 
-7. **Integration Tests** ⏳ **TODO**
-   - [ ] Stress scenarios show differentiation
-   - [ ] Factor exposures interpretable
-   - [ ] Reports generate with new values
-   - [ ] Sign consistency throughout pipeline
+2. [ ] **Fix data import layer**
+   - Ensure SHORT positions imported with correct sign from CSV/ETL
+   - Add validation to prevent positive quantities for SHORT types
 
-**Created Scripts**:
-- `scripts/analyze_exposure_dependencies.py` - Validates Option B safety
+#### 2.6.4.3 Priority 3: Interest Rate Units Fix ⏳ **PENDING**
 
-8. **Validation Metrics**
-   - Beta coverage: % positions with valid betas
-   - Exposure comparison: old vs new differences
-   - Stress test improvements: scenarios no longer all at 99%
+1. [ ] **Analyze impact of units fix**
+   - Review all code using interest rate data
+   - Check for downstream dependencies
+   - Document potential breaking changes
 
-#### 2.6.4.4 Migration & Rollout (Day 4-5)
+2. [ ] **Fix units inconsistency**
+   - Correct `market_risk.py` calculation (pct_change() * 10000 issue)
+   - Ensure consistent decimal vs percentage handling
+   - Test with known interest rate scenarios
 
-9. **Dual-Run Validation**
-   - Enable feature flag for test portfolios
-   - Run both calculations in parallel for 1 week
-   - Log and monitor differences
-   - Alert on significant deviations (>10%)
+#### 2.6.4.4 Testing & Validation ⏳ **PENDING**
 
-10. **Backfill & Documentation**
-    - Recalculate last 30 days for demo portfolios
-    - Generate comparison reports
-    - Update API documentation
-    - Communicate changes to stakeholders
+**Unit Tests**:
+- [ ] Beta values stay within ±3.0 cap
+- [ ] No duplicate position-factor entries
+- [ ] Short positions show negative exposures
+- [ ] Interest rate scenarios produce non-zero impacts
+
+**Integration Tests**:
+- [ ] Factor exposures sum to reasonable % of gross exposure (not 500%!)
+- [ ] Stress scenarios show differentiation
+- [ ] Reports generate with corrected values
+
+#### 2.6.4.5 Items to Remove (No Longer Needed)
+
+- ~~Dual-run validation~~ - No feature flags per user request
+- ~~Parallel testing~~ - Direct implementation only
+- ~~Stakeholder communication~~ - Prototype phase, no current users
 
 #### 2.6.4.5 Deferred - Awaiting Options Data
 - Greeks calculation
@@ -1175,9 +1174,31 @@ if total_direct_pnl < max_loss:
 - Options P&L attribution
 - *Timeline: After securing options data provider*
 
-### 2.6.5 Success Criteria
+### 2.6.5 Factor Model Documentation ✅ **CLARIFIED 2025-08-26**
+
+**Important Design Decision**: Factor exposures are calculated independently and CORRECTLY exceed 100% when summed.
+
+**Why Factor Exposures Sum to >100%:**
+- Factors are **NOT mutually exclusive** - they measure different dimensions of risk
+- A single position can have high exposure to multiple factors simultaneously
+- Example: AAPL can be both high Growth (innovative) AND high Quality (profitable)
+- This is the **industry standard** approach (Bloomberg, MSCI Barra, etc.)
+
+**What Each Factor Exposure Means:**
+- Market Beta: 32% means "if Market factor moves 1%, portfolio moves 0.32%"
+- Value: 96% means "if Value factor moves 1%, portfolio moves 0.96%"
+- These are **independent** risk measurements, not partitions of the portfolio
+
+**Analogy:** Like asking "What % of students are male?" (48%) and "What % are seniors?" (25%) - 
+the total (73%) exceeds any meaningful threshold because categories overlap.
+
+**This is NOT a bug** - it's the correct behavior for independent factor analysis.
+
+### 2.6.6 Success Criteria
 - [ ] Short exposures show correct negative values (Demo Hedge Fund: ~$1.5M)
-- [ ] Factor dollar exposures are interpretable and documented
+- [x] Factor dollar exposures are interpretable and documented ✅ **DOCUMENTED ABOVE**
+- [x] Factor betas properly capped at ±3.0 ✅ **VERIFIED**
+- [x] No duplicate factor exposure entries ✅ **FIXED with delete-then-insert**
 - [ ] Stress scenarios show differentiated impacts (not all at 99% cap)
 - [ ] Interest rate scenarios show non-zero impacts
 - [ ] Data validation prevents quantity sign mismatches

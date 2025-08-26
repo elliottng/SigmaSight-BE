@@ -9,7 +9,7 @@ from uuid import UUID
 import pandas as pd
 import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 import statsmodels.api as sm
 
 from app.models.positions import Position
@@ -290,7 +290,12 @@ async def calculate_factor_betas_hybrid(
                     try:
                         model = sm.OLS(y, X_with_const).fit()
                         beta = model.params[1] if len(model.params) > 1 else 0.0
+                        original_beta = beta
                         beta = max(-BETA_CAP_LIMIT, min(BETA_CAP_LIMIT, beta))
+                        
+                        # Log if cap was applied
+                        if abs(original_beta) > BETA_CAP_LIMIT:
+                            logger.warning(f"Beta capped for position {position_id}, factor {factor_name}: {original_beta:.3f} -> {beta:.3f}")
                         
                         position_betas[position_id][factor_name] = float(beta)
                         regression_stats[position_id][factor_name] = {
@@ -517,6 +522,18 @@ async def store_position_factor_exposures(
     }
     
     try:
+        # First, delete any existing records for this calculation date to prevent duplicates
+        logger.info(f"Clearing existing factor exposures for date {calculation_date}")
+        position_ids = [UUID(pid) for pid in position_betas.keys()]
+        if position_ids:
+            delete_stmt = delete(PositionFactorExposure).where(
+                and_(
+                    PositionFactorExposure.position_id.in_(position_ids),
+                    PositionFactorExposure.calculation_date == calculation_date
+                )
+            )
+            await db.execute(delete_stmt)
+        
         # Get factor definitions for ID mapping
         stmt = select(FactorDefinition).where(FactorDefinition.is_active == True)
         result = await db.execute(stmt)
@@ -550,32 +567,15 @@ async def store_position_factor_exposures(
                     
                     factor_id = factor_name_to_id[mapped_name]
                     
-                    # Check if record exists
-                    existing = await db.execute(
-                        select(PositionFactorExposure).where(
-                            and_(
-                                PositionFactorExposure.position_id == position_id,
-                                PositionFactorExposure.factor_id == factor_id,
-                                PositionFactorExposure.calculation_date == calculation_date
-                            )
-                        )
+                    # Create new record (we already deleted existing ones)
+                    exposure_record = PositionFactorExposure(
+                        position_id=position_id,
+                        factor_id=factor_id,
+                        calculation_date=calculation_date,
+                        exposure_value=Decimal(str(beta_value)),
+                        quality_flag=quality_flag
                     )
-                    existing_record = existing.scalar_one_or_none()
-                    
-                    if existing_record:
-                        # Update existing record
-                        existing_record.exposure_value = Decimal(str(beta_value))
-                        existing_record.quality_flag = quality_flag
-                    else:
-                        # Create new record
-                        exposure_record = PositionFactorExposure(
-                            position_id=position_id,
-                            factor_id=factor_id,
-                            calculation_date=calculation_date,
-                            exposure_value=Decimal(str(beta_value)),
-                            quality_flag=quality_flag
-                        )
-                        db.add(exposure_record)
+                    db.add(exposure_record)
                     
                     results["records_stored"] += 1
                 
@@ -611,6 +611,14 @@ async def aggregate_portfolio_factor_exposures(
     - Calculate each position's contribution to factor exposure
     - Sum contributions for portfolio-level dollar exposure
     - Store both signed and magnitude portfolio betas
+    
+    IMPORTANT: Factor exposures are INDEPENDENT and will sum to >100% of portfolio value.
+    This is correct behavior - each factor measures a different dimension of risk.
+    Example: A portfolio can be 96% exposed to Value factor AND 67% to Growth factor
+    simultaneously because positions can score high on multiple factors.
+    
+    This follows industry standard (Bloomberg, MSCI Barra) factor models where
+    exposures are not mutually exclusive partitions but independent risk measurements.
     
     Args:
         db: Database session
