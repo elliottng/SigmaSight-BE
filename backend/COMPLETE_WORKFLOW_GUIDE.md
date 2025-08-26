@@ -1,13 +1,18 @@
-# Complete Workflow Guide - From Setup to Reports
+# Complete Workflow Guide - From Setup to Reports & API Server
 
-This guide walks through the **complete workflow** from initial setup to generating portfolio reports with all calculation data.
+> **Last Updated**: 2025-08-26
+> **Phase**: 3.0 - API Development (30% complete)
+> **API Status**: Raw Data APIs 100% operational
+
+This guide walks through the **complete workflow** from initial setup to generating portfolio reports and running the FastAPI server for API access.
 
 ## Prerequisites
 
 ✅ Completed the [Windows Setup Guide](setup-guides/WINDOWS_SETUP_GUIDE.md) or [Mac Install Guide](setup-guides/MAC_INSTALL_GUIDE.md)  
 ✅ Docker Desktop is running  
 ✅ You're in the project directory: `backend`  
-✅ API keys configured in `.env` file (especially FMP_API_KEY which is REQUIRED)
+✅ API keys configured in `.env` file (especially FMP_API_KEY which is REQUIRED)  
+✅ JWT_SECRET_KEY configured in `.env` file for API authentication
 
 ---
 
@@ -209,7 +214,165 @@ uv run python -m app.cli.report_generator_cli generate \
 
 ---
 
-## Step 8: Daily Workflow
+## Step 8: Launch FastAPI Server for API Access
+
+### Start the Development Server
+
+```bash
+# Option A: Using the run.py script (recommended)
+uv run python run.py
+
+# Option B: Using uvicorn directly
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Option C: Using uv run with uvicorn
+uv run uvicorn app.main:app --reload
+```
+
+The server will start at: `http://localhost:8000`
+
+**Expected output when server starts successfully**:
+```
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+### Verify Server is Running
+
+1. **Quick Health Check**:
+   ```bash
+   curl http://localhost:8000/health
+   # Should return: {"status":"healthy"}
+   ```
+
+2. **Check API Version**:
+   ```bash
+   curl http://localhost:8000/api/v1/
+   # Should return API version info
+   ```
+
+3. **Browser Check**:
+   - Open http://localhost:8000/docs in your browser
+   - You should see the Swagger UI interface
+
+### Access Interactive API Documentation
+
+1. **Swagger UI**: http://localhost:8000/docs
+   - Interactive API testing interface
+   - Try out endpoints directly in the browser
+   - View request/response schemas
+
+2. **ReDoc**: http://localhost:8000/redoc
+   - Alternative API documentation format
+   - Better for reading, less interactive
+
+### Test API Authentication
+
+```bash
+# Login to get JWT token
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo_individual@sigmasight.com", "password": "demo12345"}'
+
+# Save the token from the response
+# Example response: {"access_token": "eyJ...", "token_type": "bearer"}
+```
+
+### Test Raw Data APIs (100% Complete)
+
+```bash
+# Replace <TOKEN> with the access_token from login
+
+# Get portfolios
+curl -X GET "http://localhost:8000/api/v1/data/portfolios" \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get positions for a portfolio
+curl -X GET "http://localhost:8000/api/v1/data/portfolios/<PORTFOLIO_ID>/positions" \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get risk metrics
+curl -X GET "http://localhost:8000/api/v1/data/portfolios/<PORTFOLIO_ID>/risk_metrics" \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get factor exposures
+curl -X GET "http://localhost:8000/api/v1/data/portfolios/<PORTFOLIO_ID>/factor_exposures" \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get market quotes
+curl -X GET "http://localhost:8000/api/v1/data/prices/quotes?symbols=AAPL,MSFT,GOOGL" \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get portfolio exposures
+curl -X GET "http://localhost:8000/api/v1/data/portfolios/<PORTFOLIO_ID>/exposures" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+### Using Python to Test APIs
+
+```python
+import requests
+
+# Login
+response = requests.post(
+    "http://localhost:8000/api/v1/auth/login",
+    json={"email": "demo_individual@sigmasight.com", "password": "demo12345"}
+)
+token = response.json()["access_token"]
+
+# Set headers
+headers = {"Authorization": f"Bearer {token}"}
+
+# Get portfolios
+portfolios = requests.get(
+    "http://localhost:8000/api/v1/data/portfolios",
+    headers=headers
+).json()
+
+print(f"Found {len(portfolios['data'])} portfolios")
+```
+
+### Keep Server Running in Background
+
+```bash
+# Windows - Run in background
+start /B uv run python run.py
+
+# Mac/Linux - Run in background with nohup
+nohup uv run python run.py &
+
+# Or use screen/tmux for persistent sessions
+screen -S sigmasight
+uv run python run.py
+# Press Ctrl+A then D to detach
+# Reattach with: screen -r sigmasight
+```
+
+### Available API Endpoints Overview
+
+**🟢 Raw Data APIs (100% Complete)**:
+- `/api/v1/data/portfolios` - Get all portfolios
+- `/api/v1/data/portfolios/{id}/positions` - Get portfolio positions
+- `/api/v1/data/portfolios/{id}/risk_metrics` - Get risk metrics
+- `/api/v1/data/portfolios/{id}/factor_exposures` - Get factor exposures
+- `/api/v1/data/portfolios/{id}/exposures` - Get portfolio exposures
+- `/api/v1/data/prices/quotes` - Get market quotes
+
+**🟡 Authentication APIs**:
+- `/api/v1/auth/login` - Login and get JWT token
+- `/api/v1/auth/register` - Register new user
+- `/api/v1/auth/me` - Get current user info
+
+**🔴 Other APIs (In Development)**:
+- Analytics APIs - Calculations and derived metrics
+- Management APIs - Portfolio CRUD operations
+- Export APIs - Report generation and downloads
+
+See [API Specifications V1.4.4](_docs/requirements/API_SPECIFICATIONS_V1.4.4.md) for complete endpoint documentation.
+
+## Step 9: Daily Workflow
 
 Once everything is set up, your daily workflow is:
 
@@ -221,14 +384,61 @@ cd C:\Projects\SigmaSight-BE\backend
 # 3. Start database
 docker-compose up -d
 
-# 4. Run batch and generate reports
+# 4. Start API server
+uv run python run.py
+
+# 5. Run batch and generate reports (in another terminal)
 uv run python scripts/run_batch_with_reports.py
 
-# 5. View reports
+# 6. View reports
 explorer reports  # Windows
+
+# 7. Access API at http://localhost:8000/docs
 ```
 
 ---
+
+## API Server Management
+
+### Check if Server is Running
+
+```bash
+# Windows
+netstat -an | findstr :8000
+
+# Mac/Linux  
+lsof -i :8000
+# or
+netstat -an | grep 8000
+```
+
+### Stop the Server
+
+- If running in foreground: Press `Ctrl+C`
+- If running in background:
+  ```bash
+  # Find the process
+  ps aux | grep "run.py\|uvicorn"
+  # Kill it
+  kill <PID>
+  ```
+
+### Common API Issues
+
+**"Connection refused" error**:
+- Make sure the server is running: `uv run python run.py`
+- Check the port isn't blocked by firewall
+- Try accessing via `127.0.0.1:8000` instead of `localhost:8000`
+
+**"401 Unauthorized" error**:
+- Token may have expired (default: 30 days)
+- Re-login to get a new token
+- Make sure you're including the Bearer prefix: `Authorization: Bearer <token>`
+
+**"Database connection error"**:
+- Ensure PostgreSQL is running: `docker ps`
+- Check DATABASE_URL in `.env` file
+- Restart Docker if needed: `docker-compose restart`
 
 ## Troubleshooting
 
@@ -302,18 +512,22 @@ uv run python scripts/test_fmp_batch_integration.py
 
 ## Next Steps
 
-1. **Review Generated Reports** - Check all sections are populated
-2. **Verify Calculations** - Ensure numbers make sense
-3. **Test Different Portfolios** - Run for all 3 demo portfolios
-4. **Customize Reports** - Modify templates in `app/reports/templates/`
-5. **Schedule Daily Runs** - Set up Windows Task Scheduler or cron
+1. **Explore API Endpoints** - Use http://localhost:8000/docs to test all endpoints
+2. **Review Generated Reports** - Check all sections are populated
+3. **Verify Calculations** - Ensure numbers make sense via API responses
+4. **Test Different Portfolios** - Run for all 3 demo portfolios
+5. **Integrate with Frontend** - Use Raw Data APIs for UI development
+6. **Customize Reports** - Modify templates in `app/reports/templates/`
+7. **Schedule Daily Runs** - Set up Windows Task Scheduler or cron
+8. **Monitor API Performance** - Check response times in `/docs`
 
 ---
 
 ## Questions?
 
-- Check the [White Paper](docs/Calculation_Engine_White_Paper.md) for calculation details
-- Review [TODO2.md](TODO2.md) for known issues and roadmap
+- Check the [White Paper](_docs/generated/Calculation_Engine_White_Paper.md) for calculation details
+- Review [TODO3.md](TODO3.md) for current API development status
 - See [AI_AGENT_REFERENCE.md](AI_AGENT_REFERENCE.md) for code structure
+- View [API Specifications](/_docs/requirements/API_SPECIFICATIONS_V1.4.4.md) for endpoint details
 
 Remember: The first run takes longer as it fetches historical data. Subsequent runs are faster!
