@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> ⚠️ **CRITICAL WARNING (2025-08-26)**: API implementation significantly incomplete.
+> - Many endpoints return MOCK/random data
+> - Legacy endpoints are TODO stubs
+> - See `backend/API_IMPLEMENTATION_STATUS.md` for TRUE status
+> - Do NOT rely on other documentation claiming "100% complete"
+
 ## Project Overview
 
 SigmaSight Backend - A FastAPI-based portfolio risk analytics platform with 8 calculation engines, automated batch processing, and comprehensive financial analytics. The project is structured with the main application code in the `backend/` subdirectory.

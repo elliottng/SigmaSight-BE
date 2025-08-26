@@ -1,5 +1,9 @@
 # Claude AI Agent Instructions - SigmaSight Backend
 
+> ⚠️ **CRITICAL WARNING (2025-08-26)**: Many API endpoints return MOCK data or TODO stubs.
+> See [API_IMPLEMENTATION_STATUS.md](API_IMPLEMENTATION_STATUS.md) for TRUE implementation status.
+> Do NOT assume endpoints are functional based on other documentation.
+
 **Purpose**: Instructions and preferences for Claude AI agents working on the SigmaSight backend codebase.
 
 **Target**: Claude Code, Claude 3.5 Sonnet, and other AI coding agents
