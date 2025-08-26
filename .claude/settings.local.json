@@ -8,7 +8,10 @@
       "Bash(git push:*)",
       "Bash(grep:*)",
       "Bash(PYTHONIOENCODING=utf-8 uv run python scripts/debug_factor_calculation.py)",
-      "Bash(PYTHONIOENCODING=utf-8 uv run python:*)"
+      "Bash(PYTHONIOENCODING=utf-8 uv run python:*)",
+      "Bash(rm:*)",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"

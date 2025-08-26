@@ -71,7 +71,9 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 - Demo data with 3 portfolios (63 positions)
 - Rate limiting infrastructure
 - Database models and relationships
-- Market data integration (Polygon, FMP)
+- Market data integration (FMP primary, Polygon secondary, FRED for economic data)
+  - Note: Mutual fund coverage limited to ~7.5% (mainly Vanguard funds)
+  - TradeFeeds integration blocked by CAPTCHA protection
 
 ### 🔑 Key Success Factors:
 - **Use existing calculations** - Don't recreate, just expose
