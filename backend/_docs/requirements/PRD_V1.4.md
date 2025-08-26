@@ -1,6 +1,9 @@
 # SigmaSight Backend - Project Requirements Document (PRD) & Engineering Design Document (EDD)
 
 ## 1. Executive Summary
+
+> ⚠️ **STATUS UPDATE (2025-08-26 15:00 PST)**: Backend development is complete through Phase 3.0 with Raw Data APIs (100% complete). Frontend and agent development can proceed without additional backend work. See [TODO3.md](../../TODO3.md) for current API development status.
+
 SigmaSight is a portfolio risk management platform designed to provide institutional-quality analytics for long/short equity portfolios. This document outlines the backend requirements and technical design for a demonstration system that showcases core functionality through pre-computed analytics and batch processing.
 
 **Key Principles**
@@ -11,7 +14,7 @@ SigmaSight is a portfolio risk management platform designed to provide instituti
 - **API-First Design**: RESTful API matching the V5 frontend prototype requirements
 
 ## 2. Project Scope
-### In Scope – Phase 1 (Demo)
+### ~~In Scope – Phase 1 (Demo)~~ **[COMPLETED - See TODO1.md]** *(Updated 2025-08-26 15:00 PST)*
 - Portfolio data ingestion via CSV upload
 - Pre-calculated risk metrics and factor exposures
 - Position management with tagging system
@@ -20,7 +23,7 @@ SigmaSight is a portfolio risk management platform designed to provide instituti
 - Mock options Greeks display
 - API endpoints for frontend V5 prototype
 
-### In Scope – Phase 2 (Post-Demo)
+### ~~In Scope – Phase 2 (Post-Demo)~~ **[COMPLETED - See TODO2.md]** *(Updated 2025-08-26 15:00 PST)*
 - Real-time ProForma modeling with session management
 - Dynamic Greeks calculation
 - Real export functionality (FIX, CSV formats)

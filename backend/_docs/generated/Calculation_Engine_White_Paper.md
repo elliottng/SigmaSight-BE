@@ -1,8 +1,10 @@
 # SigmaSight Calculation Engine White Paper
 
+> ⚠️ **DOCUMENT STATUS (2025-08-26 15:50 PST)**: This white paper reflects the Phase 1 implementation status. For current API development status see [TODO3.md](../../TODO3.md). The calculation engines described here are operational with 7/8 engines functional.
+
 ## Executive Summary
 
-The SigmaSight Calculation Engine provides institutional-grade portfolio analytics through eight integrated calculation modules operating in a sequential batch processing framework. Built on FastAPI with PostgreSQL, the system currently processes 3 demo portfolios with 63 positions. While the core architecture is complete and several modules are fully operational (market data, exposures, factor analysis), others have limitations due to data dependencies (Greeks without options chains) or pending implementation (VaR, Sharpe ratios). This document details the mathematical foundations, current implementation status, known limitations, and architectural decisions of our calculation infrastructure.
+The SigmaSight Calculation Engine provides institutional-grade portfolio analytics through eight integrated calculation modules operating in a sequential batch processing framework. Built on FastAPI with PostgreSQL, the system currently processes 3 demo portfolios with 63 positions. While the core architecture is complete and several modules are fully operational (market data, exposures, factor analysis), others have limitations due to data dependencies (Greeks without options chains) or ~~pending implementation~~ **completed with graceful degradation** (VaR, Sharpe ratios). This document details the mathematical foundations, current implementation status, known limitations, and architectural decisions of our calculation infrastructure.
 
 ### Who Should Read This Document
 
@@ -21,7 +23,7 @@ The SigmaSight Calculation Engine provides institutional-grade portfolio analyti
 - What happens to your portfolio in extreme market scenarios
 - How our system processes calculations reliably every day
 
-## Current System Status (August 2025)
+## Current System Status ~~(August 2025)~~ **(Updated 2025-08-26)**
 
 - **Architecture Status**: Core infrastructure complete with 8 calculation engines deployed
 - **Functional Coverage**: 

@@ -1,7 +1,9 @@
-# Section 1.5 Demo Data Seeding - Usage Guide
+# ~~Section 1.5~~ Demo Data Seeding - Usage Guide
+
+> ⚠️ **CURRENT STATUS (2025-08-26 15:45 PST)**: Demo seeding is fully operational with 3 portfolios and 63 positions. This is actively used for development and testing. See [TODO1.md](../../TODO1.md) Section 1.5 for implementation details.
 
 ## Overview
-Section 1.5 provides complete demo data seeding for SigmaSight, creating 3 sophisticated portfolios with all data required for batch processing framework.
+~~Section 1.5~~ **Demo data seeding** provides complete demo data seeding for SigmaSight, creating 3 sophisticated portfolios with all data required for batch processing framework.
 
 ## Implementation Status: ✅ COMPLETE
 

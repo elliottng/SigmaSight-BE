@@ -1,12 +1,14 @@
 # Portfolio Aggregation Design V1.4
 
+> ⚠️ **IMPLEMENTATION STATUS (2025-08-26 15:55 PST)**: Portfolio aggregation has been fully implemented as part of Phase 1. See [TODO1.md](../../TODO1.md) Section 1.4.3 for completion details. This functionality is used by the Raw Data APIs.
+
 ## Overview
 This document defines the detailed design decisions for portfolio aggregation functionality in SigmaSight V1.4. These decisions prioritize simplicity, performance, and alignment with the batch-first architecture.
 
 ## Design Decisions (Questions 1-15)
 
 ### 1. Position Data Structure
-**Decision**: Use already-calculated values from Section 1.4.1
+**Decision**: Use already-calculated values from ~~Section 1.4.1~~ **market data calculations (implemented)**
 
 ```python
 {

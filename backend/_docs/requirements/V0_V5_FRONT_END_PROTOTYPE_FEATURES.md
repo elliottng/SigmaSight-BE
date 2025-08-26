@@ -1,5 +1,7 @@
 # SigmaSight V5 Prototype Features
 
+> ⚠️ **BACKEND STATUS (2025-08-26 15:25 PST)**: Backend APIs are ready to support frontend development. Raw Data APIs (6/6 endpoints) are 100% complete at `/api/v1/data/` namespace. Frontend can proceed without additional backend work. See [TODO3.md](../../TODO3.md) for full API implementation status.
+
 ## 1. Overview
 This document describes the features implemented in the SigmaSight V5 prototype (GitHub repository last updated ~5 days ago) that the backend API must support. The prototype is built with Next.js 15.2.4 and demonstrates the core user interface and workflows that will connect to the SigmaSight backend.
 
@@ -307,14 +309,16 @@ Each scenario card shows:
 - Stale-while-revalidate pattern
 
 ## 11. Backend Requirements Summary
-To support this V5 prototype, the backend must provide:
+~~To support this V5 prototype, the backend must provide:~~
 
-1. Portfolio Overview Data - Exposures, P&L, summary metrics
-2. Position Management - CRUD operations with tagging
-3. Risk Calculations - Greeks, factor exposures, risk metrics
-4. Market Data - Real-time quotes (or mock data)
-5. Batch Processing - Daily updates for historical data
-6. Session Management - For ProForma modeling (Phase 2)
-7. Export Functionality - Trade list generation
+**CURRENT STATUS (2025-08-26 15:25 PST)**: The backend currently provides:
 
-The API should return data in formats that directly map to the UI components, including visual indicators (percentages, status colors, thresholds) to minimize client-side calculations.
+1. ✅ **Portfolio Overview Data** - Raw data APIs complete at `/api/v1/data/portfolios`
+2. ✅ **Position Management** - Raw data APIs complete at `/api/v1/data/positions`  
+3. ✅ **Risk Calculations** - Raw data APIs complete at `/api/v1/data/risk_metrics`
+4. ✅ **Market Data** - Available via batch processing and market data cache
+5. ✅ **Batch Processing** - Daily automated updates operational
+6. 🚧 **Session Management** - For ProForma modeling (in progress, see TODO3.md)
+7. 🚧 **Export Functionality** - Trade list generation (planned)
+
+The API returns data in formats that directly map to the UI components. Frontend developers can proceed with implementation using the Raw Data APIs.

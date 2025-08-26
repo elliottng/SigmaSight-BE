@@ -1,5 +1,7 @@
 # Demo Overview
 
+> ⚠️ **BACKEND STATUS (2025-08-26 15:15 PST)**: Backend APIs are ready for demo with Raw Data APIs 100% complete. Frontend can proceed with implementation. Demo users available with password "demo12345". See [TODO3.md](../../TODO3.md) for API development status.
+
 ## 0.1 Overview
 Duration: 15-20 minutes
 Objective: Get feedback from target customers and potential investors.
@@ -207,12 +209,12 @@ Show update to Changes Summary
 Script: "Let's recap what makes SigmaSight unique:"
 
 ### ~~Historical Data Processing~~ *(REMOVED - V1.4 scope change)*
-- ~~After uploading the CSV, the system automatically fetches 90 days of real historical market data~~
-- ~~This creates authentic portfolio performance history based on actual market movements~~
-- ~~The historical charts and metrics shown reflect real market conditions~~
-- ~~Processing typically takes 5-10 minutes for a full portfolio~~
+~~- After uploading the CSV, the system automatically fetches 90 days of real historical market data~~
+~~- This creates authentic portfolio performance history based on actual market movements~~
+~~- The historical charts and metrics shown reflect real market conditions~~
+~~- Processing typically takes 5-10 minutes for a full portfolio~~
 
-**Updated Demo Flow**: *Portfolio snapshots and performance tracking will begin from CSV upload date, building forward daily performance history.*
+**Updated Demo Flow (2025-08-26 15:15 PST)**: Portfolio snapshots and performance tracking begin from CSV upload date, building forward daily performance history. Demo data with 3 portfolios and 63 positions is pre-seeded and ready for demonstration.
 
 ## Demo Environment Setup Notes
 

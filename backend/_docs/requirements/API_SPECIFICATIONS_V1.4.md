@@ -1,6 +1,9 @@
 # SigmaSight API Endpoints Specification v1.4
 
-## Document Version Control
+> ⚠️ **DEPRECATED (2025-08-26 14:45 PST)**: This document is superseded by [API_SPECIFICATIONS_V1.4.4.md](./API_SPECIFICATIONS_V1.4.4.md). 
+> Please use V1.4.4 for all current development. This document is retained for historical reference only.
+
+## ~~Document Version Control~~ **[OUTDATED - See V1.4.4]**
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
