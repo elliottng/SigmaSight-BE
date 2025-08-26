@@ -72,7 +72,7 @@ After installation, restart your terminal and verify: `uv --version`
 1. **Clone the repository:**
 ```bash
 git clone https://github.com/elliottng/SigmaSight-BE.git
-cd SigmaSight-BE/sigmasight-backend
+cd SigmaSight-BE/backend
 ```
 
 2. **Verify you're in the right directory:**
@@ -318,7 +318,7 @@ Once the server is running:
 ### Project Structure
 
 ```
-sigmasight-backend/
+backend/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py          # FastAPI application

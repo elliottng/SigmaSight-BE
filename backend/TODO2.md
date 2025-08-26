@@ -1791,6 +1791,21 @@ CREATE TABLE portfolio_metrics (
 
 ---
 
+## Phase 2.12: Project Structure Reorganization
+*Rename sigmasight-backend to backend, create frontend and agent top level folders*
+
+- [x] **Rename folder**: `sigmasight-backend/` → `backend/`
+- [x] **Update pyproject.toml**: Change package name to "backend"
+- [x] **Update main.py**: Fix print message reference
+- [x] **Update CLAUDE.md**: Fix PYTHONPATH examples
+- [x] **Create top-level folders**: `frontend/` and `agent/`
+- [x] **Update documentation**: Fix folder paths in setup guides (15 files)
+- [x] **Test functionality**: Run verification scripts from new `backend/` directory
+
+**Risk**: Low - Uses relative imports, no hardcoded paths in code
+
+---
+
 ## Phase 3.0: API Development
 *All REST API endpoints for exposing backend functionality*
 

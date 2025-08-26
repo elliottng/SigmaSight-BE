@@ -15,7 +15,7 @@ This guide is specifically for setting up the SigmaSight Backend using Windsurf 
 
 3. **Open the Backend Project:**
    - Navigate to the cloned folder
-   - Open the `sigmasight-backend` folder in Windsurf
+   - Open the `backend` folder in Windsurf
 
 ### Step 2: Let Cascade AI Help You Set Up
 

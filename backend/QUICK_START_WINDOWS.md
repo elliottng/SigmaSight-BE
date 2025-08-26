@@ -5,7 +5,7 @@
 ```powershell
 # 1. Clone repository
 git clone https://github.com/elliottng/SigmaSight-BE.git
-cd SigmaSight-BE\sigmasight-backend
+cd SigmaSight-BE\backend
 
 # 2. Install dependencies
 uv sync
@@ -27,7 +27,7 @@ uv run python scripts/seed_database.py
 
 ```powershell
 # Navigate to project
-cd C:\Projects\SigmaSight-BE\sigmasight-backend
+cd C:\Projects\SigmaSight-BE\backend
 
 # Start database (if not running)
 docker-compose up -d

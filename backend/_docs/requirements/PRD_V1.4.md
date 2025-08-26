@@ -465,7 +465,7 @@ This stack mirrors typical hedge fund infrastructure:
 
 ### 4.2 Project Structure
 ```
-sigmasight-backend/
+backend/
 ├── alembic/
 │   └── versions/
 ├── app/
@@ -516,7 +516,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone repo
 git clone https://github.com/your-org/sigmasight-backend.git
-cd sigmasight-backend
+cd backend
 
 # Create env
 uv venv && source .venv/bin/activate

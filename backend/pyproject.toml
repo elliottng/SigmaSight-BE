@@ -1,5 +1,5 @@
 [project]
-name = "sigmasight-backend"
+name = "backend"
 version = "0.1.0"
 description = "FastAPI backend for SigmaSight portfolio risk management platform"
 readme = "README.md"

@@ -252,10 +252,10 @@ Add to crontab for daily report generation:
 
 ```bash
 # Daily at 6 AM: Run batch and generate reports
-0 6 * * * cd /path/to/sigmasight-backend && uv run python scripts/run_batch_with_reports.py >> /var/log/sigmasight/daily.log 2>&1
+0 6 * * * cd /path/to/backend && uv run python scripts/run_batch_with_reports.py >> /var/log/sigmasight/daily.log 2>&1
 
 # Weekly on Sunday: Include correlations
-0 6 * * 0 cd /path/to/sigmasight-backend && uv run python scripts/run_batch_with_reports.py --correlations >> /var/log/sigmasight/weekly.log 2>&1
+0 6 * * 0 cd /path/to/backend && uv run python scripts/run_batch_with_reports.py --correlations >> /var/log/sigmasight/weekly.log 2>&1
 ```
 
 ### API Integration

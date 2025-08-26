@@ -137,7 +137,7 @@ We'll install these tools in order:
 
 4. **Navigate to the project:**
    ```bash
-   cd SigmaSight-BE\sigmasight-backend
+   cd SigmaSight-BE\backend
    ```
 
 ---
@@ -192,7 +192,7 @@ We'll install these tools in order:
    ```bash
    docker ps
    ```
-   - You should see a container named `sigmasight-backend_postgres_1` or similar
+   - You should see a container named `backend_postgres_1` or similar
 
 3. **Set up database tables (Professional Approach):**
    ```bash
@@ -247,7 +247,7 @@ After initial setup, here's how to start SigmaSight each day:
    - Look for whale icon in system tray
 
 2. **Open Command Prompt**
-   - Navigate to project: `cd C:\Projects\SigmaSight-BE\sigmasight-backend`
+   - Navigate to project: `cd C:\Projects\SigmaSight-BE\backend`
 
 3. **Start the database:**
    ```bash
@@ -315,7 +315,7 @@ After initial setup, here's how to start SigmaSight each day:
 
 ```bash
 # Navigate to project
-cd C:\Projects\SigmaSight-BE\sigmasight-backend
+cd C:\Projects\SigmaSight-BE\backend
 
 # Start database
 docker-compose up -d
@@ -376,7 +376,7 @@ Windows Command Prompt has encoding limitations that can cause Unicode errors wh
 ## 💡 Tips
 
 - Keep Docker Desktop running in the background
-- Create a desktop shortcut to `C:\Projects\SigmaSight-BE\sigmasight-backend`
+- Create a desktop shortcut to `C:\Projects\SigmaSight-BE\backend`
 - Save commonly used commands in a text file for easy copy-paste
 - The database data persists even after stopping Docker
 - Use PowerShell or Windows Terminal for better Unicode support

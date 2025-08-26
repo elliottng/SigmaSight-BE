@@ -81,7 +81,7 @@ Build a FastAPI backend for SigmaSight portfolio risk management platform with R
 
 ### 0.3 Project Structure ✅ COMPLETED
 ```
-sigmasight-backend/
+backend/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py

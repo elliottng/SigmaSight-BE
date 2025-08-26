@@ -42,12 +42,12 @@ uv --version || echo "❌ UV not installed"
 
 ### Step 1: Navigate to Project Directory
 ```bash
-cd /Users/elliottng/CascadeProjects/SigmaSight-BE/sigmasight-backend
+cd /Users/elliottng/CascadeProjects/SigmaSight-BE/backend
 ```
 
 **Verification**:
 ```bash
-pwd  # Should show: /Users/elliottng/CascadeProjects/SigmaSight-BE/sigmasight-backend
+pwd  # Should show: /Users/elliottng/CascadeProjects/SigmaSight-BE/backend
 ls pyproject.toml  # Should exist
 ```
 
@@ -607,7 +607,7 @@ After initial setup, here's how to start SigmaSight each time:
 open -a Docker  # Opens Docker Desktop if not running
 
 # 2. Navigate to project directory
-cd /Users/elliottng/CascadeProjects/SigmaSight-BE/sigmasight-backend
+cd /Users/elliottng/CascadeProjects/SigmaSight-BE/backend
 
 # 3. Start the database
 docker-compose up -d
@@ -646,7 +646,7 @@ uv run python scripts/setup_dev_database_alembic.py
 
 ```bash
 # Navigate to project
-cd /Users/elliottng/CascadeProjects/SigmaSight-BE/sigmasight-backend
+cd /Users/elliottng/CascadeProjects/SigmaSight-BE/backend
 
 # Start everything
 docker-compose up -d postgres

@@ -9,7 +9,7 @@ This guide ensures all team members use professional database migration workflow
 ### 1. Clone and Environment Setup
 ```bash
 git clone https://github.com/elliottng/SigmaSight-BE.git
-cd SigmaSight-BE/sigmasight-backend
+cd SigmaSight-BE/backend
 
 # Copy environment template
 cp .env.example .env

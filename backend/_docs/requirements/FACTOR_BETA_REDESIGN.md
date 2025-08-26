@@ -48,7 +48,7 @@ Do not implement until this plan is reviewed and approved.
 ## 3. Legacy Reference: Methods and Differences vs Current
 
 This section summarizes the legacy reference scripts in
-`sigmasight-backend/_docs/requirements/legacy_scripts_for_reference_only/legacy_analytics_for_reference/`
+`backend/_docs/requirements/legacy_scripts_for_reference_only/legacy_analytics_for_reference/`
 and contrasts them with the current SigmaSight implementation.
 
 3.1) Legacy data and returns
@@ -305,7 +305,7 @@ This document will remain the source of truth for the *design*, while `TODO2.md`
 
 - `app/calculations/factors.py`
 - `app/calculations/market_data.py`
-- `sigmasight-backend/_docs/requirements/FACTOR_EXPOSURE_REDESIGN.md`
+- `backend/_docs/requirements/FACTOR_EXPOSURE_REDESIGN.md`
 
 ---
 

@@ -6,7 +6,7 @@ This guide walks through the **complete workflow** from initial setup to generat
 
 ✅ Completed the [Windows Setup Guide](setup-guides/WINDOWS_SETUP_GUIDE.md) or [Mac Install Guide](setup-guides/MAC_INSTALL_GUIDE.md)  
 ✅ Docker Desktop is running  
-✅ You're in the project directory: `sigmasight-backend`  
+✅ You're in the project directory: `backend`  
 ✅ API keys configured in `.env` file (especially FMP_API_KEY which is REQUIRED)
 
 ---
@@ -15,9 +15,9 @@ This guide walks through the **complete workflow** from initial setup to generat
 
 ```bash
 # Make sure you're in the sigmasight-backend directory
-cd C:\Projects\SigmaSight-BE\sigmasight-backend  # Windows
+cd C:\Projects\SigmaSight-BE\backend  # Windows
 # or
-cd ~/Projects/SigmaSight-BE/sigmasight-backend    # Mac
+cd ~/Projects/SigmaSight-BE/backend    # Mac
 
 # Start PostgreSQL
 docker-compose up -d
@@ -26,7 +26,7 @@ docker-compose up -d
 docker ps
 ```
 
-You should see a container named `sigmasight-backend_postgres_1` running.
+You should see a container named `backend_postgres_1` running.
 
 ---
 
@@ -141,7 +141,7 @@ uv run python scripts/run_batch_with_reports.py --skip-batch
 
 ## Step 6: View Generated Reports
 
-The script generates reports in the `sigmasight-backend/reports/` directory. The folder is named using a slugified version of the **portfolio's name** and the report date.
+The script generates reports in the `backend/reports/` directory. The folder is named using a slugified version of the **portfolio's name** and the report date.
 
 For example, a report for the "Demo Hedge Fund-Style Investor" portfolio on August 8, 2025, will be in: `reports/demo-hedge-fund-style-investor-portfolio_2025-08-08/`
 
@@ -216,7 +216,7 @@ Once everything is set up, your daily workflow is:
 ```bash
 # 1. Start Docker (if not running)
 # 2. Navigate to project
-cd C:\Projects\SigmaSight-BE\sigmasight-backend
+cd C:\Projects\SigmaSight-BE\backend
 
 # 3. Start database
 docker-compose up -d
