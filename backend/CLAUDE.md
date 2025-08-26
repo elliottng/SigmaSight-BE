@@ -4,7 +4,7 @@
 
 **Target**: Claude Code, Claude 3.5 Sonnet, and other AI coding agents
 
-**Last Updated**: 2025-08-10
+**Last Updated**: 2025-08-26
 
 ---
 
@@ -17,9 +17,10 @@
    - Eliminates 30-45 minutes of discovery time
    - **Always reference this before exploring the codebase**
 
-2. **[TODO1.md](TODO1.md)** - Phase 1 implementation status and issues
-3. **[TODO2.md](TODO2.md)** - Current phase planning and tasks
-4. **[README.md](README.md)** - Setup instructions and environment
+2. **[TODO3.md](TODO3.md)** - Current Phase 3.0 API development (active)
+3. **[TODO1.md](TODO1.md)** - Phase 1 implementation (complete)
+4. **[TODO2.md](TODO2.md)** - Phase 2 implementation (complete)
+5. **[README.md](README.md)** - Setup instructions and environment
 
 ### **Specialized References**
 - **Batch Processing Issues**: See TODO1.md Section 1.6.14 for systematic issue resolution
@@ -44,12 +45,12 @@
 
 **✅ DO:**
 - Read AI_AGENT_REFERENCE.md first to understand the codebase
-- Check TODO1.md and TODO2.md for current status before implementing
+- Check TODO3.md for current work, TODO1.md and TODO2.md for completed phases
 - Use existing demo data (3 portfolios, 63 positions) for testing
 - Implement graceful degradation for missing calculation data
 - Follow async patterns consistently (avoid sync/async mixing)
 - Use the diagnostic commands from AI_AGENT_REFERENCE.md
-- Update completion status in TODO2.md as work progresses
+- Update completion status in TODO3.md as work progresses
 
 **❌ DON'T:**
 - Explore file structure without consulting the reference guide
