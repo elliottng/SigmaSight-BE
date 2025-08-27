@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '../contexts/AuthContext'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'SigmaSight GPT Agent',
-  description: 'Portfolio analysis with GPT Agent',
+  title: 'SigmaSight - Portfolio Risk Management',
+  description: 'Professional portfolio risk analytics and management platform',
+  keywords: 'portfolio, risk management, options, Greeks, factor analysis',
 }
 
 export default function RootLayout({
@@ -13,8 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        {children}
+      <body className={inter.className} suppressHydrationWarning={true}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

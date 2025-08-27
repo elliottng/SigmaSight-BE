@@ -51,6 +51,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # React dev server
         "http://localhost:3001",  # Next.js dev server (alternate)
         "http://localhost:3002",  # Next.js dev server (current)
+        "http://localhost:3008",  # Next.js dev server (current port)
         "http://localhost:5173",  # Vite dev server
         "https://sigmasight-frontend.vercel.app",  # Production frontend
     ]
@@ -59,6 +60,9 @@ class Settings(BaseSettings):
     BATCH_PROCESSING_ENABLED: bool = True
     MARKET_DATA_UPDATE_INTERVAL: int = 3600  # 1 hour in seconds
     
+    # OpenAI integration (optional)
+    OPENAI_API_KEY: str = Field(default="", env="OPENAI_API_KEY")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

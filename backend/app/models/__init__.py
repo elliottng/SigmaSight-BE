@@ -11,6 +11,7 @@ from app.models.modeling import ModelingSessionSnapshot
 from app.models.history import ExportHistory
 from app.models.correlations import CorrelationCalculation, CorrelationCluster, CorrelationClusterPosition, PairwiseCorrelation
 from app.models.reports import PortfolioReport, ReportGenerationJob
+from app.models.alerts import Alert, AlertRule, AlertType, AlertPriority, AlertStatus
 
 # Export all models
 __all__ = [
@@ -53,4 +54,11 @@ __all__ = [
     # Reports module
     "PortfolioReport",
     "ReportGenerationJob",
+    
+    # Alerts module
+    "Alert",
+    "AlertRule",
+    "AlertType",
+    "AlertPriority",
+    "AlertStatus",
 ]

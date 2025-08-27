@@ -51,6 +51,9 @@ async def login(user_login: UserLogin, db: AsyncSession = Depends(get_db)):
     token_data = create_token_response(str(user.id), user.email)
     auth_logger.info(f"Login successful for user: {user.email}")
     
+    # Add user data to token response
+    token_data["user"] = CurrentUser.model_validate(user)
+    
     return TokenResponse(**token_data)
 
 
@@ -120,5 +123,8 @@ async def refresh_token(current_user: CurrentUser = Depends(get_current_user)):
     
     # For V1, we just create a new token with the same data
     token_data = create_token_response(str(current_user.id), current_user.email)
+    
+    # Add user data to token response
+    token_data["user"] = current_user
     
     return TokenResponse(**token_data)

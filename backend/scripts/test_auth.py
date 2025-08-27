@@ -22,7 +22,7 @@ TEST_USER = {
 
 DEMO_USER = {
     "email": "demo_individual@sigmasight.com",
-    "password": "demo12345"
+    "password": "password123"
 }
 
 INVALID_USER = {

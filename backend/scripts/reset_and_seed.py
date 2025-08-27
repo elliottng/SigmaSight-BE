@@ -138,9 +138,9 @@ async def reset_and_seed():
             logger.info("🚀 Demo environment is ready for development and testing!")
             logger.info("")
             logger.info("Demo User Credentials:")
-            logger.info("  Individual Investor: demo_individual@sigmasight.com / demo12345")
-            logger.info("  High Net Worth: demo_hnw@sigmasight.com / demo12345")
-            logger.info("  Hedge Fund Style: demo_hedgefundstyle@sigmasight.com / demo12345")
+            logger.info("  Individual Investor: demo_individual@sigmasight.com / password123")
+            logger.info("  High Net Worth: demo_hnw@sigmasight.com / password123")
+            logger.info("  Hedge Fund Style: demo_hedgefundstyle@sigmasight.com / password123")
         else:
             logger.error("❌ Reset and seed completed but validation failed")
             return False

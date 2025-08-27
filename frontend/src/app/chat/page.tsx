@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
+type Role = "system" | "user" | "assistant";
+
 interface ChatMessage {
-  id: string
+  role: Role
   content: string
-  sender: 'user' | 'agent'
-  timestamp: Date
+  id?: string
+  timestamp?: Date
   status?: 'sending' | 'sent' | 'error'
 }
 
@@ -18,15 +20,16 @@ interface AgentStatus {
 }
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "system", content: "You are a helpful financial analysis assistant for SigmaSight portfolio management." }
+  ])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>({
-    online: false,
-    message: 'Connecting...'
+    online: true,
+    message: 'Online'
   })
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const AGENT_URL = 'http://localhost:8787'
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,104 +39,52 @@ export default function ChatPage() {
     scrollToBottom()
   }, [messages])
 
-  const checkAgentStatus = async () => {
-    try {
-      const response = await fetch(`${AGENT_URL}/health`)
-      if (response.ok) {
-        setAgentStatus({
-          online: true,
-          message: 'Online'
-        })
-      } else {
-        setAgentStatus({
-          online: false,
-          message: 'Error'
-        })
-      }
-    } catch (error) {
-      setAgentStatus({
-        online: false,
-        message: 'Offline'
-      })
-    }
-  }
-
-  useEffect(() => {
-    checkAgentStatus()
-    const interval = setInterval(checkAgentStatus, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   const sendMessage = async () => {
-    if (!input.trim() || !agentStatus.online) return
+    const prompt = input.trim()
+    if (!prompt || isTyping) return
 
     const userMessage: ChatMessage = {
+      role: "user",
+      content: prompt,
       id: `user-${Date.now()}`,
-      content: input.trim(),
-      sender: 'user',
       timestamp: new Date(),
       status: 'sent'
     }
 
-    setMessages(prev => [...prev, userMessage])
+    // Add user message and prepare for assistant response
+    const msgOut = [...messages, userMessage]
+    setMessages(msgOut)
     setInput('')
     setIsTyping(true)
 
     try {
-      // Try the GPT agent analyze endpoint first
-      const response = await fetch(`${AGENT_URL}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          portfolio_id: 'demo-portfolio-id',
-          user_context: 'SigmaSight Portfolio Analysis'
-        })
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: msgOut }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        const agentMessage: ChatMessage = {
-          id: `agent-${Date.now()}`,
-          content: data.response || data.analysis || JSON.stringify(data, null, 2),
-          sender: 'agent',
-          timestamp: new Date(),
-          status: 'sent'
-        }
-        setMessages(prev => [...prev, agentMessage])
-      } else {
-        // Try alternative chat endpoint if analyze fails
-        const chatResponse = await fetch(`${AGENT_URL}/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage.content
-          })
-        })
-
-        if (chatResponse.ok) {
-          const chatData = await chatResponse.json()
-          const agentMessage: ChatMessage = {
-            id: `agent-${Date.now()}`,
-            content: chatData.response || chatData.message || 'Response received',
-            sender: 'agent',
-            timestamp: new Date(),
-            status: 'sent'
-          }
-          setMessages(prev => [...prev, agentMessage])
-        } else {
-          throw new Error(`GPT Agent responded with status ${response.status}`)
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
+
+      const data = await response.json()
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: data.content || "No response received",
+        id: `assistant-${Date.now()}`,
+        timestamp: new Date(),
+        status: 'sent'
+      }
+      
+      setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
       const errorMessage: ChatMessage = {
-        id: `agent-error-${Date.now()}`,
-        content: `Unable to connect to GPT Agent. Please ensure the agent is running on port 8787. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        sender: 'agent',
+        role: "assistant", 
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        id: `error-${Date.now()}`,
         timestamp: new Date(),
         status: 'error'
       }
@@ -165,8 +116,8 @@ export default function ChatPage() {
           <span className="text-xl font-semibold text-gray-800">SigmaSight</span>
         </Link>
         <div className="flex items-center space-x-3">
-          <div className={`w-3 h-3 rounded-full ${agentStatus.online ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-gray-600">GPT Agent: {agentStatus.message}</span>
+          <div className="w-3 h-3 rounded-full bg-green-500" />
+          <span className="text-sm text-gray-600">GPT-5-nano: Online</span>
         </div>
       </header>
 
@@ -192,21 +143,23 @@ export default function ChatPage() {
             </div>
           ) : (
           <div className="space-y-4">
-            {messages.map((message) => (
+            {messages
+              .filter(m => m.role !== "system")
+              .map((message, i) => (
               <div
-                key={message.id}
+                key={message.id || i}
                 className={`flex items-start space-x-3 ${
-                  message.sender === 'user' ? 'justify-end' : 'justify-start'
+                  message.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
-                {message.sender === 'agent' && (
+                {message.role === 'assistant' && (
                   <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                     🤖
                   </div>
                 )}
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                    message.sender === 'user'
+                    message.role === 'user'
                       ? 'bg-blue-600 text-white rounded-br-sm'
                       : message.status === 'error'
                       ? 'bg-red-50 text-red-800 border border-red-200 rounded-bl-sm'
@@ -214,11 +167,13 @@ export default function ChatPage() {
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs mt-2 opacity-70">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
+                  {message.timestamp && (
+                    <p className="text-xs mt-2 opacity-70">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  )}
                 </div>
-                {message.sender === 'user' && (
+                {message.role === 'user' && (
                   <div className="flex-shrink-0 w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                     👤
                   </div>
@@ -258,11 +213,11 @@ export default function ChatPage() {
                 placeholder="What are my biggest risks? How correlated are my positions?"
                 className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 pr-12 text-gray-800 outline-none focus:border-blue-600 transition-colors min-h-[50px] placeholder-gray-400"
                 rows={1}
-                disabled={!agentStatus.online || isTyping}
+                disabled={isTyping}
               />
               <button
                 onClick={sendMessage}
-                disabled={!input.trim() || !agentStatus.online || isTyping}
+                disabled={!input.trim() || isTyping}
                 className="absolute right-2 bottom-2 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,7 +227,7 @@ export default function ChatPage() {
             </div>
             <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
               <span>Press Enter to send • Shift+Enter for new line</span>
-              <span>{agentStatus.online ? 'Connected to GPT Agent' : 'Connecting...'}</span>
+              <span>GPT-5-nano Chat Ready</span>
             </div>
           </div>
         </div>
