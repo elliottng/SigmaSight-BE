@@ -19,13 +19,39 @@
 
 ## 2. Architecture & Sequence
 
+### 2.1 Service Separation Architecture
+
+**Design Principle:** The Agent module must be cleanly separable from the main backend, enabling future deployment as an independent microservice.
+
+```
+# Phase 1: Co-located (MVP)
+Frontend → Backend[/api/v1/chat/*] → Backend[/api/v1/data/*] → Database
+                     ↓
+                OpenAI API
+
+# Future: Separated microservice
+Frontend → Agent Service[:8001] → Backend[:8000]/api/v1/data/* → Database
+                ↓
+           OpenAI API
+```
+
+**Separation Rules:**
+1. **No direct database access** - Agent uses Raw Data APIs only
+2. **No shared models** - Agent has its own Pydantic schemas
+3. **HTTP-only communication** - Even when co-located, use HTTP clients
+4. **Independent config** - Separate settings module for Agent
+5. **Isolated dependencies** - Agent has minimal deps (openai, httpx, pydantic)
+
+### 2.2 Request Flow
+
 ```
 Frontend (Next.js) ──POST /chat/conversations────────▶ Backend (FastAPI)
 Frontend (Next.js) ──SSE POST /chat/send─────────────▶  ├─ Auth (verify JWT cookie)
-                                                        ├─ Compose prompt (mode)
-                                                        ├─ OpenAI Responses (GPT‑5; Agents SDK wrapper)
-                                                        │    ├─ Tool call → server‑side handler → Raw Data service
-                                                        │    └─ Code Interpreter (JSON only)
+                                                        ├─ Agent Module:
+                                                        │   ├─ Compose prompt (mode)
+                                                        │   ├─ OpenAI Responses (GPT‑5)
+                                                        │   ├─ Tool calls → HTTP → Raw Data APIs
+                                                        │   └─ Code Interpreter (JSON only)
                                                         └─ Stream SSE events back to FE
 ```
 
@@ -35,29 +61,54 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
 
 ## 3. Modules & Repo Layout
 
+### 3.1 Phase 1: Co-located Structure
 ```
 /backend/
-  src/sigmasight_api/
-    auth/                     # JWT login route
-    chat/
-      conversations.py        # POST /chat/conversations
-      send.py                 # POST /chat/send (SSE)
-    tools/                    # server-side tool handlers calling Raw Data services
-    services/raw_data/        # thin service layer over FastAPI or in-proc calls
-    prompts/                  # prompt files Blue/Green (copied from agent_pkg)
-    telemetry/
-/agent/
-  agent_pkg/
-    prompts/                  # versioned Markdown with YAML frontmatter
-    tools/                    # tool schema registry (names, JSON schemas)
-    orchestration/            # Agents SDK integration & dispatcher
-    memory/                   # session helpers (Conversations) & primer glue
-/shared/
-  clients/                    # typed clients (if agent splits later)
-  models/                     # Pydantic types for tool IO
-/frontend/
-  src/app/agent/              # chat page
-  src/components/chat/        # ChatContainer, MessageList, MessageInput, AgentMessage
+  app/
+    api/v1/
+      auth/                   # Existing JWT login routes
+      data/                   # Existing Raw Data APIs
+    agent/                    # ISOLATED AGENT MODULE
+      __init__.py
+      config.py               # Agent-specific settings (OpenAI keys, models)
+      router.py               # FastAPI router for /api/v1/chat/*
+      handlers/
+        conversations.py      # POST /chat/conversations handler
+        send.py              # POST /chat/send SSE handler
+      tools/
+        handlers.py          # Tool implementations (HTTP calls to Raw Data)
+        schemas.py           # OpenAI function definitions
+      prompts/
+        analyst_blue.md      # Blue mode prompt
+        analyst_green.md     # Green mode prompt
+      clients/
+        raw_data.py          # HTTP client for Raw Data APIs
+      models.py              # Agent-specific Pydantic models
+      logging.py             # Agent-specific logger with "agent." prefix
+```
+
+### 3.2 Future: Separated Service Structure
+```
+/agent-service/               # Completely separate repository/deployment
+  src/
+    main.py                   # FastAPI app entry point
+    config.py                 # Service configuration
+    auth.py                   # JWT validation (shared secret with backend)
+    handlers/
+      conversations.py
+      send.py
+    tools/
+      handlers.py            # HTTP calls to backend Raw Data APIs
+      schemas.py
+    prompts/
+      analyst_blue.md
+      analyst_green.md
+    clients/
+      backend_api.py         # Full HTTP client for backend APIs
+    models.py
+    logging.py
+  Dockerfile
+  requirements.txt            # Minimal: fastapi, openai, httpx, pydantic
 ```
 
 ---
@@ -83,7 +134,88 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
 
 ---
 
-## 5. Chat Endpoints (Backend)
+## 5. Service Separation Implementation Guidelines
+
+### 5.1 Development Practices
+
+**DO:**
+* Place all Agent code in `app/agent/` module
+* Use HTTP clients for ALL data access (even co-located)
+* Define Agent-specific Pydantic models (no SQLAlchemy imports)
+* Create separate config with `AGENT_` prefixed env vars
+* Use dependency injection for Raw Data API base URL
+* Write integration tests that mock Raw Data API responses
+
+**DON'T:**
+* Import from `app.models.*` (database models)
+* Import from `app.database` (DB session)
+* Import from `app.services.*` (business logic)
+* Share utility functions (copy what you need)
+* Access Redis/cache directly (use API endpoints)
+* Write to any database tables
+
+### 5.2 Authentication Flow
+
+**Co-located (Phase 1):**
+```python
+# Agent receives JWT from cookie/header
+# Validates using shared secret
+# Extracts user_id for API calls
+```
+
+**Separated (Future):**
+```python
+# Agent validates JWT with backend's public key
+# OR uses service-to-service token
+# Includes auth in Raw Data API calls
+```
+
+### 5.3 Configuration Management
+
+```python
+# backend/app/agent/config.py
+class AgentSettings(BaseSettings):
+    # OpenAI Configuration
+    OPENAI_API_KEY: str
+    OPENAI_MODEL_DEFAULT: str = "gpt-5"
+    OPENAI_MODEL_FALLBACK: str = "gpt-4o-mini"
+    
+    # Backend API Configuration
+    BACKEND_API_BASE_URL: str = "http://localhost:8000"  # Future: external URL
+    BACKEND_API_TIMEOUT: int = 30
+    
+    # Agent-specific
+    AGENT_CACHE_TTL: int = 600
+    AGENT_SSE_HEARTBEAT_MS: int = 15000
+    AGENT_MAX_CONVERSATION_LENGTH: int = 100
+    
+    class Config:
+        env_prefix = "AGENT_"  # All env vars prefixed with AGENT_
+
+agent_settings = AgentSettings()
+```
+
+### 5.4 Testing Strategy
+
+**Unit Tests:**
+* Mock OpenAI responses
+* Mock Raw Data API responses
+* Test prompt generation
+* Test tool handler logic
+
+**Integration Tests (Co-located):**
+* Start backend with test data
+* Agent makes real HTTP calls to localhost
+* Verify end-to-end flow
+
+**Integration Tests (Separated):**
+* Use docker-compose with backend + agent services
+* Test service-to-service auth
+* Test network failures/retries
+
+---
+
+## 6. Chat Endpoints (Backend)
 
 ### 5.1 `POST /chat/conversations`
 

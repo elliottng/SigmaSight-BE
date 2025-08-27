@@ -59,13 +59,51 @@ Users: 2 cofounders + \~10 beta testers. Target: Phase 1 functional prototype in
 
 ## 3) Architecture
 
+### 3.1 Service Separation Design
+
+The Agent is designed as a **separable service** that can be deployed either:
+1. **Co-located** (MVP): Runs within the main backend process
+2. **Standalone** (Future): Independent microservice with its own deployment
+
+```
+# MVP: Co-located deployment
+[Frontend] → [Backend + Agent Module] → [Database]
+                    ↓
+              [OpenAI API]
+
+# Future: Separated microservice
+[Frontend] → [Agent Service] → [Backend Raw Data APIs]
+                    ↓              ↓
+              [OpenAI API]     [Database]
+```
+
+### 3.2 Clean Separation Requirements
+
+**Service Boundaries:**
+* Agent communicates with backend ONLY through defined API contracts
+* No direct database access from Agent code (uses backend APIs)
+* No shared business logic or domain models
+* Separate configuration and secrets management
+* Independent logging and monitoring
+
+**Interface Contracts:**
+* Authentication: Standard JWT Bearer tokens or service-to-service auth
+* Data Access: HTTP calls to Raw Data API endpoints
+* Response Format: Standardized JSON schemas
+* Error Handling: Consistent HTTP status codes and error formats
+
+### 3.3 Current Architecture (Co-located MVP)
+
 ```
 [Next.js Frontend]
-   └── calls → [SigmaSight Backend /chat endpoints]
-                  ├─ verifies JWT (HTTP-only cookie)
-                  ├─ orchestrates OpenAI Responses (GPT‑5 default)
-                  ├─ executes server-side tool handlers → Raw Data APIs (sync)
-                  └─ streams events (SSE) → FE renders tokens, tool breadcrumbs, results
+   └── calls → [SigmaSight Backend]
+                  ├─ /api/v1/auth/* (existing)
+                  ├─ /api/v1/data/* (existing Raw Data APIs)
+                  └─ /api/v1/chat/* (NEW Agent module)
+                       ├─ verifies JWT (HTTP-only cookie)
+                       ├─ orchestrates OpenAI Responses (GPT‑5 default)
+                       ├─ executes tool handlers → calls Raw Data APIs
+                       └─ streams events (SSE) → FE renders tokens
 ```
 
 **Key decisions (locked):**
@@ -494,11 +532,17 @@ Rather than assuming which model works best for which task, Phase 3 implements c
 
 ### Phase 1: MVP Chat Agent (1 week sprint)
 
-**Backend (Days 1-3)**
+**Backend (Days 1-3) - With Service Separation in Mind**
 * ✅ Setup auth (POST login + HTTP‑only cookie) - COMPLETED
 * Day 1: Create `/chat/conversations`, `/chat/send` endpoints
-* Day 2: Register the six Raw Data tools; wire handlers
+  * Place in separate `app/agent/` module, not mixed with core backend
+  * Use dependency injection for Raw Data API clients
+* Day 2: Register the six Raw Data tools; wire handlers  
+  * Tool handlers make HTTP calls to Raw Data APIs (even when co-located)
+  * No direct database access or model imports
 * Day 3: Draft Analyst Blue/Green prompts; test streaming
+  * Separate configuration file for Agent-specific settings
+  * Independent logging with "agent." prefix
 
 **Frontend MVP (Days 4-5)**
 * Day 4: Minimal chat UI (single HTML/JS file if needed)

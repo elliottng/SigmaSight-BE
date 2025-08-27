@@ -24,11 +24,15 @@
 
 Implement a chat-based portfolio analysis agent that uses OpenAI's API with function calling to Raw Data endpoints and Code Interpreter for calculations. This requires new backend chat endpoints, enhancing Raw Data APIs, and tool handler implementations.
 
+**Architecture Requirement:**
+- **SERVICE SEPARATION**: Agent must be implemented as an isolated module that can be cleanly extracted into a standalone microservice. See PRD §3.1-3.2 and TDD §2.1 for separation requirements.
+
 **Critical Issues to Address:**
 - ✅ GPT-5 now available - use as default model (per OpenAI docs)
 - ✅ Raw Data APIs (6/6) return real data - need parameter enhancements only
 - Backend chat endpoints don't exist yet - need to implement
 - ✅ UTC ISO 8601 standardization COMPLETED (Phase 3)
+- ⚠️ Agent must use HTTP calls to Raw Data APIs (no direct DB access)
 
 ---
 
@@ -166,6 +170,46 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [ ] Consider truncating large tool outputs (store preview only)
   - [ ] Note: Skip PII redaction for prototype phase
 
+
+---
+
+## 🏗️ Service Separation Architecture (Throughout All Phases)
+
+### Isolation Requirements
+- [ ] **Create isolated Agent module structure**
+  ```
+  backend/app/agent/
+  ├── __init__.py
+  ├── config.py           # Agent-specific settings (AGENT_ prefix)
+  ├── router.py           # FastAPI router for /api/v1/chat/*
+  ├── handlers/           # Request handlers
+  ├── tools/              # Tool implementations
+  ├── clients/            # HTTP client for Raw Data APIs
+  ├── models.py           # Agent-specific Pydantic models
+  └── logging.py          # Agent-specific logger
+  ```
+
+### Development Rules
+- [ ] **NO direct database access**
+  - [ ] No imports from `app.models.*` (SQLAlchemy models)
+  - [ ] No imports from `app.database` (DB session)
+  - [ ] No imports from `app.services.*` (business logic)
+  - [ ] Use HTTP client for ALL data access
+
+- [ ] **Independent configuration**
+  - [ ] Create `AgentSettings` class with `AGENT_` prefix
+  - [ ] Separate OpenAI keys and settings
+  - [ ] Injectable backend API base URL
+
+- [ ] **HTTP-only communication**
+  - [ ] Create `RawDataClient` class using httpx
+  - [ ] Include auth headers in all requests
+  - [ ] Handle retries and timeouts
+
+- [ ] **Testing isolation**
+  - [ ] Unit tests mock all Raw Data API responses
+  - [ ] Integration tests use actual HTTP calls
+  - [ ] No database fixtures in Agent tests
 
 ---
 
