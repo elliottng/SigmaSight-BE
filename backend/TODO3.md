@@ -141,6 +141,129 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 #### Factor Data ✅
 - [x] **GET /api/v1/data/factors/etf-prices** - Factor ETF price data ✅ Mock implementation
   - [x] Return prices for 7-factor model ETFs ✅ Mock data for all 7
+
+### 3.0.2.1 Raw Data API Test Plan (2025-08-26)
+*Comprehensive testing against all 3 demo accounts to assess REAL data availability*
+
+#### Test Accounts
+1. **demo_individual@sigmasight.com** - Individual Investor Portfolio (16 positions)
+2. **demo_hnw@sigmasight.com** - High Net Worth Portfolio (17 positions)
+3. **demo_hedgefundstyle@sigmasight.com** - Hedge Fund Style Portfolio (30 positions)
+
+#### Test Objectives
+- Verify each endpoint returns REAL data, not mock/random values
+- Confirm data completeness for all positions
+- Identify any missing data fields
+- Test error handling and edge cases
+- Measure response times and data sizes
+
+#### Test Cases by Endpoint
+
+##### 1. GET /api/v1/data/portfolios
+- [ ] Returns all 3 portfolios for each demo user
+- [ ] Each portfolio has correct position count
+- [ ] Portfolio values are calculated from real market data
+- [ ] cash_balance is properly implemented (not hardcoded to 0)
+- [ ] Response includes all required fields per API spec
+
+##### 2. GET /api/v1/data/portfolios/{id}/positions
+- [ ] Returns correct number of positions for each portfolio
+- [ ] Position market values calculated from real prices
+- [ ] Greeks data present for options positions
+- [ ] P&L calculations based on real entry/current prices
+- [ ] Tags and strategy tags properly returned
+
+##### 3. GET /api/v1/data/portfolios/{id}/risk_metrics
+- [ ] Returns real calculated metrics, not placeholder values
+- [ ] Beta calculation uses real market correlation
+- [ ] Volatility based on actual price history
+- [ ] VaR and other metrics properly calculated
+- [ ] All risk metrics have reasonable values
+
+##### 4. GET /api/v1/data/portfolios/{id}/factor_exposures
+- [ ] Factor betas calculated from real regression analysis
+- [ ] All 7 factors have exposure values
+- [ ] Values are within reasonable ranges (-2 to +2)
+- [ ] Dollar exposures properly calculated
+- [ ] Confidence intervals included
+
+##### 5. GET /api/v1/data/prices/historical
+- [x] ✅ Endpoint returns 200 OK
+- [x] ✅ Returns data for all portfolio symbols  
+- [x] ✅ OHLCV data structure complete
+- [x] ✅ Covers 90+ days of data
+- [ ] ❌ **MOCK DATA** - prices clustered around 200-206 (not real)
+
+##### 6. GET /api/v1/data/prices/quotes
+- [ ] Returns current market prices from real source
+- [ ] Bid/ask spreads are realistic (not simulated)
+- [ ] Daily changes match market movements
+- [ ] Updates reflect real-time or near real-time data
+- [ ] All requested symbols have quotes
+
+##### 7. GET /api/v1/data/portfolios/{id}/exposures
+- [ ] Long/short exposures calculated correctly
+- [ ] Gross/net exposures match position sum
+- [ ] Sector exposures properly aggregated
+- [ ] Delta-adjusted exposures for options
+- [ ] All exposure types included
+
+##### 8. GET /api/v1/data/portfolios/{id}/complete
+- [ ] Comprehensive data package returned
+- [ ] All nested data structures populated
+- [ ] No null/missing critical fields
+- [ ] Data internally consistent
+- [ ] Suitable for LLM consumption (<150k tokens)
+
+#### Test Script Implementation
+```python
+# Location: scripts/test_raw_data_apis.py
+# Will test each endpoint for all 3 demo accounts
+# Generate detailed report of findings
+# Output: RAW_DATA_API_TEST_RESULTS.md
+```
+
+#### Test Results Summary (2025-08-26 17:17)
+✅ **All 6 /data/ endpoints return 200 OK responses**
+- All endpoints are technically functional
+- Response times: 13-110ms (good performance)
+- Data sizes: 961 bytes to 477KB
+
+⚠️ **Data Quality Issues Confirmed:**
+1. **Historical Prices**: Appear to be MOCK data (all prices clustered around 200-206)
+2. **Market Quotes**: Limited to 3 symbols (AAPL, MSFT, GOOGL)
+3. **Factor ETF Prices**: Likely mock data (needs verification)
+4. **Cash Balance**: Not visible in test (needs manual check)
+
+### 3.0.2.2 Raw Data API Implementation Tasks
+*Based on test results, implement missing functionality with REAL data*
+
+#### Priority 1: Fix Critical Data Issues
+- [ ] Implement real cash_balance tracking (not hardcoded 0)
+- [ ] Replace mock historical prices with database/API data
+- [ ] Connect real-time quotes to actual market data provider
+- [ ] Fix factor ETF prices to use real data
+
+#### Priority 2: Complete Missing Calculations
+- [ ] Implement proper Greeks calculations for options
+- [ ] Calculate real correlation matrices
+- [ ] Generate actual VaR and stress test results
+- [ ] Compute proper beta values from price data
+
+#### Priority 3: Data Quality Improvements
+- [ ] Add data validation for all endpoints
+- [ ] Implement proper error handling
+- [ ] Add caching for expensive calculations
+- [ ] Optimize query performance
+
+#### Implementation Tracking
+- [ ] Create test script `test_raw_data_apis.py`
+- [ ] Run comprehensive tests against all demo accounts
+- [ ] Document findings in test results file
+- [ ] Fix mock data endpoints (historical, quotes, factor ETFs)
+- [ ] Implement missing calculations
+- [ ] Re-run tests to verify fixes
+- [ ] Update API_IMPLEMENTATION_STATUS.md with results
   - [x] Include returns calculations ✅ Returns included
   - [x] Provide model metadata ✅ Version & regression window
 

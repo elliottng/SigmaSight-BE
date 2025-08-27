@@ -11,7 +11,8 @@
       "Bash(PYTHONIOENCODING=utf-8 uv run python:*)",
       "Bash(rm:*)",
       "Bash(git reset:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(curl:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"
