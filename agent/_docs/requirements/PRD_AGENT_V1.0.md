@@ -272,28 +272,28 @@ data: {}
 
 Users can switch modes using `/mode <color>` command (e.g., `/mode green`, `/mode blue`).
 
-### 5.1 Green Mode (v001) - The Educator
+### 5.1 Green Mode (v001)
 
 * **Teaching-focused**: Step-by-step explanations with context
 * **Beginner-friendly**: Defines financial terms, explains calculations
 * **Verbose output**: Emphasizes clarity over brevity
 * **Example**: "Let me explain VaR: Value at Risk measures..."
 
-### 5.2 Blue Mode (v001) - The Quant
+### 5.2 Blue Mode (v001)
 
 * **Concise & technical**: Tables, numbers, minimal prose
 * **Professional audience**: Assumes financial knowledge
 * **Data-forward**: Bullet points, quick insights
 * **Example**: "VaR(95%): $1.2M | CVaR: $1.5M | Sharpe: 1.34"
 
-### 5.3 Indigo Mode (v001) - The Strategist
+### 5.3 Indigo Mode (v001)
 
 * **Big-picture analysis**: Market context, macro trends
 * **Narrative style**: Tells the story behind the numbers
 * **Forward-looking**: Emphasizes scenarios and implications
 * **Example**: "Given current Fed policy and sector rotation..."
 
-### 5.4 Violet Mode (v001) - The Risk Manager
+### 5.4 Violet Mode (v001)
 
 * **Risk-focused**: Emphasizes downside, stress scenarios
 * **Conservative tone**: Highlights concerns and hedges

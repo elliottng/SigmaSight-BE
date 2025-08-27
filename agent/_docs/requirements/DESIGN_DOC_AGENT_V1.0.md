@@ -79,10 +79,10 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
         handlers.py          # Tool implementations (HTTP calls to Raw Data)
         schemas.py           # OpenAI function definitions
       prompts/
-        green.md             # Green mode - The Educator
-        blue.md              # Blue mode - The Quant
-        indigo.md            # Indigo mode - The Strategist
-        violet.md            # Violet mode - The Risk Manager
+        green.md             # Green mode (teaching-focused)
+        blue.md              # Blue mode (concise/technical)
+        indigo.md            # Indigo mode (strategic/narrative)
+        violet.md            # Violet mode (risk-focused)
       clients/
         raw_data.py          # HTTP client for Raw Data APIs
       models.py              # Agent-specific Pydantic models
@@ -474,10 +474,10 @@ If the backend exposes a different/extended mapping at runtime, tool handlers mu
 **Location:** `agent/agent_pkg/prompts/`
 
 ### 9.1 Mode Files
-- `green_v001.md` - The Educator (verbose, teaching-focused)
-- `blue_v001.md` - The Quant (concise, data-forward)
-- `indigo_v001.md` - The Strategist (narrative, macro-focused)
-- `violet_v001.md` - The Risk Manager (conservative, risk-focused)
+- `green_v001.md` - Teaching-focused, verbose explanations
+- `blue_v001.md` - Concise, quantitative, data-forward
+- `indigo_v001.md` - Strategic narrative, macro-focused
+- `violet_v001.md` - Conservative, risk-focused analysis
 
 ### 9.2 Mode Switching
 - User command: `/mode <color>` (e.g., `/mode green`)
@@ -488,7 +488,7 @@ If the backend exposes a different/extended mapping at runtime, tool handlers mu
 ```yaml
 id: green
 version: v001
-mode: Green - The Educator
+mode: Green
 persona: Teaching-focused financial analyst
 owner: agent-team
 change_notes: "Initial"

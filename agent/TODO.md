@@ -529,20 +529,20 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 - [ ] **agent/agent_pkg/prompts/**
   ```
   agent/agent_pkg/prompts/
-  ├── green_v001.md       # The Educator (default)
-  ├── blue_v001.md        # The Quant
-  ├── indigo_v001.md      # The Strategist
-  ├── violet_v001.md      # The Risk Manager
+  ├── green_v001.md       # Teaching-focused (default)
+  ├── blue_v001.md        # Concise/quantitative
+  ├── indigo_v001.md      # Strategic/narrative
+  ├── violet_v001.md      # Risk-focused
   └── common_instructions.md
   ```
 
-### 4.2 Green Mode - The Educator
+### 4.2 Green Mode
 - [ ] **Create green_v001.md**
   ```yaml
   ---
   id: green
   version: v001
-  mode: Green - The Educator
+  mode: Green
   persona: Teaching-focused financial analyst
   token_budget: 2000
   ---
@@ -555,13 +555,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - Include "as of" timestamps
   ```
 
-### 4.3 Blue Mode - The Quant
+### 4.3 Blue Mode
 - [ ] **Create blue_v001.md**
   ```yaml
   ---
   id: blue
   version: v001
-  mode: Blue - The Quant
+  mode: Blue
   persona: Quantitative analyst
   token_budget: 1500
   ---
@@ -574,13 +574,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - Minimal explanations
   ```
 
-### 4.4 Indigo Mode - The Strategist
+### 4.4 Indigo Mode
 - [ ] **Create indigo_v001.md**
   ```yaml
   ---
   id: indigo
   version: v001
-  mode: Indigo - The Strategist
+  mode: Indigo
   persona: Strategic investment analyst
   token_budget: 1800
   ---
@@ -593,13 +593,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - Strategic recommendations
   ```
 
-### 4.5 Violet Mode - The Risk Manager
+### 4.5 Violet Mode
 - [ ] **Create violet_v001.md**
   ```yaml
   ---
   id: violet
   version: v001
-  mode: Violet - The Risk Manager
+  mode: Violet
   persona: Conservative risk analyst
   token_budget: 1700
   ---
