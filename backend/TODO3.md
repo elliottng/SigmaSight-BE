@@ -660,100 +660,144 @@ return standardize_datetime_dict(response)
 
 ---
 
-## Phase 4: Advanced Features & Frontend Integration (Future)
+## Phase 4: Additional Features
 
-### 4.0.1 Change Authentication to Cookie-based (from JWT Bearer) 🔄 **PRIORITY**
-*Simplify authentication before Agent implementation - switch from Bearer tokens to HTTP-only cookies*
+### 4.0.1 Dual Authentication Strategy (JWT Bearer + HTTP-only Cookies) 🔄 **PRIORITY**
+*Support both Bearer tokens AND cookies for maximum flexibility - critical for Agent SSE implementation*
 
-**Added:** 2025-08-27 | **Timeline:** 1-2 hours | **Risk:** Very Low
+**Added:** 2025-08-27 | **Timeline:** 1-2 hours | **Risk:** Very Low | **Status:** Plan of Record
 
-#### Rationale for Change
-Currently using JWT Bearer tokens (Authorization header), but switching to cookie-based auth because:
-1. **SSE Support**: Server-Sent Events (required for Agent chat) work seamlessly with cookies (automatic attachment)
-2. **Security**: HTTP-only cookies prevent XSS token theft (tokens can't be accessed via JavaScript)
-3. **Simplicity**: No token management code in frontend, works automatically with all requests
-4. **Zero Users**: No backward compatibility needed - perfect time to make the change
-5. **Industry Standard**: Most chat applications (ChatGPT, Slack web, Discord) use cookies for web clients
+> **CANONICAL DECISION**: This is the authentication plan for the entire project. Referenced by `/agent/TODO.md`.
+
+#### Rationale for Dual Authentication
+
+We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
+
+1. **SSE Requirements**: Server-Sent Events (required for Agent chat) work poorly with Authorization headers but seamlessly with cookies (automatic attachment)
+2. **API Best Practices**: Bearer tokens are industry standard for REST APIs - clean, explicit, testable
+3. **Developer Experience**: Bearer tokens are easier for testing (curl, Postman), debugging, and API integrations
+4. **Future Flexibility**: Mobile/desktop apps need Bearer tokens (cookies don't work in native apps)
+5. **Security Benefits**: Both are secure when implemented correctly - Bearer in memory/sessionStorage, cookies as HTTP-only
+6. **No Existing Clients**: We can implement both correctly from the start without migration complexity
+
+#### Why NOT Cookie-Only
+- **CORS Complexity**: Cookies require credentials:'include' and careful CORS configuration
+- **Testing Friction**: Hard to test with curl/Postman without browser-like cookie management
+- **API Integration**: Future partners/tools expect Bearer token auth
+- **Mobile Apps**: iOS/Android apps can't effectively use cookies
+
+#### Why NOT Bearer-Only
+- **SSE Limitation**: EventSource API doesn't support custom headers (Authorization)
+- **WebSocket Issues**: Similar header limitations for future real-time features
+- **Auto-attach**: Cookies automatically sent with every request (including SSE)
 
 #### Implementation Plan
 
-##### Step 1: Modify Login Endpoint (~10 min)
+##### Step 1: Modify Login Endpoint (~15 min)
 - [ ] **Update `app/api/v1/auth.py` login function**:
-  - [ ] Keep generating JWT token as before
-  - [ ] Add cookie to response:
+  - [ ] Keep returning JWT token in response body (existing behavior)
+  - [ ] ALSO set JWT as HTTP-only cookie:
     ```python
+    response = JSONResponse(content={
+        "access_token": token,
+        "token_type": "bearer"
+    })
     response.set_cookie(
         key="auth_token",
-        value=token_data["access_token"],
+        value=token,
         httponly=True,
         samesite="lax",
         secure=settings.ENVIRONMENT == "production",
         max_age=86400  # 24 hours
     )
+    return response
     ```
-  - [ ] Still return token in body for now (will remove after testing)
+  - [ ] Document that both auth methods are now available
 
-##### Step 2: Update Authentication Dependency (~15 min)
+##### Step 2: Update Authentication Dependency (~20 min)
 - [ ] **Modify `app/core/dependencies.py` get_current_user function**:
   - [ ] Import `Cookie` from fastapi
-  - [ ] Change from HTTPBearer to cookie:
+  - [ ] Support BOTH authentication methods:
     ```python
     async def get_current_user(
-        auth_token: str = Cookie(None),
+        bearer: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+        auth_cookie: Optional[str] = Cookie(None, alias="auth_token"),
         db: AsyncSession = Depends(get_db)
     ) -> CurrentUser:
+        # Try Bearer token first (preferred for regular API calls)
+        token = None
+        if bearer and bearer.credentials:
+            token = bearer.credentials
+        # Fall back to cookie (needed for SSE)
+        elif auth_cookie:
+            token = auth_cookie
+        else:
+            raise HTTPException(401, "No valid authentication provided")
+        
+        # Same JWT verification logic regardless of source
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            # ... rest of verification logic
+        except JWTError:
+            raise HTTPException(401, "Invalid authentication token")
     ```
-  - [ ] Use same JWT verification logic, just different source
-  - [ ] Return 401 if cookie missing or invalid
+  - [ ] Update error messages to mention both auth methods
+  - [ ] Add logging to track which auth method is being used
 
-##### Step 3: Test All Endpoints (~20 min)
-- [ ] Test login sets cookie correctly
-- [ ] Test protected endpoints work with cookie auth:
-  - [ ] `/api/v1/data/portfolios`
-  - [ ] `/api/v1/data/portfolio/{id}/complete`
-  - [ ] `/api/v1/data/positions/details`
-- [ ] Verify Swagger/docs still work (may need cookie auth support)
+##### Step 3: Test Both Authentication Methods (~20 min)
+- [ ] **Test Bearer token auth (existing)**:
+  - [ ] Verify login returns token in response body
+  - [ ] Test protected endpoints with Authorization header:
+    ```bash
+    curl -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/data/portfolios
+    ```
+- [ ] **Test cookie auth (new)**:
+  - [ ] Verify login sets auth_token cookie
+  - [ ] Test protected endpoints with cookie:
+    ```bash
+    # Login and save cookie
+    curl -c cookies.txt -X POST localhost:8000/api/v1/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"demo_individual@sigmasight.com","password":"demo12345"}'
+    
+    # Use cookie for protected endpoint
+    curl -b cookies.txt localhost:8000/api/v1/data/portfolios
+    ```
+- [ ] **Test precedence**:
+  - [ ] Verify Bearer token takes precedence when both provided
+  - [ ] Verify fallback to cookie when no Bearer token
+- [ ] Verify Swagger/docs work with both auth methods
 
-##### Step 4: Clean Up Bearer Token Code (~10 min)
-- [ ] **Remove HTTPBearer dependencies**:
-  - [ ] Remove `from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials`
-  - [ ] Remove `security = HTTPBearer()` 
-  - [ ] Clean up unused imports
-- [ ] **Update login response**:
-  - [ ] Remove token from response body (only set cookie)
-  - [ ] Return simple success message: `{"message": "Login successful"}`
-
-##### Step 5: Update Documentation (~15 min)
+##### Step 4: Update Documentation (~15 min)
 - [ ] **Update API documentation**:
-  - [ ] Update `API_IMPLEMENTATION_STATUS.md` auth section
-  - [ ] Update any auth examples in README.md
-- [ ] **Update CLAUDE.md**:
-  - [ ] Note cookie-based auth
-  - [ ] Update testing examples to use cookies
-- [ ] **Update Agent docs**:
-  - [ ] Update `agent/CLAUDE.md` to remove dual auth notes
-  - [ ] Update `agent/_docs/requirements/DESIGN_DOC_AGENT_V1.0.md` Section 11
-  - [ ] Update `agent/TODO.md` to remove dual auth tasks
+  - [ ] Update `API_IMPLEMENTATION_STATUS.md` to note dual auth support
+  - [ ] Document both auth methods in README
+- [ ] **Update backend CLAUDE.md**:
+  - [ ] Document dual auth strategy
+  - [ ] Provide testing examples for both methods
+- [ ] **Cross-reference with Agent docs**:
+  - [ ] Ensure `agent/TODO.md` references this as canonical auth decision
+  - [ ] Note that SSE endpoints will use cookie auth
 
-##### Step 6: Verify & Commit (~10 min)
+##### Step 5: Verify & Commit (~10 min)
 - [ ] Run full test suite: `uv run pytest`
-- [ ] Test with curl using cookies:
-  ```bash
-  # Login and save cookie
-  curl -c cookies.txt -X POST localhost:8000/api/v1/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"email":"demo_individual@sigmasight.com","password":"demo12345"}'
-  
-  # Use cookie for protected endpoint
-  curl -b cookies.txt localhost:8000/api/v1/data/portfolios
-  ```
-- [ ] Commit with clear message about auth change
+- [ ] Test both auth methods thoroughly
+- [ ] Commit with message: "Implement dual authentication (Bearer + Cookie) for SSE support"
 
-#### Rollback Plan (if needed)
-1. Single git revert of the auth change commit
-2. No database changes to rollback
-3. No data migrations needed
-4. Instant restoration of Bearer token auth
+#### Benefits of This Approach
+1. **Zero Breaking Changes**: Existing Bearer token auth continues to work
+2. **SSE Ready**: Cookie auth enables Server-Sent Events for Agent
+3. **Best Practices**: Follows industry standards for both REST APIs and real-time features
+4. **Future Proof**: Ready for mobile apps (Bearer) and web features (cookies)
+5. **Developer Friendly**: Easy testing with curl/Postman using Bearer tokens
+
+#### Testing Matrix
+| Endpoint Type | Bearer Token | Cookie | Priority |
+|--------------|--------------|--------|----------|
+| Regular API  | ✅ Works     | ✅ Works | Bearer first |
+| SSE Endpoints| ❌ Can't attach | ✅ Works | Cookie only |
+| WebSockets   | ❌ Limited   | ✅ Works | Cookie only |
+| Mobile Apps  | ✅ Perfect   | ❌ N/A   | Bearer only |
 
 #### Benefits After Migration
 - ✅ SSE/WebSocket ready for Agent implementation

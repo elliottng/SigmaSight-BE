@@ -64,12 +64,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   SSE_HEARTBEAT_INTERVAL_MS=15000
   ```
 
-### 0.3 Update Auth to Support Cookies
-- [ ] **Modify /api/v1/auth/login endpoint**
-  - [ ] Keep returning JWT in response body (existing)
-  - [ ] Also set JWT as HTTP-only cookie (new)
-  - [ ] Cookie settings: SameSite=Lax, Secure (in production), 24h expiry
-  - [ ] This enables SSE to work without auth headers
+### 0.3 Implement Dual Authentication Support
+> **See canonical implementation plan**: `backend/TODO3.md` Section 4.0.1 - Dual Authentication Strategy
+> This is the plan of record for the entire project.
+
+- [ ] **Summary**: Implement dual auth (Bearer + Cookie) per backend/TODO3.md §4.0.1
+  - [ ] Rationale: SSE requires cookies, APIs work better with Bearer tokens
+  - [ ] No breaking changes - both methods will be supported
 
 ### 0.4 Database Schema Updates (via Alembic Migrations)
 - [ ] **Create SQLAlchemy models for conversation tables** (ref: TDD §18.2 for patterns)
@@ -249,10 +250,10 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 2.2 Implement Conversation Management
 - [ ] **POST /chat/conversations endpoint** (ref: TDD §5.1, PRD §7.1)
-  - [ ] Implement dual auth support (ref: TDD §11):
+  - [ ] Implement dual auth support (ref: backend/TODO3.md §4.0.1):
     - [ ] Accept existing Bearer token via HTTPBearer
     - [ ] Also accept JWT from HTTP-only cookie
-    - [ ] Modify/extend `get_current_user` dependency
+    - [ ] Use existing `get_current_user` dependency
   - [ ] Insert conversation row in database with our UUID as id
   - [ ] Return our UUID as conversation_id (canonical ID for frontend)
   - [ ] Store provider_thread_id if OpenAI creates one (optional)

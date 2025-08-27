@@ -14,7 +14,8 @@
       "Bash(git rm:*)",
       "Bash(curl:*)",
       "Bash(uv add:*)",
-      "Bash(python -m pytest tests/test_datetime_utils.py -v)"
+      "Bash(python -m pytest tests/test_datetime_utils.py -v)",
+      "Bash(git log:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Users\\BenBalbale\\CascadeProjects\\SigmaSight-BE"
