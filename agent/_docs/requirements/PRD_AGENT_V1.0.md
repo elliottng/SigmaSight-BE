@@ -13,7 +13,7 @@ Ship a **chat interface** where an Agent answers portfolio questions by combinin
 
   * **Function calling (tools) to Raw Data APIs only** (see §6 Tools & Schemas; sourced from `API_SPECIFICATIONS_V1.4.4.md`).
   * **Code Interpreter ON by default** for ad‑hoc calculations (operates on **JSON** returned by tools; CSV optional in future).
-  * **Modes:** **Analyst Blue** and **Analyst Green** (prompt variants for tone/strategy).
+  * **Modes:** **Green**, **Blue**, **Indigo**, **Violet** (four distinct analyst personalities).
   * **Read‑only** (no write ops).
 * **Phase 2:**
 
@@ -41,7 +41,7 @@ Users: 2 cofounders + \~10 beta testers. Target: Phase 1 functional prototype in
 * Implement **function calling** to **Raw Data** endpoints only.
 * **Enable Code Interpreter** by default (JSON inputs) for calculations/aggregations.
 * Provide **session memory** via Conversations and a small per‑user primer (cross‑session).
-* Support **two prompt modes**: Analyst Blue, Analyst Green.
+* Support **four prompt modes**: Green, Blue, Indigo, Violet.
 
 **Non‑Goals**
 
@@ -143,7 +143,7 @@ The Agent is designed as a **separable service** that can be deployed either:
 * **Message Input**
   * Single-line text input (or basic textarea)
   * Send button
-  * Mode toggle (Analyst Blue/Green)
+  * Mode toggle (Green/Blue/Indigo/Violet)
   * Disabled state during streaming
 
 * **Streaming**
@@ -270,22 +270,42 @@ data: {}
 
 ## 5) Prompts & Modes
 
-### 5.1 Analyst Blue (v001)
+Users can switch modes using `/mode <color>` command (e.g., `/mode green`, `/mode blue`).
 
-* Concise, quant‑forward; prefer tables and bullet rationales.
-* Use tools for factual data; use Code Interpreter for math/aggregation.
-* If data insufficient, **ask to narrow** (short, specific).
+### 5.1 Green Mode (v001) - The Educator
 
-### 5.2 Analyst Green (v001)
+* **Teaching-focused**: Step-by-step explanations with context
+* **Beginner-friendly**: Defines financial terms, explains calculations
+* **Verbose output**: Emphasizes clarity over brevity
+* **Example**: "Let me explain VaR: Value at Risk measures..."
 
-* Explanatory/teaching tone; step‑by‑step justification.
-* Same tool/CI rules; emphasize clarity over compactness.
+### 5.2 Blue Mode (v001) - The Quant
 
-**Shared guardrails**
+* **Concise & technical**: Tables, numbers, minimal prose
+* **Professional audience**: Assumes financial knowledge
+* **Data-forward**: Bullet points, quick insights
+* **Example**: "VaR(95%): $1.2M | CVaR: $1.5M | Sharpe: 1.34"
 
-* Never fabricate tickers/values; include “as‑of” when relevant.
-* State uncertainty when data is missing or ambiguous.
-* If caps are hit, propose narrower parameters.
+### 5.3 Indigo Mode (v001) - The Strategist
+
+* **Big-picture analysis**: Market context, macro trends
+* **Narrative style**: Tells the story behind the numbers
+* **Forward-looking**: Emphasizes scenarios and implications
+* **Example**: "Given current Fed policy and sector rotation..."
+
+### 5.4 Violet Mode (v001) - The Risk Manager
+
+* **Risk-focused**: Emphasizes downside, stress scenarios
+* **Conservative tone**: Highlights concerns and hedges
+* **Compliance-minded**: Includes disclaimers, assumptions
+* **Example**: "WARNING: Concentration risk detected. Top 3 positions = 45% of portfolio"
+
+**Shared Guardrails (All Modes)**
+
+* Never fabricate tickers/values; include "as-of" timestamps
+* State uncertainty when data is missing or ambiguous
+* If caps are hit, propose narrower parameters
+* Use tools for factual data; Code Interpreter for calculations
 
 ---
 
@@ -540,7 +560,7 @@ Rather than assuming which model works best for which task, Phase 3 implements c
 * Day 2: Register the six Raw Data tools; wire handlers  
   * Tool handlers make HTTP calls to Raw Data APIs (even when co-located)
   * No direct database access or model imports
-* Day 3: Draft Analyst Blue/Green prompts; test streaming
+* Day 3: Draft Green/Blue/Indigo/Violet prompts; test streaming
   * Separate configuration file for Agent-specific settings
   * Independent logging with "agent." prefix
 
@@ -550,7 +570,7 @@ Rather than assuming which model works best for which task, Phase 3 implements c
   * Display streaming text
   * Send button and input field
 * Day 5: Polish and testing
-  * Mode toggle (Blue/Green)
+  * Mode switcher (Green/Blue/Indigo/Violet)
   * Basic markdown rendering
   * "Thinking..." during tool calls
 

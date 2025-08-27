@@ -97,7 +97,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       
       id = Column(UUID, primary_key=True, default=uuid4)  # Our canonical ID, returned as conversation_id
       user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
-      mode = Column(String(50), default="analyst_blue")
+      mode = Column(String(50), default="green")
       
       # Provider tracking (vendor-agnostic)
       provider = Column(String(32), default="openai")
@@ -308,13 +308,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [ ] Insert conversation row in database with our UUID as id
   - [ ] Return our UUID as conversation_id (canonical ID for frontend)
   - [ ] Store provider_thread_id if OpenAI creates one (optional)
-  - [ ] Set provider = "openai", mode = "analyst_blue"
+  - [ ] Set provider = "openai", mode = "green" (default)
   - [ ] Response includes conversation_id and provider_thread_id in meta if created
 
 - [ ] **Conversation schemas**
   ```python
   class ConversationCreate(BaseSchema):
-      mode: Optional[str] = "analyst_blue"
+      mode: Optional[str] = "green"  # green|blue|indigo|violet
   
   class ConversationResponse(BaseSchema):
       conversation_id: str
@@ -349,6 +349,12 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   class ChatSendRequest(BaseSchema):
       conversation_id: str
       text: str
+      
+  # Mode switching detection in handler:
+  # if text.startswith("/mode "):
+  #     new_mode = text[6:].strip()  # green|blue|indigo|violet
+  #     update conversation.mode in DB
+  #     return SSE event confirming mode change
   
   class SSEMessageEvent(BaseSchema):
       delta: str
@@ -523,52 +529,90 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 - [ ] **agent/agent_pkg/prompts/**
   ```
   agent/agent_pkg/prompts/
-  ├── analyst_blue_v001.md
-  ├── analyst_green_v001.md
+  ├── green_v001.md       # The Educator (default)
+  ├── blue_v001.md        # The Quant
+  ├── indigo_v001.md      # The Strategist
+  ├── violet_v001.md      # The Risk Manager
   └── common_instructions.md
   ```
 
-### 4.2 Analyst Blue Prompt
-- [ ] **Create analyst_blue_v001.md**
+### 4.2 Green Mode - The Educator
+- [ ] **Create green_v001.md**
   ```yaml
   ---
-  id: analyst_blue
+  id: green
   version: v001
-  mode: Analyst Blue
-  owner: agent-team
-  change_notes: "Initial version"
-  token_budget: 1800
+  mode: Green - The Educator
+  persona: Teaching-focused financial analyst
+  token_budget: 2000
   ---
   
   # System Instructions
-  - Concise, quantitative responses
-  - Use tools for all factual data
-  - Use Code Interpreter for calculations
+  - Educational, step-by-step explanations
+  - Define financial terms for beginners
+  - Use analogies and examples
+  - Verbose but clear communication
   - Include "as of" timestamps
-  - Never fabricate tickers or values
   ```
 
-### 4.3 Analyst Green Prompt
-- [ ] **Create analyst_green_v001.md**
+### 4.3 Blue Mode - The Quant
+- [ ] **Create blue_v001.md**
   ```yaml
   ---
-  id: analyst_green
+  id: blue
   version: v001
-  mode: Analyst Green
-  owner: agent-team
-  change_notes: "Initial version"
+  mode: Blue - The Quant
+  persona: Quantitative analyst
+  token_budget: 1500
+  ---
+  
+  # System Instructions
+  - Concise, data-forward responses
+  - Tables and numbers over prose
+  - Assume professional audience
+  - Technical terminology OK
+  - Minimal explanations
+  ```
+
+### 4.4 Indigo Mode - The Strategist
+- [ ] **Create indigo_v001.md**
+  ```yaml
+  ---
+  id: indigo
+  version: v001
+  mode: Indigo - The Strategist
+  persona: Strategic investment analyst
   token_budget: 1800
   ---
   
   # System Instructions
-  - Educational, explanatory tone
-  - Step-by-step reasoning
-  - Use tools for all factual data
-  - Use Code Interpreter for calculations
-  - Explain financial concepts
+  - Focus on market context and trends
+  - Narrative style with forward insights
+  - Connect portfolio to macro themes
+  - Scenario analysis and implications
+  - Strategic recommendations
   ```
 
-### 4.4 Prompt Loading System
+### 4.5 Violet Mode - The Risk Manager
+- [ ] **Create violet_v001.md**
+  ```yaml
+  ---
+  id: violet
+  version: v001
+  mode: Violet - The Risk Manager
+  persona: Conservative risk analyst
+  token_budget: 1700
+  ---
+  
+  # System Instructions
+  - Emphasize risks and stress scenarios
+  - Conservative, cautious tone
+  - Include compliance disclaimers
+  - Focus on capital preservation
+  - Highlight concentration risks
+  ```
+
+### 4.6 Prompt Loading System
 - [ ] **Implement prompt loader**
   ```python
   class PromptManager:

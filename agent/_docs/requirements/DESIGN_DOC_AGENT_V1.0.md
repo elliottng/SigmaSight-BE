@@ -9,7 +9,7 @@
 
 ## 1. Overview & Scope
 
-**Goal (Phase 1):** Ship a chat interface where an Agent answers portfolio questions using **function calling to Raw Data APIs** and **Code Interpreter** for calculations. No writes. Two prompt modes: **Analyst Blue** and **Analyst Green**.
+**Goal (Phase 1):** Ship a chat interface where an Agent answers portfolio questions using **function calling to Raw Data APIs** and **Code Interpreter** for calculations. No writes. Four prompt modes: **Green**, **Blue**, **Indigo**, **Violet**.
 
 **Out of scope (Phase 1):** Calculation‑engine tools, file uploads, conversation sharing, dashboard integration, long‑term memory beyond session, pagination (we use hard caps + truncation metadata).
 
@@ -79,8 +79,10 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
         handlers.py          # Tool implementations (HTTP calls to Raw Data)
         schemas.py           # OpenAI function definitions
       prompts/
-        analyst_blue.md      # Blue mode prompt
-        analyst_green.md     # Green mode prompt
+        green.md             # Green mode - The Educator
+        blue.md              # Blue mode - The Quant
+        indigo.md            # Indigo mode - The Strategist
+        violet.md            # Violet mode - The Risk Manager
       clients/
         raw_data.py          # HTTP client for Raw Data APIs
       models.py              # Agent-specific Pydantic models
@@ -101,8 +103,10 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
       handlers.py            # HTTP calls to backend Raw Data APIs
       schemas.py
     prompts/
-      analyst_blue.md
-      analyst_green.md
+      green.md
+      blue.md
+      indigo.md
+      violet.md
     clients/
       backend_api.py         # Full HTTP client for backend APIs
     models.py
@@ -233,7 +237,7 @@ agent_settings = AgentSettings()
 
 ## 6. Orchestration (Responses + Agents SDK)
 
-- **Agents SDK** provides a thin wrapper: registers **prompt modes** (Blue/Green), **tool registry**, and the run loop with retries.
+- **Agents SDK** provides a thin wrapper: registers **prompt modes** (Green/Blue/Indigo/Violet), **tool registry**, and the run loop with retries.
 - **We still call Responses API** under the hood; Conversations supply session memory.
 - **Server‑side tool handlers** are plain Python functions (see §7) that call Raw Data services (in‑proc or HTTP).
 
@@ -469,21 +473,32 @@ If the backend exposes a different/extended mapping at runtime, tool handlers mu
 
 **Location:** `agent/agent_pkg/prompts/`
 
-- Files: `analyst_blue_v001.md`, `analyst_green_v001.md`
-- **YAML frontmatter** requirements:
+### 9.1 Mode Files
+- `green_v001.md` - The Educator (verbose, teaching-focused)
+- `blue_v001.md` - The Quant (concise, data-forward)
+- `indigo_v001.md` - The Strategist (narrative, macro-focused)
+- `violet_v001.md` - The Risk Manager (conservative, risk-focused)
 
+### 9.2 Mode Switching
+- User command: `/mode <color>` (e.g., `/mode green`)
+- Default mode: `green` (most beginner-friendly)
+- Mode persists per conversation
+
+### 9.3 YAML Frontmatter
 ```yaml
-id: analyst_blue
+id: green
 version: v001
-mode: Analyst Blue
+mode: Green - The Educator
+persona: Teaching-focused financial analyst
 owner: agent-team
 change_notes: "Initial"
-token_budget: 1800
+token_budget: 2000  # Green uses more tokens for explanations
 ```
 
-- **Templating variables:** `{user_profile}`, `{as_of}`, `{caps}`.
-- **Guardrails (both modes):** Use tools for facts; use CI for math; include as‑of; never fabricate; propose narrower params when truncated.
-- **Telemetry:** Log `prompt_id`, `version`, `hash` per run.
+### 9.4 Common Elements
+- **Templating variables:** `{user_profile}`, `{as_of}`, `{caps}`
+- **Shared guardrails:** Use tools for facts; CI for math; include timestamps; never fabricate
+- **Telemetry:** Log `prompt_id`, `version`, `mode`, `hash` per run
 
 ---
 
