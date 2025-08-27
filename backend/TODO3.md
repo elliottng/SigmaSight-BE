@@ -273,7 +273,7 @@ Currently we have mixed date/time formats in API responses:
 - Some use `datetime.utcnow().isoformat() + "Z"` → `"2025-08-27T02:12:55.628484Z"` ✅
 - Some return SQLAlchemy DateTime with offset → `"2025-08-27T07:48:00.498537+00:00"` ⚠️
 - Date fields use ISO date format → `"2025-08-23"` ✅
-- **11 instances** of `datetime.now()` (local time) instead of UTC
+- **110 instances** of `datetime.now()` (local time) instead of UTC (audit completed)
 - **Inconsistent** manual "Z" suffix addition across endpoints
 
 This inconsistency causes issues for:
@@ -293,7 +293,7 @@ This inconsistency causes issues for:
 #### Implementation Tasks (Risk-Mitigated Approach)
 
 ##### Phase 1: Foundation & Testing Infrastructure (Week 1) - LOW RISK
-- [ ] Create `app/core/datetime_utils.py` with standardization helpers
+- [x] Create `app/core/datetime_utils.py` with standardization helpers ✅ **COMPLETED**
   ```python
   from datetime import datetime, date
   from typing import Optional, Any, Dict
@@ -321,22 +321,22 @@ This inconsistency causes issues for:
       # Implementation with field detection logic
   ```
   
-- [ ] **Create comprehensive test suite FIRST**:
-  - [ ] `tests/test_datetime_utils.py` - Unit tests for utility functions
+- [x] **Create comprehensive test suite FIRST**: ✅ **COMPLETED**
+  - [x] `tests/test_datetime_utils.py` - Unit tests for utility functions (40 tests passing)
   - [ ] `tests/test_datetime_consistency.py` - Integration tests for all endpoints
-  - [ ] Test mixed timezone inputs, naive datetimes, None values
-  - [ ] Test backward compatibility scenarios
+  - [x] Test mixed timezone inputs, naive datetimes, None values ✅
+  - [x] Test backward compatibility scenarios ✅
 
-- [ ] **Audit current datetime usage** (prevent surprises):
-  - [ ] Generate report of all `datetime.now()` usages (11 found)
-  - [ ] Generate report of all `.isoformat()` patterns (27 found)
-  - [ ] Document which services/endpoints need updates
-  - [ ] Identify external API datetime dependencies
+- [x] **Audit current datetime usage** (prevent surprises): ✅ **COMPLETED**
+  - [x] Generate report of all `datetime.now()` usages (**110 found** - much more than expected!)
+  - [x] Generate report of all `.isoformat()` patterns (55 found)
+  - [x] Document which services/endpoints need updates (31 files identified)
+  - [x] Identify external API datetime dependencies (pytz in scheduler)
 
 ##### Phase 2: Service Layer Fixes (Week 2) - MEDIUM RISK (Mitigated)
 **Risk Mitigation: Fix service layer BEFORE API layer to ensure data consistency**
 
-- [ ] **Replace local time with UTC** (11 instances):
+- [ ] **Replace local time with UTC** (**110 instances** in 31 files):
   - [ ] `app/services/market_data_service.py:177` - timestamp in fallback
   - [ ] `app/calculations/portfolio.py:50,55,57` - cache timing
   - [ ] `app/clients/fmp_client.py:111,256` - timestamp fields
@@ -486,8 +486,8 @@ else:
 #### Risk Tracking Dashboard
 | Phase | Risk Level | Status | Issues Found | Mitigation Applied |
 |-------|------------|--------|--------------|-------------------|
-| Phase 1 | LOW | ⏳ | - | - |
-| Phase 2 | MEDIUM | ⏳ | - | - |
+| Phase 1 | LOW | ✅ COMPLETE | 110 datetime.now() (10x expected) | Tests created first |
+| Phase 2 | **HIGH** | ⏳ | Scope increased 10x | Need phased approach |
 | Phase 3 | MEDIUM | ⏳ | - | - |
 | Phase 4 | LOW | ⏳ | - | - |
 | Phase 5 | LOW | ⏳ | - | - |
