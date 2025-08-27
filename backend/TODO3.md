@@ -349,62 +349,51 @@ This inconsistency causes issues for:
   - [x] Created migration script `migrate_datetime_now.py` ✅
   - [ ] Add linting rule to prevent future `datetime.now()` usage
 
-- [ ] **Fix calculation timestamp inconsistencies**:
-  - [ ] Standardize all `calculated_at` fields in calculations module
-  - [ ] Update batch processing timestamp handling
-  - [ ] Fix cache timestamp comparisons (use UTC)
+- [x] **Fix calculation timestamp inconsistencies**: ✅ **COMPLETED**
+  - [x] Standardize all `calculated_at` fields in calculations module ✅
+  - [x] Update batch processing timestamp handling ✅
+  - [x] Fix cache timestamp comparisons (use UTC) ✅
   
-- [ ] **Add service layer tests**:
-  - [ ] Test date comparisons work correctly with UTC
-  - [ ] Verify cache invalidation timing
-  - [ ] Test batch processing with UTC timestamps
+- [x] **Add service layer tests**: ✅ **COMPLETED**
+  - [x] Test date comparisons work correctly with UTC ✅
+  - [x] Verify cache invalidation timing ✅
+  - [x] Test batch processing with UTC timestamps ✅
 
-##### Phase 3: API Layer - Backward Compatible (Week 3) - MEDIUM RISK (Mitigated)
-**Risk Mitigation: Implement with feature flag and gradual rollout**
+##### Phase 3: Direct API Layer Migration (Week 3) - LOW RISK 
+**Updated Plan: No external clients = No backward compatibility needed** ✅
 
-- [ ] **Update Pydantic BaseSchema with compatibility**:
+- [ ] **Update Pydantic BaseSchema directly**:
   ```python
   # app/schemas/base.py
   from app.core.datetime_utils import to_utc_iso8601
-  from app.config import settings
   
   class BaseSchema(BaseModel):
       model_config = ConfigDict(
           json_encoders={
-              datetime: lambda v: (
-                  to_utc_iso8601(v) if settings.USE_ISO8601_STRICT 
-                  else v.isoformat() if v else None
-              ),
+              datetime: lambda v: to_utc_iso8601(v),
+              UUID: lambda v: str(v) if v else None,
           }
       )
   ```
 
-- [ ] **Add feature flag for gradual rollout**:
-  - [ ] `USE_ISO8601_STRICT=false` initially (backward compatible)
-  - [ ] Test with internal services first
-  - [ ] Monitor for client issues
-  - [ ] Gradually enable for specific endpoints
+- [ ] **Update /data/ Endpoints directly**:
+  - [ ] `/portfolio/{id}/complete` - Use to_utc_iso8601() for all timestamps
+  - [ ] `/portfolio/{id}/data-quality` - Standardize datetime fields
+  - [ ] `/positions/details` - Fix entry_date format
+  - [ ] `/prices/historical/{id}` - Ensure consistent date formats
+  - [ ] `/prices/quotes` - Standardize timestamp fields
+  - [ ] `/factors/etf-prices` - Fix updated_at format
 
-- [ ] **Update /data/ Endpoints with compatibility checks**:
-  - [ ] `/portfolio/{id}/complete` - Add version parameter
-  - [ ] `/portfolio/{id}/data-quality` - Support both formats temporarily
-  - [ ] `/positions/details` - Deprecation warning for old format
-  - [ ] `/prices/historical/{id}` - Version-aware responses
-  - [ ] `/prices/quotes` - Maintain backward compatibility
-  - [ ] `/factors/etf-prices` - Phased migration
+- [ ] **Remove manual "Z" suffix additions**:
+  - [ ] Search for `.isoformat() + "Z"` patterns
+  - [ ] Replace with standardized utility functions
+  - [ ] Ensure consistent formatting across all endpoints
 
-- [ ] **Client communication plan**:
-  - [ ] Document format changes in API docs
-  - [ ] Add deprecation warnings to responses
-  - [ ] Provide migration timeline (4 weeks)
-  - [ ] Create client migration guide
-
-##### Phase 4: Full Migration (Week 4) - LOW RISK
-- [ ] **Enable strict mode globally**:
-  - [ ] Set `USE_ISO8601_STRICT=true`
-  - [ ] Remove backward compatibility code
+##### Phase 4: Verification & Cleanup (Week 4) - LOW RISK
+- [ ] **Clean up redundant code**:
+  - [ ] Remove any `.isoformat() + "Z"` patterns
+  - [ ] Ensure all endpoints use standardized utilities
   - [ ] Update all API documentation
-  - [ ] Version bump API (if needed)
 
 - [ ] **Update remaining namespaces**:
   - [ ] Analytics endpoints (when implemented)
@@ -413,11 +402,11 @@ This inconsistency causes issues for:
   - [ ] System endpoints (when implemented)
 
 - [ ] **Database model enhancements**:
-  - [ ] Add UTC properties to all timestamp fields
+  - [ ] Add UTC properties to all timestamp fields (if needed)
   - [ ] Update all serialization methods
   - [ ] Ensure consistent timezone handling
 
-##### Phase 5: Verification & Monitoring (Week 5) - LOW RISK
+##### Phase 5: Final Verification (Week 5) - LOW RISK
 - [ ] **Comprehensive validation**:
   - [ ] Run full test suite against all endpoints
   - [ ] Validate with all 3 demo portfolios
@@ -436,30 +425,25 @@ This inconsistency causes issues for:
   - [ ] Add to CLAUDE.md best practices
   - [ ] Update AI_AGENT_REFERENCE.md
 
-#### Rollback Strategy (Risk Mitigation)
+#### Rollback Strategy (Simplified - No External Clients)
 
-##### Immediate Rollback (< 5 minutes)
-1. **Feature flag disable**: Set `USE_ISO8601_STRICT=false`
-2. **Cache clear**: Flush any cached responses
-3. **Alert clients**: Send notification of temporary revert
-
-##### Service Layer Rollback (< 30 minutes)
-1. **Git revert**: `git revert <commit-hash>` for service changes
+##### Git-based Rollback (< 10 minutes)
+1. **Git revert**: `git revert <commit-hash>` for any problematic changes
 2. **Redeploy**: Deploy previous version
 3. **Verify**: Run smoke tests on critical endpoints
 
-##### Full Rollback Plan
-1. **Database**: No rollback needed (no schema changes)
-2. **Services**: Revert to previous git tag
-3. **API**: Feature flag controls format
-4. **Monitoring**: Track error rates during rollback
+##### Why Rollback is Low Risk
+1. **Database**: No schema changes needed
+2. **No external clients**: Only internal systems affected
+3. **Atomic commits**: Each phase can be reverted independently
+4. **Comprehensive tests**: Issues caught before production
 
-#### Example Implementation Pattern
+#### Example Implementation Pattern (Direct Migration)
 ```python
 # In endpoint handlers:
 from app.core.datetime_utils import to_utc_iso8601, standardize_datetime_dict
 
-# Before returning response:
+# Simple approach - direct conversion:
 response = {
     "portfolio": {
         "id": str(portfolio.id),
@@ -473,11 +457,7 @@ response = {
 # Or for complex nested structures:
 return standardize_datetime_dict(response)
 
-# With feature flag:
-if settings.USE_ISO8601_STRICT:
-    return standardize_datetime_dict(response)
-else:
-    return response  # Old format for compatibility
+# No feature flags needed - direct migration
 ```
 
 #### Success Criteria & Metrics
@@ -493,16 +473,16 @@ else:
 |-------|------------|--------|--------------|-------------------|
 | Phase 1 | LOW | ✅ COMPLETE | 110 datetime.now() (10x expected) | Tests created first |
 | Phase 2 | **HIGH** | ✅ COMPLETE | 43 critical replacements done | Migration script used |
-| Phase 3 | MEDIUM | ⏳ | - | - |
+| Phase 3 | **LOW** | ⏳ | No clients = simplified plan | Direct migration OK |
 | Phase 4 | LOW | ⏳ | - | - |
 | Phase 5 | LOW | ⏳ | - | - |
 
 #### Notes
 - **Critical for Agent integration** (Phase 1 of Agent implementation)
 - **Risk assessment completed**: See UTC_ISO8601_RISK_ASSESSMENT.md
-- **Medium risk areas identified**: Service layer (11 datetime.now() instances) and API layer (client compatibility)
-- **Mitigation strategies in place**: Feature flags, phased rollout, comprehensive testing
-- **Rollback plan ready**: Can revert in < 5 minutes with feature flag
+- **Phase 2 completed**: 43 critical production instances replaced and tested
+- **Simplified Phase 3**: No external clients = no backward compatibility needed
+- **Direct migration approach**: Can implement standardization without feature flags
 
 #### Implementation Tracking
 - [ ] Create test script `test_raw_data_apis.py`
