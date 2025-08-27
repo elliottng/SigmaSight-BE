@@ -244,13 +244,13 @@ agent_settings = AgentSettings()
 
 ## 7. Function Tools — Raw Data (Phase 1)
 
-### 7.0 Agent-Specific Endpoints (Architectural Decision)
+### 7.0 Agent-Optimized Endpoints (Architectural Decision)
 
 **Problem:** Having tool handlers fetch data, apply business logic, and filter results creates a "leaky abstraction" where the Agent layer knows too much about portfolio logic.
 
-**Solution:** Create agent-specific API endpoints that encapsulate this business logic server-side:
+**Solution:** Create agent-optimized API endpoints that encapsulate this business logic server-side:
 
-1. **`/api/v1/data/agent/*`** - New namespace for agent-optimized endpoints
+1. **Enhanced `/api/v1/data/*` endpoints** - Agent-optimized parameters and responses
 2. **Pre-filtered responses** - Backend handles symbol selection, caps, truncation
 3. **Token-aware** - Endpoints designed to return <2k tokens per response
 4. **Clean tool handlers** - Tool handlers become simple pass-through proxies
@@ -388,7 +388,7 @@ Error (non‑200):
 
 ### 7.4 `get_prices_historical`
 
-**Maps to:** `GET /api/v1/data/agent/prices/historical/{portfolio_id}` ⚠️ **NEW ENDPOINT**\
+**Maps to:** `GET /api/v1/data/prices/historical/{portfolio_id}` ⚠️ **ENHANCED ENDPOINT**\
 **Input**
 
 ```json
@@ -409,10 +409,10 @@ Error (non‑200):
 **Limits:** `max_symbols=5`, `max_window_days=180`\
 **Output:** Per‑symbol series for top N symbols (by selection method)
 
-**Architecture Update:** This is now a **dedicated agent endpoint** that:
-1. Handles symbol selection logic server-side (no tool handler fetching)
-2. Returns pre-filtered data within token limits
-3. Includes selection metadata in response
+**Architecture Update:** This endpoint now includes **agent-optimized parameters** that:
+1. Handle symbol selection logic server-side (no tool handler fetching)
+2. Return pre-filtered data within token limits
+3. Include selection metadata in response
 4. Tool handler becomes a simple pass-through
 
 ### 7.5 `get_current_quotes`

@@ -89,7 +89,7 @@ The Agent is designed as a **separable service** that can be deployed either:
 
 **Interface Contracts:**
 * Authentication: Standard JWT Bearer tokens or service-to-service auth
-* Data Access: HTTP calls to **Agent-specific endpoints** (`/api/v1/data/agent/*`)
+* Data Access: HTTP calls to **enhanced data endpoints** (`/api/v1/data/*`)
 * Business Logic: Backend handles all filtering, selection, aggregation
 * Tool Handlers: Simple pass-through proxies (no data manipulation)
 * Response Format: Pre-optimized for LLM token limits (<2k tokens)
@@ -313,7 +313,7 @@ Users can switch modes using `/mode <color>` command (e.g., `/mode green`, `/mod
 
 ## 6) Tools & Schemas (Phase 1 — Agent-Optimized APIs)
 
-**Architecture Update:** Tools now call **agent-specific endpoints** (`/api/v1/data/agent/*`) that handle business logic server-side. Tool handlers are simple pass-through proxies with no data manipulation.
+**Architecture Update:** Tools call **enhanced data endpoints** (`/api/v1/data/*`) that handle business logic server-side. Tool handlers are simple pass-through proxies with no data manipulation.
 
 > **Backend-Enforced Caps:**
 > - Prices: Backend returns max 5 symbols (by value/weight)

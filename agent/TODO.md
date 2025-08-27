@@ -213,37 +213,38 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ---
 
-## 📋 Phase 1: Create Agent-Specific API Endpoints (Day 2-3)
+## 📋 Phase 1: Enhance Data API Endpoints for Agent Use (Day 2-3)
 
-> **ARCHITECTURE UPDATE**: Based on review feedback, we're creating dedicated agent endpoints
-> rather than having tool handlers apply business logic. This keeps the Agent layer clean.
+> **ARCHITECTURE UPDATE**: Based on review feedback, we're enhancing existing data endpoints
+> with agent-optimized parameters rather than having tool handlers apply business logic.
 > 
-> New endpoints will be under `/api/v1/data/agent/*` namespace and handle:
+> Enhanced endpoints at `/api/v1/data/*` will handle:
 > - Symbol selection logic (top N by value/weight)
 > - Token-aware response sizing
 > - Pre-filtered, capped responses
 > 
 > Reference: TDD §7.0 for architectural decision, §7.1-7.6 for tool specifications
 
-### 1.0 NEW Agent-Optimized Endpoints (Priority)
-- [ ] **GET /api/v1/data/agent/prices/historical/{portfolio_id}**
-  - [ ] Fetch portfolio positions internally
-  - [ ] Apply selection_method (top_by_value, top_by_weight)
+### 1.0 Enhanced Agent-Optimized Endpoints (Priority)
+- [ ] **GET /api/v1/data/prices/historical/{portfolio_id}** - Add agent parameters
+  - [ ] Add `max_symbols` parameter (default: 5, max: 5)
+  - [ ] Add `selection_method` (top_by_value, top_by_weight, all)
+  - [ ] Fetch portfolio positions internally when selection needed
   - [ ] Return max 5 symbols with price history
   - [ ] Include selection metadata in response
   - [ ] Token-aware response sizing (<2k tokens)
 
-- [ ] **GET /api/v1/data/agent/positions/{portfolio_id}**
+- [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
   - [ ] Pre-filter to top 50 positions by value
   - [ ] Include aggregated statistics
   - [ ] Optimize response for LLM consumption
 
-- [ ] **GET /api/v1/data/agent/portfolio/{portfolio_id}/summary**
+- [ ] **GET /api/v1/data/portfolio/{portfolio_id}/summary** - New endpoint
   - [ ] Condensed portfolio overview
   - [ ] Key metrics only
   - [ ] Designed for initial context setting
 
-### 1.1 Existing Endpoints - Keep for Raw Data Access
+### 1.1 Existing Endpoints - Enhance with Parameters
 - [x] **GET /api/v1/data/portfolio/{portfolio_id}/complete** 
   - ✅ Returns real portfolio data with positions
   - ✅ cash_balance calculated as 5% of portfolio
