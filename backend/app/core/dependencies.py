@@ -1,7 +1,7 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,16 +14,18 @@ from app.models.users import User
 from app.schemas.auth import CurrentUser
 from app.core.logging import auth_logger
 
-# HTTP Bearer token security scheme
-security = HTTPBearer()
+# HTTP Bearer token security scheme (with auto_error=False for dual auth)
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    auth_cookie: Optional[str] = Cookie(None, alias="auth_token"),
     db: AsyncSession = Depends(get_db)
 ) -> CurrentUser:
     """
-    Dependency to get the current authenticated user
+    Dependency to get the current authenticated user.
+    Supports dual authentication: Bearer token (preferred) or Cookie (fallback).
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,25 +33,46 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    # Try Bearer token first (preferred for regular API calls)
+    token = None
+    auth_method = None
+    
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+        auth_method = "bearer"
+        auth_logger.debug("Using Bearer token authentication")
+    # Fall back to cookie (needed for SSE)
+    elif auth_cookie:
+        token = auth_cookie
+        auth_method = "cookie"
+        auth_logger.debug("Using cookie authentication")
+    else:
+        auth_logger.warning("No valid authentication provided (neither Bearer nor cookie)")
+        raise credentials_exception
+    
     try:
-        # Verify and decode the JWT token
-        payload = verify_token(credentials.credentials)
+        # Verify and decode the JWT token (same logic regardless of source)
+        payload = verify_token(token)
         if payload is None:
+            auth_logger.warning(f"Token verification failed (auth method: {auth_method})")
             raise credentials_exception
         
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
+            auth_logger.warning(f"No subject in token (auth method: {auth_method})")
             raise credentials_exception
         
         # Convert string to UUID
         try:
             user_id = UUID(user_id_str)
         except ValueError:
-            auth_logger.warning(f"Invalid UUID format in token: {user_id_str}")
+            auth_logger.warning(f"Invalid UUID format in token: {user_id_str} (auth method: {auth_method})")
             raise credentials_exception
         
+    except HTTPException:
+        raise
     except Exception as e:
-        auth_logger.error(f"Token validation error: {e}")
+        auth_logger.error(f"Token validation error: {e} (auth method: {auth_method})")
         raise credentials_exception
     
     # Get user from database
@@ -68,6 +91,9 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Inactive user"
             )
+        
+        # Log successful authentication with method used
+        auth_logger.info(f"User authenticated successfully: {user.email} (method: {auth_method})")
         
         # Return CurrentUser schema
         return CurrentUser.model_validate(user)
@@ -99,17 +125,19 @@ async def get_current_active_user(
 # Optional user dependency (doesn't raise if no token)
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    auth_cookie: Optional[str] = Cookie(None, alias="auth_token"),
     db: AsyncSession = Depends(get_db)
 ) -> Optional[CurrentUser]:
     """
-    Optional dependency that returns None if no valid token is provided
+    Optional dependency that returns None if no valid token is provided.
+    Supports both Bearer token and cookie authentication.
     """
-    if credentials is None:
+    if not credentials and not auth_cookie:
         return None
     
     try:
-        # Reuse the existing logic but catch exceptions
-        return await get_current_user(credentials, db)
+        # Reuse the existing dual-auth logic but catch exceptions
+        return await get_current_user(credentials, auth_cookie, db)
     except HTTPException:
         return None
     except Exception:

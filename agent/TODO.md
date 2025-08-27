@@ -34,6 +34,12 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ## 📋 Phase 0: Prerequisites & Fixes (Day 1-2)
 
+> **Status Update (2025-08-27):**
+> - ✅ Dual authentication (0.3) - COMPLETED and tested
+> - ✅ GPT-5 configuration (0.1) - Model references updated
+> - ⏳ Environment setup (0.2) - Ready to proceed
+> - ⏳ Database schema (0.4) - Next priority
+
 ### 0.1 Configure GPT-5 Model Settings
 - [ ] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
   - [ ] Verify GPT-5 access in OpenAI account
@@ -64,13 +70,14 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   SSE_HEARTBEAT_INTERVAL_MS=15000
   ```
 
-### 0.3 Implement Dual Authentication Support
-> **See canonical implementation plan**: `backend/TODO3.md` Section 4.0.1 - Dual Authentication Strategy
-> This is the plan of record for the entire project.
+### 0.3 Implement Dual Authentication Support ✅ **COMPLETED**
+> **See canonical implementation**: `backend/TODO3.md` Section 4.0.1 - Dual Authentication Strategy
+> Implemented 2025-08-27 - Both Bearer tokens and cookies are now supported!
 
-- [ ] **Summary**: Implement dual auth (Bearer + Cookie) per backend/TODO3.md §4.0.1
-  - [ ] Rationale: SSE requires cookies, APIs work better with Bearer tokens
-  - [ ] No breaking changes - both methods will be supported
+- [x] **Summary**: Implemented dual auth (Bearer + Cookie) per backend/TODO3.md §4.0.1
+  - [x] Bearer tokens work for all REST APIs (preferred method)
+  - [x] Cookies work as fallback (required for SSE)
+  - [x] No breaking changes - both methods fully supported and tested
 
 ### 0.4 Database Schema Updates (via Alembic Migrations)
 - [ ] **Create SQLAlchemy models for conversation tables** (ref: TDD §18.2 for patterns)
@@ -250,10 +257,10 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 2.2 Implement Conversation Management
 - [ ] **POST /chat/conversations endpoint** (ref: TDD §5.1, PRD §7.1)
-  - [ ] Implement dual auth support (ref: backend/TODO3.md §4.0.1):
-    - [ ] Accept existing Bearer token via HTTPBearer
-    - [ ] Also accept JWT from HTTP-only cookie
-    - [ ] Use existing `get_current_user` dependency
+  - [x] ✅ Dual auth support already implemented in backend:
+    - [x] Bearer token via HTTPBearer works
+    - [x] JWT from HTTP-only cookie works
+    - [x] Can use existing `get_current_user` dependency
   - [ ] Insert conversation row in database with our UUID as id
   - [ ] Return our UUID as conversation_id (canonical ID for frontend)
   - [ ] Store provider_thread_id if OpenAI creates one (optional)

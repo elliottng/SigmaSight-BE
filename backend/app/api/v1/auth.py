@@ -1,7 +1,8 @@
 """
 Authentication API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import uuid4
@@ -12,13 +13,14 @@ from app.core.dependencies import get_current_user
 from app.models.users import User, Portfolio
 from app.schemas.auth import UserLogin, UserRegister, TokenResponse, UserResponse, CurrentUser
 from app.core.logging import auth_logger
+from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
 @router.post("/login")
 async def login(user_login: UserLogin, db: AsyncSession = Depends(get_db)):
-    """Authenticate user and return JWT token"""
+    """Authenticate user and return JWT token (in response body AND cookie)"""
     auth_logger.info(f"Login attempt for email: {user_login.email}")
     
     # Get user by email
@@ -47,16 +49,34 @@ async def login(user_login: UserLogin, db: AsyncSession = Depends(get_db)):
             detail="Incorrect email or password"
         )
     
-    # Create and return JWT token
+    # Create JWT token
     token_data = create_token_response(str(user.id), user.email)
     auth_logger.info(f"Login successful for user: {user.email}")
     
-    # Return simple token response (not TokenResponse schema which expects user field)
-    return {
+    # Create response with token in body (for existing clients)
+    response = JSONResponse(content={
         "access_token": token_data["access_token"],
         "token_type": token_data["token_type"],
         "expires_in": token_data["expires_in"]
-    }
+    })
+    
+    # ALSO set token as HTTP-only cookie (for SSE support)
+    # Convert expires_in (seconds) to max_age for cookie
+    max_age = token_data.get("expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    
+    response.set_cookie(
+        key="auth_token",
+        value=token_data["access_token"],
+        httponly=True,
+        samesite="lax" if settings.ENVIRONMENT != "production" else "none",
+        secure=settings.ENVIRONMENT == "production",
+        max_age=max_age,
+        domain=getattr(settings, "COOKIE_DOMAIN", None) if settings.ENVIRONMENT == "production" else None
+    )
+    
+    auth_logger.info(f"Set auth cookie for user: {user.email} (expires in {max_age}s)")
+    
+    return response
 
 
 @router.post("/register", response_model=UserResponse)
@@ -120,24 +140,55 @@ async def get_current_user_info(current_user: CurrentUser = Depends(get_current_
 
 @router.post("/refresh")
 async def refresh_token(current_user: CurrentUser = Depends(get_current_user)):
-    """Refresh JWT token (for V1, just return a new token)"""
+    """Refresh JWT token (returns new token in body AND cookie)"""
     auth_logger.info(f"Token refresh requested: {current_user.email}")
     
-    # For V1, we just create a new token with the same data
+    # Create a new token with the same data
     token_data = create_token_response(str(current_user.id), current_user.email)
     
-    return {
+    # Create response with token in body (for existing clients)
+    response = JSONResponse(content={
         "access_token": token_data["access_token"],
         "token_type": token_data["token_type"],
         "expires_in": token_data["expires_in"]
-    }
+    })
+    
+    # ALSO set token as HTTP-only cookie (for SSE support)
+    max_age = token_data.get("expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    
+    response.set_cookie(
+        key="auth_token",
+        value=token_data["access_token"],
+        httponly=True,
+        samesite="lax" if settings.ENVIRONMENT != "production" else "none",
+        secure=settings.ENVIRONMENT == "production",
+        max_age=max_age,
+        domain=getattr(settings, "COOKIE_DOMAIN", None) if settings.ENVIRONMENT == "production" else None
+    )
+    
+    auth_logger.info(f"Refreshed auth token for user: {current_user.email} (expires in {max_age}s)")
+    
+    return response
 
 
 @router.post("/logout")
-async def logout(current_user: CurrentUser = Depends(get_current_user)):
-    """Logout endpoint - invalidates session (client should discard token)"""
+async def logout(
+    response: Response,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Logout endpoint - clears auth cookie and instructs client to discard token"""
     auth_logger.info(f"Logout requested: {current_user.email}")
     
-    # For JWT-based auth, logout is handled client-side by discarding the token
-    # In V2, we could add token blacklisting if needed
+    # Clear the auth cookie
+    response.delete_cookie(
+        key="auth_token",
+        samesite="lax" if settings.ENVIRONMENT != "production" else "none",
+        secure=settings.ENVIRONMENT == "production",
+        domain=getattr(settings, "COOKIE_DOMAIN", None) if settings.ENVIRONMENT == "production" else None
+    )
+    
+    auth_logger.info(f"Cleared auth cookie for user: {current_user.email}")
+    
+    # Note: Client should also discard any stored Bearer tokens
+    # In a future version, we could implement token blacklisting
     return {"message": "Successfully logged out", "success": True}
