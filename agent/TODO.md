@@ -674,11 +674,45 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ---
 
-## 📋 Phase 5: Testing & Validation (Day 9-10)
+## 📋 Phase 5: API Documentation Sync (Ongoing)
+
+> **IMPORTANT**: As we implement and enhance endpoints, we track progress in agent/TODO.md
+> then update backend/_docs/requirements/API_SPECIFICATIONS_V1.4.4.md after completion.
+
+### 5.1 API Endpoint Cross-Reference (Per API_SPECIFICATIONS_V1.4.4.md)
+
+**Currently Documented Raw Data Endpoints:**
+- ✅ `GET /api/v1/data/portfolio/{portfolio_id}/complete` - Matches spec
+- ✅ `GET /api/v1/data/portfolio/{portfolio_id}/data-quality` - Matches spec
+- ✅ `GET /api/v1/data/positions/details` - Matches spec
+- ✅ `GET /api/v1/data/prices/historical/{portfolio_id}` - Needs enhancement per Agent requirements
+- ✅ `GET /api/v1/data/prices/quotes` - Matches spec
+- ✅ `GET /api/v1/data/factors/etf-prices` - Matches spec
+
+**New Endpoints to Add to API Spec (After Implementation):**
+- [ ] `GET /api/v1/data/positions/top/{portfolio_id}` - Top N positions by value
+- [ ] `GET /api/v1/data/portfolio/{portfolio_id}/summary` - Condensed overview
+
+**Enhancement Parameters to Document (After Implementation):**
+- [ ] `/prices/historical` - Add `max_symbols`, `selection_method` parameters
+- [ ] All endpoints - Add `meta` object with truncation info
+
+### 5.2 Documentation Update Checklist
+- [ ] **After each endpoint implementation:**
+  - [ ] Test endpoint thoroughly
+  - [ ] Update API_SPECIFICATIONS_V1.4.4.md with:
+    - [ ] New parameters
+    - [ ] Response schema changes
+    - [ ] Meta object structure
+    - [ ] Truncation behavior
+  - [ ] Increment version to 1.4.5
+  - [ ] Update implementation status percentage
+
+## 📋 Phase 6: Testing & Validation (Day 9-10)
 
 > Reference: TDD §14 (Testing), PRD §9 (Performance Targets), §13 (Golden Set)
 
-### 5.1 Unit Tests
+### 6.1 Unit Tests
 - [ ] **Test conversation management**
   - [ ] Conversation creation
   - [ ] Mode switching
