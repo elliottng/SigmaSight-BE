@@ -69,28 +69,36 @@ The Agent is designed as a **separable service** that can be deployed either:
 ```
 # MVP: Co-located deployment
 [Frontend] → [Backend + Agent Module] → [Database]
-                    ↓
-              [OpenAI API]
+                    ↓                      ├─ Backend tables (users, portfolios, positions)
+              [OpenAI API]                 └─ Agent tables (conversations, messages)
 
 # Future: Separated microservice
 [Frontend] → [Agent Service] → [Backend Raw Data APIs]
                     ↓              ↓
-              [OpenAI API]     [Database]
+              [OpenAI API]     [Backend DB]
+                    ↓
+              [Agent DB]
 ```
 
 ### 3.2 Clean Separation Requirements
 
+**Database Architecture:**
+* Agent owns its database schema with dedicated tables
+* Agent can directly create/manage conversation, message, preference tables
+* Agent MUST use APIs for all portfolio/market data (no access to backend tables)
+* Clear schema separation: `agent_*` tables vs core backend tables
+* When separated to microservice, Agent migrates its schema
+
 **Service Boundaries:**
-* Agent communicates with backend ONLY through defined API contracts
-* No direct database access from Agent code (uses backend APIs)
-* No shared business logic or domain models
+* No shared business logic or domain models between Agent and backend
 * Separate configuration and secrets management
 * Independent logging and monitoring
+* Agent never accesses users, portfolios, positions tables directly
 
 **Interface Contracts:**
 * Authentication: Standard JWT Bearer tokens or service-to-service auth
-* Data Access: HTTP calls to **enhanced data endpoints** (`/api/v1/data/*`)
-* Business Logic: Backend handles all filtering, selection, aggregation
+* Portfolio Data: HTTP calls to **enhanced data endpoints** (`/api/v1/data/*`)
+* Business Logic: Backend handles all portfolio filtering, selection, aggregation
 * Tool Handlers: Simple pass-through proxies (no data manipulation)
 * Response Format: Pre-optimized for LLM token limits (<2k tokens)
 

@@ -84,19 +84,21 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [x] No breaking changes - both methods fully supported and tested
 
 ### 0.4 Database Schema Updates (via Alembic Migrations)
-- [ ] **Create SQLAlchemy models for conversation tables** (ref: TDD §18.2 for patterns)
-  - [ ] Create `backend/app/models/conversations.py`
-  - [ ] Define `Conversation` model class
-  - [ ] Define `ConversationMessage` model class
-  - [ ] Import models in `app/models/__init__.py`
+- [ ] **Create Agent-specific SQLAlchemy models** (ref: TDD §18.2 for patterns)
+  - [ ] Create `backend/app/agent/models/` directory
+  - [ ] Create `backend/app/agent/models/conversations.py`
+  - [ ] Define `Conversation` model class (agent_conversations table)
+  - [ ] Define `Message` model class (agent_messages table)
+  - [ ] Create `backend/app/agent/models/preferences.py`
+  - [ ] Define `UserPreference` model (agent_user_preferences table)
 
-- [ ] **Conversation model schema**
+- [ ] **Conversation model schema** (Agent owns these tables!)
   ```python
   class Conversation(Base):
-      __tablename__ = "conversations"
+      __tablename__ = "agent_conversations"  # Note: agent_ prefix
       
       id = Column(UUID, primary_key=True, default=uuid4)  # Our canonical ID, returned as conversation_id
-      user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+      user_id = Column(UUID, nullable=False)  # Reference to users.id but NO FK (clean separation)
       mode = Column(String(50), default="green")
       
       # Provider tracking (vendor-agnostic)
@@ -190,11 +192,12 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### Development Rules
-- [ ] **NO direct database access**
-  - [ ] No imports from `app.models.*` (SQLAlchemy models)
-  - [ ] No imports from `app.database` (DB session)
-  - [ ] No imports from `app.services.*` (business logic)
-  - [ ] Use HTTP client for ALL data access
+- [ ] **Agent owns its database schema**
+  - [ ] Create Agent SQLAlchemy models in `app/agent/models/`
+  - [ ] Use `agent_` prefix for all Agent tables
+  - [ ] Direct database access for Agent tables (conversations, messages, etc.)
+  - [ ] NO access to backend tables (users, portfolios, positions)
+  - [ ] Use HTTP client for ALL portfolio/market data
 
 - [ ] **Independent configuration**
   - [ ] Create `AgentSettings` class with `AGENT_` prefix

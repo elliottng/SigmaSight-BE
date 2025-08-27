@@ -36,11 +36,12 @@ Frontend → Agent Service[:8001] → Backend[:8000]/api/v1/data/* → Database
 ```
 
 **Separation Rules:**
-1. **No direct database access** - Agent uses Raw Data APIs only
-2. **No shared models** - Agent has its own Pydantic schemas
-3. **HTTP-only communication** - Even when co-located, use HTTP clients
-4. **Independent config** - Separate settings module for Agent
-5. **Isolated dependencies** - Agent has minimal deps (openai, httpx, pydantic)
+1. **Agent owns its database schema** - Direct access to agent_* tables
+2. **No access to backend domain tables** - Must use APIs for portfolios/positions
+3. **Agent has dedicated SQLAlchemy models** - For conversations, messages, etc.
+4. **HTTP-only for portfolio data** - Even when co-located, use HTTP clients
+5. **Independent config** - Separate settings module for Agent
+6. **Schema migration path** - Agent schema portable when service separated
 
 ### 2.2 Request Flow
 
@@ -72,6 +73,13 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
       __init__.py
       config.py               # Agent-specific settings (OpenAI keys, models)
       router.py               # FastAPI router for /api/v1/chat/*
+      models/                 # SQLAlchemy models for Agent tables
+        __init__.py
+        conversations.py      # Conversation, Message models
+        preferences.py        # UserPreference, PromptVersion models
+      schemas/                # Pydantic models for API
+        chat.py              # Request/response schemas
+        sse.py               # SSE event schemas
       handlers/
         conversations.py      # POST /chat/conversations handler
         send.py              # POST /chat/send SSE handler
@@ -85,7 +93,7 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
         violet.md            # Violet mode (risk-focused)
       clients/
         raw_data.py          # HTTP client for Raw Data APIs
-      models.py              # Agent-specific Pydantic models
+      database.py            # Agent database session management
       logging.py             # Agent-specific logger with "agent." prefix
 ```
 
@@ -144,18 +152,19 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
 
 **DO:**
 * Place all Agent code in `app/agent/` module
-* Use HTTP clients for ALL data access (even co-located)
-* Define Agent-specific Pydantic models (no SQLAlchemy imports)
+* Create Agent-specific SQLAlchemy models in `app/agent/models/`
+* Use `agent_` prefix for all Agent database tables
+* Access Agent tables directly through SQLAlchemy
+* Use HTTP clients for portfolio/market data access
 * Create separate config with `AGENT_` prefixed env vars
-* Use dependency injection for Raw Data API base URL
-* Write integration tests that mock Raw Data API responses
+* Write Alembic migrations for Agent schema changes
 
 **DON'T:**
-* Import from `app.models.*` (database models)
-* Import from `app.database` (DB session)
-* Import from `app.services.*` (business logic)
-* Share utility functions (copy what you need)
-* Write to any database tables
+* Import from `app.models.*` (backend domain models)
+* Access backend tables (users, portfolios, positions) directly
+* Share SQLAlchemy models between Agent and backend
+* Mix Agent and backend business logic
+* Bypass APIs for portfolio/market data
 
 ### 5.2 Authentication Flow
 
