@@ -662,6 +662,108 @@ return standardize_datetime_dict(response)
 
 ## Phase 4: Advanced Features & Frontend Integration (Future)
 
+### 4.0.1 Change Authentication to Cookie-based (from JWT Bearer) 🔄 **PRIORITY**
+*Simplify authentication before Agent implementation - switch from Bearer tokens to HTTP-only cookies*
+
+**Added:** 2025-08-27 | **Timeline:** 1-2 hours | **Risk:** Very Low
+
+#### Rationale for Change
+Currently using JWT Bearer tokens (Authorization header), but switching to cookie-based auth because:
+1. **SSE Support**: Server-Sent Events (required for Agent chat) work seamlessly with cookies (automatic attachment)
+2. **Security**: HTTP-only cookies prevent XSS token theft (tokens can't be accessed via JavaScript)
+3. **Simplicity**: No token management code in frontend, works automatically with all requests
+4. **Zero Users**: No backward compatibility needed - perfect time to make the change
+5. **Industry Standard**: Most chat applications (ChatGPT, Slack web, Discord) use cookies for web clients
+
+#### Implementation Plan
+
+##### Step 1: Modify Login Endpoint (~10 min)
+- [ ] **Update `app/api/v1/auth.py` login function**:
+  - [ ] Keep generating JWT token as before
+  - [ ] Add cookie to response:
+    ```python
+    response.set_cookie(
+        key="auth_token",
+        value=token_data["access_token"],
+        httponly=True,
+        samesite="lax",
+        secure=settings.ENVIRONMENT == "production",
+        max_age=86400  # 24 hours
+    )
+    ```
+  - [ ] Still return token in body for now (will remove after testing)
+
+##### Step 2: Update Authentication Dependency (~15 min)
+- [ ] **Modify `app/core/dependencies.py` get_current_user function**:
+  - [ ] Import `Cookie` from fastapi
+  - [ ] Change from HTTPBearer to cookie:
+    ```python
+    async def get_current_user(
+        auth_token: str = Cookie(None),
+        db: AsyncSession = Depends(get_db)
+    ) -> CurrentUser:
+    ```
+  - [ ] Use same JWT verification logic, just different source
+  - [ ] Return 401 if cookie missing or invalid
+
+##### Step 3: Test All Endpoints (~20 min)
+- [ ] Test login sets cookie correctly
+- [ ] Test protected endpoints work with cookie auth:
+  - [ ] `/api/v1/data/portfolios`
+  - [ ] `/api/v1/data/portfolio/{id}/complete`
+  - [ ] `/api/v1/data/positions/details`
+- [ ] Verify Swagger/docs still work (may need cookie auth support)
+
+##### Step 4: Clean Up Bearer Token Code (~10 min)
+- [ ] **Remove HTTPBearer dependencies**:
+  - [ ] Remove `from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials`
+  - [ ] Remove `security = HTTPBearer()` 
+  - [ ] Clean up unused imports
+- [ ] **Update login response**:
+  - [ ] Remove token from response body (only set cookie)
+  - [ ] Return simple success message: `{"message": "Login successful"}`
+
+##### Step 5: Update Documentation (~15 min)
+- [ ] **Update API documentation**:
+  - [ ] Update `API_IMPLEMENTATION_STATUS.md` auth section
+  - [ ] Update any auth examples in README.md
+- [ ] **Update CLAUDE.md**:
+  - [ ] Note cookie-based auth
+  - [ ] Update testing examples to use cookies
+- [ ] **Update Agent docs**:
+  - [ ] Update `agent/CLAUDE.md` to remove dual auth notes
+  - [ ] Update `agent/_docs/requirements/DESIGN_DOC_AGENT_V1.0.md` Section 11
+  - [ ] Update `agent/TODO.md` to remove dual auth tasks
+
+##### Step 6: Verify & Commit (~10 min)
+- [ ] Run full test suite: `uv run pytest`
+- [ ] Test with curl using cookies:
+  ```bash
+  # Login and save cookie
+  curl -c cookies.txt -X POST localhost:8000/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"demo_individual@sigmasight.com","password":"demo12345"}'
+  
+  # Use cookie for protected endpoint
+  curl -b cookies.txt localhost:8000/api/v1/data/portfolios
+  ```
+- [ ] Commit with clear message about auth change
+
+#### Rollback Plan (if needed)
+1. Single git revert of the auth change commit
+2. No database changes to rollback
+3. No data migrations needed
+4. Instant restoration of Bearer token auth
+
+#### Benefits After Migration
+- ✅ SSE/WebSocket ready for Agent implementation
+- ✅ Simpler frontend (no token storage/management)
+- ✅ Better security (HTTP-only prevents XSS)
+- ✅ Consistent with industry standards for web apps
+- ✅ CSRF protection ready when we add write operations
+
+---
+
 ### 4.1 Developer Experience & Onboarding
 *Make the project easy to set up and contribute to*
 

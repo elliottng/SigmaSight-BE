@@ -367,11 +367,25 @@ token_budget: 1800
 
 ## 11. Auth & Security
 
-- **Login:** `POST /api/v1/auth/login` (JWT set in HTTP‑only, SameSite=Lax cookie; 24h TTL for MVP).
-- **Backend‑only OpenAI calls.**
-- **Tool handlers** receive `user_id` from verified request context; no user JWT forwarded to OpenAI/tools.
-- **PII:** Mask account IDs in tool outputs if present; omit emails.
-- **Rate limits:** Basic per‑user (e.g., 60 req/min burst 10).
+### Authentication Strategy (Dual Support)
+Given the existing backend uses Bearer tokens but SSE works better with cookies, we implement **dual authentication**:
+
+- **Login:** `POST /api/v1/auth/login` returns JWT in response body (existing) AND sets HTTP‑only cookie (new)
+- **Regular endpoints:** Accept BOTH Bearer token (existing) OR cookie (new)
+- **SSE endpoints:** Prefer cookie (automatic attachment) but accept Bearer via query param if needed
+- **Implementation:** Modify `get_current_user` dependency to check both sources:
+  ```python
+  # Try Bearer token first (existing clients)
+  # Fallback to cookie (SSE, new clients)
+  # Return 401 if neither present
+  ```
+
+### Security Notes
+- **Backend‑only OpenAI calls:** API keys never exposed to frontend
+- **Tool handlers** receive `user_id` from verified request context; no user JWT forwarded to OpenAI/tools
+- **CSRF:** Not needed in Phase 1 (read-only endpoints)
+- **PII:** Consider masking in Phase 2
+- **Rate limits:** Basic per‑user (e.g., 60 req/min burst 10)
 
 ---
 
@@ -431,10 +445,71 @@ token_budget: 1800
 
 - **Raw Data params**: Use **exact params from spec** (see §7.A). No currency/timezone params in P1; standardize times to **UTC ISO‑8601 **``.
 - **Factor ETF universe**: **Resolved**. Canonical mapping confirmed (see §7.6); location: `backend/app/constants/factors.py` (`FACTOR_ETFS`); provider: **FMP** via backend.
-- **Dates**: Backend will migrate to UTC ISO; handlers normalize meanwhile.
+- **Dates**: ✅ **COMPLETED** - Backend migrated to UTC ISO 8601 with Z suffix (Phase 3 completed 2025-08-27).
 - **Auth cookie TTL**: 24h for MVP; no refresh token in P1.
 - **Caps**: Adopt 5‑symbols & 180‑days policies (see §12); positions 200 rows; transactions 500 rows.
-- **Model override**: Admin‑only per‑conversation toggle (GPT‑5 ⇄ 4o‑mini).
+- **Model override**: Admin‑only per‑conversation toggle (GPT‑5 ⇄ gpt-5-mini). Note: GPT-5 now available per OpenAI docs.
 - **Historical prices symbols filter**: **No change to APIs in P1**. Handlers will enforce caps and **post‑process** to top 5 symbols; we can revisit a server‑side filter or async job in Phase 2 if needed.
 
 *No additional open items for Phase 1.*
+
+---
+
+## 18. Existing Backend Infrastructure (Project Context)
+
+**This section documents what already exists in the backend that the agent implementation will build upon.**
+
+### 18.1 Authentication System
+- **JWT Bearer tokens** implemented in `app/api/v1/auth.py`
+- **HTTPBearer security** scheme (not cookies initially - may need adaptation for SSE)
+- **get_current_user** dependency in `app/core/dependencies.py`
+- Token expiration: 30 minutes (ACCESS_TOKEN_EXPIRE_MINUTES)
+- Returns `CurrentUser` schema with user_id, email, is_active
+
+### 18.2 Database Infrastructure
+- **Async SQLAlchemy** with PostgreSQL
+- **Base class** in `app/database.py` with naming conventions
+- **Dependency injection**: `get_db()` for FastAPI endpoints
+- **Context manager**: `get_async_session()` for scripts/batch jobs
+- **Alembic migrations** for schema management
+- Models must be imported in `init_db()` for table creation (line ~85)
+
+### 18.3 Configuration System
+- **Pydantic Settings** with BaseSettings in `app/config.py`
+- Environment variables auto-loaded with `Field(..., env="VAR_NAME")`
+- Settings instance available as `app.config.settings`
+- Existing market data provider configs (FMP, Polygon, etc.)
+
+### 18.4 API Structure
+- **Main router**: `/api/v1/` prefix
+- **Router registration** in `app/api/v1/router.py`
+- **CORS configured** for localhost:3000
+- **FastAPI app** in `app/main.py` with middleware
+
+### 18.5 Raw Data APIs (✅ 100% Complete)
+All 6 Raw Data endpoints are **working with real data** as of 2025-08-26:
+- `/api/v1/data/portfolio/{id}/complete` - Real portfolio data with 5% cash balance
+- `/api/v1/data/portfolio/{id}/data-quality` - Real data quality assessments
+- `/api/v1/data/positions/details` - Real positions from database
+- `/api/v1/data/prices/historical/{id}` - 292 days of real OHLCV data
+- `/api/v1/data/prices/quotes` - Real-time market quotes
+- `/api/v1/data/factors/etf-prices` - All 7 ETFs with real prices
+
+**Note**: These endpoints need parameter enhancements for agent tool requirements (caps, meta objects).
+
+### 18.6 Logging Infrastructure
+- **Structured loggers**: auth_logger, db_logger, api_logger
+- **UTC timestamps** already standardized
+- Log level configured via LOG_LEVEL env var
+
+### 18.7 Datetime Standardization
+- ✅ **UTC ISO 8601 format** implemented across all APIs
+- All timestamps use Z suffix format
+- Utility functions in `app/core/datetime_utils.py`
+- Pydantic BaseSchema configured with proper json_encoders
+
+### 18.8 Demo Data
+- **3 demo portfolios** with 63 positions loaded
+- Demo users: `demo_individual@sigmasight.com / demo12345`
+- MarketDataCache with 292 days of historical prices
+- All batch calculations completed with real data

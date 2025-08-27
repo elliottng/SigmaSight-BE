@@ -112,18 +112,18 @@ Users: 2 cofounders + \~10 beta testers. Target: functional prototype in \~2 wee
 POST /chat/send  →  Content-Type: text/event-stream
 
 event: start
-:data: {}
+data: {}
 
 data: {"delta":"..."}
-...
+
 event: tool_call
-:data: {"name":"get_prices_historical", "args":{...}}
+data: {"name":"get_prices_historical", "args":{...}}
 
 event: tool_result
-:data: {"name":"get_prices_historical", "result_meta":{...}}
+data: {"name":"get_prices_historical", "result_meta":{...}}
 
 event: done
-:data: {}
+data: {}
 ```
 
 ---
