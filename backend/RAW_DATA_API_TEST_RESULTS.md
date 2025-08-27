@@ -1,6 +1,6 @@
 # Raw Data API Test Results - /data/ Namespace Only
 
-Generated: 2025-08-26T17:17:06.093617
+Generated: 2025-08-26T17:48:51.026295
 
 Server: http://localhost:8000
 
@@ -21,38 +21,38 @@ Expected Positions: 16
 
 #### Endpoint: /api/v1/data/portfolio/51134ffd-2f13-49bd-b1f5-0c327e801b69/complete
 - ✅ Status: 200
-- Response Time: 72.5ms
-- Data Size: 3,503 bytes
+- Response Time: 50.4ms
+- Data Size: 3,508 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/portfolio/51134ffd-2f13-49bd-b1f5-0c327e801b69/data-quality
 - ✅ Status: 200
-- Response Time: 74.8ms
+- Response Time: 76.6ms
 - Data Size: 992 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/positions/details
 - ✅ Status: 200
-- Response Time: 38.7ms
-- Data Size: 6,062 bytes
+- Response Time: 23.8ms
+- Data Size: 6,059 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/historical/51134ffd-2f13-49bd-b1f5-0c327e801b69
 - ✅ Status: 200
-- Response Time: 71.1ms
-- Data Size: 297,791 bytes
+- Response Time: 47.0ms
+- Data Size: 297,402 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/quotes
 - ✅ Status: 200
-- Response Time: 14.3ms
-- Data Size: 961 bytes
+- Response Time: 11.0ms
+- Data Size: 944 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/factors/etf-prices
 - ✅ Status: 200
-- Response Time: 20.6ms
-- Data Size: 9,164 bytes
+- Response Time: 17.1ms
+- Data Size: 9,168 bytes
 - 🟢 **No issues detected**
 
 ---
@@ -70,38 +70,38 @@ Expected Positions: 17
 
 #### Endpoint: /api/v1/data/portfolio/c0510ab8-c6b5-433c-adbc-3f74e1dbdb5e/complete
 - ✅ Status: 200
-- Response Time: 50.0ms
-- Data Size: 3,716 bytes
+- Response Time: 44.4ms
+- Data Size: 3,705 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/portfolio/c0510ab8-c6b5-433c-adbc-3f74e1dbdb5e/data-quality
 - ✅ Status: 200
-- Response Time: 78.5ms
+- Response Time: 82.7ms
 - Data Size: 991 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/positions/details
 - ✅ Status: 200
-- Response Time: 48.1ms
-- Data Size: 6,454 bytes
+- Response Time: 45.8ms
+- Data Size: 6,432 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/historical/c0510ab8-c6b5-433c-adbc-3f74e1dbdb5e
 - ✅ Status: 200
-- Response Time: 70.7ms
-- Data Size: 297,130 bytes
+- Response Time: 71.3ms
+- Data Size: 297,332 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/quotes
 - ✅ Status: 200
-- Response Time: 13.2ms
-- Data Size: 961 bytes
+- Response Time: 11.5ms
+- Data Size: 944 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/factors/etf-prices
 - ✅ Status: 200
-- Response Time: 20.7ms
-- Data Size: 9,187 bytes
+- Response Time: 17.3ms
+- Data Size: 9,165 bytes
 - 🟢 **No issues detected**
 
 ---
@@ -119,38 +119,38 @@ Expected Positions: 30
 
 #### Endpoint: /api/v1/data/portfolio/2ee7435f-379f-4606-bdb7-dadce587a182/complete
 - ✅ Status: 200
-- Response Time: 80.5ms
-- Data Size: 6,200 bytes
+- Response Time: 54.7ms
+- Data Size: 6,199 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/portfolio/2ee7435f-379f-4606-bdb7-dadce587a182/data-quality
 - ✅ Status: 200
-- Response Time: 55.3ms
+- Response Time: 87.1ms
 - Data Size: 1,210 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/positions/details
 - ✅ Status: 200
-- Response Time: 54.4ms
-- Data Size: 11,016 bytes
+- Response Time: 54.2ms
+- Data Size: 11,015 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/historical/2ee7435f-379f-4606-bdb7-dadce587a182
 - ✅ Status: 200
-- Response Time: 109.7ms
-- Data Size: 477,229 bytes
+- Response Time: 98.7ms
+- Data Size: 477,535 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/prices/quotes
 - ✅ Status: 200
-- Response Time: 13.4ms
-- Data Size: 961 bytes
+- Response Time: 11.9ms
+- Data Size: 944 bytes
 - 🟢 **No issues detected**
 
 #### Endpoint: /api/v1/data/factors/etf-prices
 - ✅ Status: 200
-- Response Time: 16.6ms
-- Data Size: 9,153 bytes
+- Response Time: 38.7ms
+- Data Size: 9,161 bytes
 - 🟢 **No issues detected**
 
 ---
