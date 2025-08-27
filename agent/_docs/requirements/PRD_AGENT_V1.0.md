@@ -322,13 +322,14 @@ Users can switch modes using `/mode <color>` command (e.g., `/mode green`, `/mod
 
 ## 6) Tools & Schemas (Phase 1 — Agent-Optimized APIs)
 
-**Architecture Update:** Tools call **enhanced data endpoints** (`/api/v1/data/*`) that handle business logic server-side. Tool handlers are simple pass-through proxies with no data manipulation.
+**Architecture Update:** Tools call **enhanced data endpoints** (`/api/v1/data/*`) that use a dedicated service layer for business logic. Tool handlers are simple pass-through proxies with no data manipulation.
 
-> **Backend-Enforced Caps:**
-> - Prices: Backend returns max 5 symbols (by value/weight)
-> - Positions: Backend returns top 50-200 positions
-> - All responses optimized for <2k tokens
-> - Backend handles selection logic and truncation
+> **Service Layer Responsibilities:**
+> - **PortfolioDataService** handles all portfolio data operations
+> - Symbol selection logic (top N by value/weight)
+> - Market value calculations and aggregations
+> - Response optimization for token limits (<2k tokens)
+> - Backend enforces caps: max 5 symbols, top 50-200 positions
 
 ### 6.1 Tool: **get\_portfolio\_complete**
 
@@ -559,20 +560,58 @@ Rather than assuming which model works best for which task, Phase 3 implements c
 
 ---
 
+## 12) Backend Service Layer Requirements
+
+### 12.1 New Service Implementation
+
+**PortfolioDataService** - Core service for Agent data operations:
+- `get_top_positions_by_value()` - Returns top N positions sorted by market value
+- `get_portfolio_summary()` - Condensed portfolio overview with key metrics
+- `get_historical_prices_with_selection()` - Price history for selected symbols
+
+### 12.2 Service Responsibilities
+
+**Business Logic Encapsulation:**
+- Calculate market values for positions
+- Sort and filter by various criteria (value, weight, etc.)
+- Apply symbol selection methods
+- Calculate portfolio coverage percentages
+- Optimize response sizes for token limits
+
+**Data Operations:**
+- Efficient database queries with proper joins
+- Caching strategies for frequently accessed data
+- Aggregation and summary calculations
+- Historical data retrieval with date range handling
+
+### 12.3 Implementation Notes
+
+- Service methods are **async** using SQLAlchemy async sessions
+- All methods return structured dictionaries (not ORM objects)
+- Error handling and validation in service layer
+- Unit testable with mocked database sessions
+- Reusable across multiple API endpoints
+
+---
+
 ## 13) Implementation Timeline
 
 ### Phase 1: MVP Chat Agent (1 week sprint)
 
-**Backend (Days 1-3) - With Service Separation in Mind**
+**Backend (Days 1-3) - With Service Layer Architecture**
 * ✅ Setup auth (POST login + HTTP‑only cookie) - COMPLETED
-* Day 1: Create `/chat/conversations`, `/chat/send` endpoints
-  * Place in separate `app/agent/` module, not mixed with core backend
+* Day 1: Backend service layer and endpoints
+  * Create `PortfolioDataService` with 3 core methods
+  * Implement enhanced `/data/prices/historical` endpoint
+  * Add new `/data/positions/top` and `/data/portfolio/summary` endpoints
+* Day 2: Agent module and chat infrastructure
   * Create Agent models and run Alembic migrations for agent_* tables
-  * Use dependency injection for Raw Data API clients
-* Day 2: Register the six Raw Data tools; wire handlers  
-  * Tool handlers make HTTP calls to Raw Data APIs (even when co-located)
-  * No direct database access or model imports
-* Day 3: Draft Green/Blue/Indigo/Violet prompts; test streaming
+  * Implement `/chat/conversations`, `/chat/send` SSE endpoints
+  * Place in separate `app/agent/` module
+* Day 3: Tool handlers and prompts
+  * Register the six Raw Data tools
+  * Tool handlers call enhanced backend endpoints
+  * Draft Green/Blue/Indigo/Violet prompts; test streaming
   * Separate configuration file for Agent-specific settings
   * Independent logging with "agent." prefix
 

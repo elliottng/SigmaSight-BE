@@ -732,6 +732,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > Reference: TDD §14 (Testing), PRD §9 (Performance Targets), §13 (Golden Set)
 
 ### 6.1 Unit Tests
+- [ ] **Test service layer**
+  - [ ] `PortfolioDataService.get_top_positions_by_value()`
+  - [ ] `PortfolioDataService.get_portfolio_summary()`
+  - [ ] `PortfolioDataService.get_historical_prices_with_selection()`
+  - [ ] Mock database sessions
+  - [ ] Test selection methods (top_by_value, top_by_weight)
+
 - [ ] **Test conversation management**
   - [ ] Conversation creation
   - [ ] Mode switching

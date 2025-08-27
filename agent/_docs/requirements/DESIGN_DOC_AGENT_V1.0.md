@@ -288,18 +288,43 @@ uv run alembic downgrade -1
 
 **Problem:** Having tool handlers fetch data, apply business logic, and filter results creates a "leaky abstraction" where the Agent layer knows too much about portfolio logic.
 
-**Solution:** Create agent-optimized API endpoints that encapsulate this business logic server-side:
+**Solution:** Create agent-optimized API endpoints with a proper service layer:
 
 1. **Enhanced `/api/v1/data/*` endpoints** - Agent-optimized parameters and responses
-2. **Pre-filtered responses** - Backend handles symbol selection, caps, truncation
-3. **Token-aware** - Endpoints designed to return <2k tokens per response
-4. **Clean tool handlers** - Tool handlers become simple pass-through proxies
+2. **New service layer** - `PortfolioDataService` encapsulates business logic
+3. **Pre-filtered responses** - Service handles symbol selection, caps, truncation
+4. **Token-aware** - Endpoints designed to return <2k tokens per response
+5. **Clean tool handlers** - Tool handlers become simple pass-through proxies
+
+**Service Layer Architecture:**
+```python
+# backend/app/services/portfolio_data_service.py
+class PortfolioDataService:
+    async def get_top_positions_by_value(
+        db: AsyncSession,
+        portfolio_id: UUID,
+        limit: int = 50
+    ) -> Dict
+    
+    async def get_portfolio_summary(
+        db: AsyncSession,
+        portfolio_id: UUID
+    ) -> Dict
+    
+    async def get_historical_prices_with_selection(
+        db: AsyncSession,
+        portfolio_id: UUID,
+        selection_method: str,
+        max_symbols: int = 5,
+        lookback_days: int = 90
+    ) -> Dict
+```
 
 **Benefits:**
 - Cleaner separation of concerns
-- Business logic stays in backend where it belongs
-- Easier to test and maintain
-- Can optimize queries server-side
+- Business logic in service layer, not API endpoints
+- Testable service methods
+- Reusable across multiple endpoints
 - Tool handlers remain stateless
 
 ### 7.A Common response/ error shapes & parameter inventory
@@ -660,7 +685,102 @@ Given the existing backend uses Bearer tokens but SSE works better with cookies,
 
 ---
 
-## 18. Existing Backend Infrastructure (Project Context)
+## 18. Backend Implementation Requirements
+
+### 18.1 Service Layer Implementation
+
+**New Service Required:**
+```python
+# backend/app/services/portfolio_data_service.py
+from typing import Dict, List, Optional
+from uuid import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
+
+class PortfolioDataService:
+    """Service layer for Agent-optimized data operations"""
+    
+    async def get_top_positions_by_value(
+        self,
+        db: AsyncSession,
+        portfolio_id: UUID,
+        limit: int = 50
+    ) -> Dict:
+        """
+        Get top N positions sorted by market value.
+        Calculates market values and portfolio coverage percentage.
+        """
+        # Implementation required
+        
+    async def get_portfolio_summary(
+        self,
+        db: AsyncSession,
+        portfolio_id: UUID
+    ) -> Dict:
+        """
+        Get condensed portfolio overview with key metrics.
+        Optimized for initial Agent context setting.
+        """
+        # Implementation required
+        
+    async def get_historical_prices_with_selection(
+        self,
+        db: AsyncSession,
+        portfolio_id: UUID,
+        selection_method: str = "top_by_value",
+        max_symbols: int = 5,
+        lookback_days: int = 90
+    ) -> Dict:
+        """
+        Get historical prices for selected symbols.
+        Selection methods: top_by_value, top_by_weight, all
+        """
+        # Implementation required
+```
+
+### 18.2 API Endpoint Updates
+
+**Enhanced Endpoints:**
+```python
+# backend/app/api/v1/data.py
+
+@router.get("/prices/historical/{portfolio_id}")
+async def get_historical_prices(
+    portfolio_id: UUID,
+    max_symbols: int = Query(5, le=5),
+    selection_method: str = Query("top_by_value", regex="^(top_by_value|top_by_weight|all)$"),
+    lookback_days: int = Query(90, le=180),
+    service: PortfolioDataService = Depends(get_portfolio_data_service),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    # Use service method instead of direct DB queries
+    return await service.get_historical_prices_with_selection(...)
+
+@router.get("/positions/top/{portfolio_id}")
+async def get_top_positions(
+    portfolio_id: UUID,
+    limit: int = Query(50, le=200),
+    service: PortfolioDataService = Depends(get_portfolio_data_service),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    # New endpoint using service
+    return await service.get_top_positions_by_value(...)
+
+@router.get("/portfolio/{portfolio_id}/summary")
+async def get_portfolio_summary(
+    portfolio_id: UUID,
+    service: PortfolioDataService = Depends(get_portfolio_data_service),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    # New endpoint using service
+    return await service.get_portfolio_summary(...)
+```
+
+## 19. Existing Backend Infrastructure (Project Context)
 
 **This section documents what already exists in the backend that the agent implementation will build upon.**
 
