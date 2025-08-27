@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, Literal, Mapping, Optional, TypedDict
+from app.core.datetime_utils import utc_now, to_utc_iso8601, to_iso_date
 
 # TYPE-CHECKING ONLY imports to avoid importing heavy deps at module import time
 from typing import TYPE_CHECKING
@@ -119,7 +120,7 @@ def create_report_directory(portfolio_name: str, report_date: date) -> Path:
     """
     base_dir = Path("reports")
     slugified_name = slugify(portfolio_name)
-    date_str = report_date.isoformat()
+    date_str = to_iso_date(report_date)
     
     report_dir = base_dir / f"{slugified_name}_{date_str}"
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -286,8 +287,8 @@ async def _collect_report_data(
         return {
             "meta": {
                 "portfolio_id": portfolio_id,
-                "as_of": report_date.isoformat(),
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "as_of": to_iso_date(report_date),
+                "generated_at": to_utc_iso8601(utc_now()),
                 "error": "Portfolio not found"
             }
         }
@@ -532,24 +533,24 @@ async def _collect_report_data(
         "meta": {
             "portfolio_id": portfolio_id,
             "portfolio_name": portfolio.name,
-            "as_of": initial_date.isoformat(),
-            "anchor_date": anchor_date.isoformat(),  # Document the anchor date used
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "as_of": to_iso_date(initial_date),
+            "anchor_date": to_iso_date(anchor_date),  # Document the anchor date used
+            "generated_at": to_utc_iso8601(utc_now()),
         },
         "portfolio": {
             "id": str(portfolio.id),
             "name": portfolio.name,
-            "created_at": portfolio.created_at.isoformat() if portfolio.created_at else None,
+            "created_at": to_utc_iso8601(portfolio.created_at) if portfolio.created_at else None,
             "position_count": len(positions)
         },
         "snapshot": {
-            "date": snapshot.snapshot_date.isoformat() if snapshot else None,
+            "date": to_iso_date(snapshot.snapshot_date) if snapshot else None,
             "total_value": snapshot.total_value if snapshot else Decimal("0"),  # Keep as Decimal
             "daily_pnl": snapshot.daily_pnl if snapshot and snapshot.daily_pnl else Decimal("0"),
             "daily_return": snapshot.daily_return if snapshot and snapshot.daily_return else Decimal("0"),
         } if snapshot else None,
         "correlation": {
-            "calculation_date": correlation.calculation_date.isoformat() if correlation else None,
+            "calculation_date": to_utc_iso8601(correlation.calculation_date) if correlation else None,
             "overall_correlation": correlation.overall_correlation if correlation else Decimal("0"),
             "correlation_concentration_score": correlation.correlation_concentration_score if correlation else Decimal("0"),
             "effective_positions": correlation.effective_positions if correlation else Decimal("0"),
@@ -565,7 +566,7 @@ async def _collect_report_data(
                 "category": factor.factor_type,
                 "exposure_value": exposure.exposure_value,  # Portfolio-level beta
                 "exposure_dollar": exposure.exposure_dollar,  # Portfolio-level dollar exposure
-                "calculation_date": exposure.calculation_date.isoformat() if exposure.calculation_date else None
+                "calculation_date": to_utc_iso8601(exposure.calculation_date) if exposure.calculation_date else None
             }
             for exposure, factor in factor_exposures
         ] if factor_exposures else [],

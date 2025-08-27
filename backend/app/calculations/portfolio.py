@@ -120,7 +120,7 @@ def calculate_portfolio_exposures(positions: List[Dict]) -> Dict[str, Any]:
             "stock_exposure": Decimal("0.00"),
             "notional": Decimal("0.00"),
             "metadata": {
-                "calculated_at": datetime.utcnow().isoformat() + "Z",
+                "calculated_at": to_utc_iso8601(utc_now()),
                 "position_count": 0,
                 "warnings": ["Empty portfolio - all values are zero"]
             }
@@ -188,7 +188,7 @@ def calculate_portfolio_exposures(positions: List[Dict]) -> Dict[str, Any]:
         "stock_exposure": stock_exposure.quantize(Decimal(f"0.{'0' * MONETARY_DECIMAL_PLACES}")),
         "notional": notional.quantize(Decimal(f"0.{'0' * MONETARY_DECIMAL_PLACES}")),
         "metadata": {
-            "calculated_at": datetime.utcnow().isoformat() + "Z",
+            "calculated_at": to_utc_iso8601(utc_now()),
             "position_count": len(positions),
             "warnings": []
         }
@@ -268,7 +268,7 @@ def aggregate_portfolio_greeks(positions: List[Dict]) -> Dict[str, Decimal]:
     
     # Add metadata
     total_greeks["metadata"] = {
-        "calculated_at": datetime.utcnow().isoformat() + "Z",
+        "calculated_at": to_utc_iso8601(utc_now()),
         "positions_with_greeks": positions_with_greeks,
         "positions_without_greeks": positions_without_greeks,
         "warnings": []
@@ -316,7 +316,7 @@ def calculate_delta_adjusted_exposure(positions: List[Dict]) -> Dict[str, Decima
             "raw_exposure": Decimal("0.00"),
             "delta_adjusted_exposure": Decimal("0.00"),
             "metadata": {
-                "calculated_at": datetime.utcnow().isoformat() + "Z",
+                "calculated_at": to_utc_iso8601(utc_now()),
                 "positions_included": 0,
                 "positions_excluded": 0,
                 "warnings": ["Empty portfolio"]
@@ -354,7 +354,7 @@ def calculate_delta_adjusted_exposure(positions: List[Dict]) -> Dict[str, Decima
         "raw_exposure": raw_exposure.quantize(Decimal(f"0.{'0' * MONETARY_DECIMAL_PLACES}")),
         "delta_adjusted_exposure": delta_adjusted.quantize(Decimal(f"0.{'0' * MONETARY_DECIMAL_PLACES}")),
         "metadata": {
-            "calculated_at": datetime.utcnow().isoformat() + "Z",
+            "calculated_at": to_utc_iso8601(utc_now()),
             "positions_included": positions_included,
             "positions_excluded": positions_excluded,
             "warnings": []
@@ -484,7 +484,7 @@ def aggregate_by_tags(
     
     # Add metadata
     metadata = {
-        "calculated_at": datetime.utcnow().isoformat() + "Z",
+        "calculated_at": to_utc_iso8601(utc_now()),
         "tag_filter": tag_filter,
         "tag_mode": tag_mode,
         "total_positions": len(positions),
@@ -624,7 +624,7 @@ def aggregate_by_underlying(positions: List[Dict]) -> Dict[str, Dict]:
     
     # Add metadata
     result["metadata"] = {
-        "calculated_at": datetime.utcnow().isoformat() + "Z",
+        "calculated_at": to_utc_iso8601(utc_now()),
         "total_positions": len(positions),
         "underlyings_found": len(underlying_aggregations),
         "warnings": []

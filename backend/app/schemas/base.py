@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+from app.core.datetime_utils import to_utc_iso8601
 
 
 class BaseSchema(BaseModel):
@@ -14,7 +15,7 @@ class BaseSchema(BaseModel):
         str_strip_whitespace=True,  # Auto-strip strings
         use_enum_values=True,  # Use enum values not names
         json_encoders={
-            datetime: lambda v: v.isoformat() if v else None,
+            datetime: lambda v: to_utc_iso8601(v),  # Standardized UTC ISO 8601 with Z suffix
             UUID: lambda v: str(v) if v else None,
         }
     )

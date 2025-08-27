@@ -359,10 +359,10 @@ This inconsistency causes issues for:
   - [x] Verify cache invalidation timing ✅
   - [x] Test batch processing with UTC timestamps ✅
 
-##### Phase 3: Direct API Layer Migration (Week 3) - LOW RISK 
+##### Phase 3: Direct API Layer Migration (Week 3) - LOW RISK ✅ **COMPLETED**
 **Updated Plan: No external clients = No backward compatibility needed** ✅
 
-- [ ] **Update Pydantic BaseSchema directly**:
+- [x] **Update Pydantic BaseSchema directly**:
   ```python
   # app/schemas/base.py
   from app.core.datetime_utils import to_utc_iso8601
@@ -376,18 +376,24 @@ This inconsistency causes issues for:
       )
   ```
 
-- [ ] **Update /data/ Endpoints directly**:
-  - [ ] `/portfolio/{id}/complete` - Use to_utc_iso8601() for all timestamps
-  - [ ] `/portfolio/{id}/data-quality` - Standardize datetime fields
-  - [ ] `/positions/details` - Fix entry_date format
-  - [ ] `/prices/historical/{id}` - Ensure consistent date formats
-  - [ ] `/prices/quotes` - Standardize timestamp fields
-  - [ ] `/factors/etf-prices` - Fix updated_at format
+- [x] **Update /data/ Endpoints directly**:
+  - [x] `/portfolio/{id}/complete` - Use to_utc_iso8601() for all timestamps
+  - [x] `/portfolio/{id}/data-quality` - Standardize datetime fields
+  - [x] `/positions/details` - Fix entry_date format
+  - [x] `/prices/historical/{id}` - Ensure consistent date formats
+  - [x] `/prices/quotes` - Standardize timestamp fields
+  - [x] `/factors/etf-prices` - Fix updated_at format
 
-- [ ] **Remove manual "Z" suffix additions**:
-  - [ ] Search for `.isoformat() + "Z"` patterns
-  - [ ] Replace with standardized utility functions
-  - [ ] Ensure consistent formatting across all endpoints
+- [x] **Remove manual "Z" suffix additions**:
+  - [x] Search for `.isoformat() + "Z"` patterns
+  - [x] Replace with standardized utility functions
+  - [x] Ensure consistent formatting across all endpoints
+
+**Completion Notes (2025-08-27)**:
+- BaseSchema updated with `to_utc_iso8601()` in json_encoders
+- All `.isoformat() + "Z"` patterns replaced in data.py, portfolio.py, portfolio_report_generator.py
+- Pydantic serialization verified - correctly outputs Z suffix format
+- Test confirms: `2025-08-27T03:27:28.177481Z`
 
 ##### Phase 4: Verification & Cleanup (Week 4) - LOW RISK
 - [ ] **Clean up redundant code**:

@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_async_session
 from app.core.dependencies import get_current_user
+from app.core.datetime_utils import utc_now, to_utc_iso8601, to_iso_date
 from app.models.users import Portfolio
 from app.models.positions import Position
 from app.models.market_data import MarketDataCache
@@ -121,7 +122,7 @@ async def get_portfolio_complete(
                 "total_value": total_market_value + cash_balance if include_cash else total_market_value,
                 "cash_balance": cash_balance if include_cash else 0,
                 "position_count": len(positions_data),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": to_utc_iso8601(utc_now())
             },
             "positions_summary": {
                 "long_count": long_count,
@@ -137,7 +138,7 @@ async def get_portfolio_complete(
         response["data_quality"] = {
             "complete_data_positions": complete_data_count,
             "partial_data_positions": partial_data_count,
-            "data_as_of": datetime.utcnow().isoformat() + "Z"
+            "data_as_of": to_utc_iso8601(utc_now())
         }
         
         return response
@@ -210,7 +211,7 @@ async def get_portfolio_data_quality(
         
         response = {
             "portfolio_id": str(portfolio_id),
-            "assessment_date": date.today().isoformat(),
+            "assessment_date": to_iso_date(date.today()),
             "summary": {
                 "total_positions": len(portfolio.positions),
                 "complete_data": len(complete_history),
@@ -274,7 +275,7 @@ async def get_portfolio_data_quality(
                 "missing": missing_factors
             }
         
-        response["last_update"] = datetime.utcnow().isoformat() + "Z"
+        response["last_update"] = to_utc_iso8601(utc_now())
         
         return response
 
@@ -358,7 +359,7 @@ async def get_positions_details(
                 "symbol": position.symbol,
                 "position_type": position.position_type.value,
                 "quantity": float(position.quantity),
-                "entry_date": position.entry_date.isoformat() if position.entry_date else None,
+                "entry_date": to_iso_date(position.entry_date) if position.entry_date else None,
                 "entry_price": float(position.entry_price),
                 "cost_basis": cost_basis,
                 "current_price": float(current_price),
@@ -448,7 +449,7 @@ async def get_historical_prices(
                 volumes = []
                 
                 for row in market_data_rows:
-                    dates.append(row.date.isoformat() if date_format == "iso" else int(row.date.timestamp()))
+                    dates.append(to_iso_date(row.date) if date_format == "iso" else int(row.date.timestamp()))
                     
                     # Use real OHLCV data
                     close_price = float(row.close)
@@ -477,8 +478,8 @@ async def get_historical_prices(
         return {
             "metadata": {
                 "lookback_days": lookback_days,
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
+                "start_date": to_iso_date(start_date),
+                "end_date": to_iso_date(end_date),
                 "trading_days_included": trading_days
             },
             "symbols": symbols_data
@@ -527,7 +528,7 @@ async def get_market_quotes(
                     "day_change_percent": 0,
                     "day_high": float(market_data.high) if market_data.high else float(market_data.close),
                     "day_low": float(market_data.low) if market_data.low else float(market_data.close),
-                    "timestamp": market_data.updated_at.isoformat() + "Z"
+                    "timestamp": to_utc_iso8601(market_data.updated_at)
                 })
             else:
                 # Try to fetch fresh data if not in cache
@@ -547,7 +548,7 @@ async def get_market_quotes(
                             "day_change_percent": 0,
                             "day_high": float(price),
                             "day_low": float(price),
-                            "timestamp": datetime.utcnow().isoformat() + "Z"
+                            "timestamp": to_utc_iso8601(utc_now())
                         })
                 except Exception as e:
                     logger.warning(f"Failed to fetch quote for {symbol}: {e}")
@@ -559,7 +560,7 @@ async def get_market_quotes(
                 "requested_symbols": symbol_list,
                 "successful_quotes": len(quotes_data),
                 "failed_quotes": len(symbol_list) - len(quotes_data),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": to_utc_iso8601(utc_now())
             }
         }
 
@@ -618,8 +619,8 @@ async def get_factor_etf_prices(
                     "high": float(market_data.high) if market_data.high else float(market_data.close),
                     "low": float(market_data.low) if market_data.low else float(market_data.close),
                     "volume": int(market_data.volume) if market_data.volume else 0,
-                    "date": market_data.date.isoformat() if market_data.date else None,
-                    "updated_at": market_data.updated_at.isoformat(),
+                    "date": to_iso_date(market_data.date) if market_data.date else None,
+                    "updated_at": to_utc_iso8601(market_data.updated_at),
                     "data_source": market_data.data_source,
                     "exchange": market_data.exchange,
                     "market_cap": float(market_data.market_cap) if market_data.market_cap else None
@@ -629,7 +630,7 @@ async def get_factor_etf_prices(
             "metadata": {
                 "factor_model": "7-factor",
                 "etf_count": len(factors_data),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": to_utc_iso8601(utc_now())
             },
             "data": factors_data
         }
