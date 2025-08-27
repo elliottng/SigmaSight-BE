@@ -693,7 +693,7 @@ We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
 
 #### Implementation Plan
 
-##### Step 1: Modify Login Endpoint (~15 min)
+##### Step 1: Modify Login & Refresh Endpoints (~20 min)
 - [ ] **Update `app/api/v1/auth.py` login function**:
   - [ ] Keep returning JWT token in response body (existing behavior)
   - [ ] ALSO set JWT as HTTP-only cookie:
@@ -706,12 +706,15 @@ We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
         key="auth_token",
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite="lax",  # Use "none" for cross-site production
         secure=settings.ENVIRONMENT == "production",
-        max_age=86400  # 24 hours
+        max_age=86400,  # 24 hours - standardize with JWT expiry
+        domain=settings.COOKIE_DOMAIN if settings.ENVIRONMENT == "production" else None
     )
     return response
     ```
+  - [ ] Apply same cookie logic to `/refresh` endpoint
+  - [ ] Standardize token expiry between JWT (ACCESS_TOKEN_EXPIRE_MINUTES) and cookie max_age
   - [ ] Document that both auth methods are now available
 
 ##### Step 2: Update Authentication Dependency (~20 min)
@@ -744,7 +747,35 @@ We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
   - [ ] Update error messages to mention both auth methods
   - [ ] Add logging to track which auth method is being used
 
-##### Step 3: Test Both Authentication Methods (~20 min)
+##### Step 3: Implement Logout with Cookie Clearing (~10 min)
+- [ ] **Update `app/api/v1/auth.py` logout function**:
+  - [ ] Clear the auth cookie on logout:
+    ```python
+    @router.post("/logout")
+    async def logout(response: Response):
+        response.delete_cookie(
+            key="auth_token",
+            samesite="lax",  # Match login cookie settings
+            secure=settings.ENVIRONMENT == "production"
+        )
+        return {"message": "Successfully logged out"}
+    ```
+  - [ ] Note: Frontend should also clear any stored Bearer tokens
+
+##### Step 4: Add CSRF Protection for Future Write Endpoints (~15 min)
+- [ ] **Important Security Note**:
+  - [ ] Cookie auth on write endpoints requires CSRF protection
+  - [ ] For Phase 1 (read-only), CSRF is not critical
+  - [ ] Before enabling any write operations with cookie auth:
+    ```python
+    # Option 1: Double-submit cookie pattern
+    # Option 2: Synchronizer token pattern with session
+    # Option 3: Only allow Bearer tokens for write operations
+    ```
+  - [ ] Document CSRF strategy before implementing write endpoints
+  - [ ] Consider using fastapi-csrf-protect library
+
+##### Step 5: Test Both Authentication Methods (~20 min)
 - [ ] **Test Bearer token auth (existing)**:
   - [ ] Verify login returns token in response body
   - [ ] Test protected endpoints with Authorization header:
@@ -768,7 +799,7 @@ We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
   - [ ] Verify fallback to cookie when no Bearer token
 - [ ] Verify Swagger/docs work with both auth methods
 
-##### Step 4: Update Documentation (~15 min)
+##### Step 6: Update Documentation (~15 min)
 - [ ] **Update API documentation**:
   - [ ] Update `API_IMPLEMENTATION_STATUS.md` to note dual auth support
   - [ ] Document both auth methods in README
@@ -779,10 +810,18 @@ We will support **BOTH** JWT Bearer tokens AND HTTP-only cookies because:
   - [ ] Ensure `agent/TODO.md` references this as canonical auth decision
   - [ ] Note that SSE endpoints will use cookie auth
 
-##### Step 5: Verify & Commit (~10 min)
+##### Step 7: Verify & Commit (~10 min)
 - [ ] Run full test suite: `uv run pytest`
 - [ ] Test both auth methods thoroughly
 - [ ] Commit with message: "Implement dual authentication (Bearer + Cookie) for SSE support"
+
+#### Production Cookie Considerations
+For production deployment with cross-site requirements:
+- **SameSite**: Change from "lax" to "none" if frontend and backend are on different domains
+- **Secure**: Always true in production (requires HTTPS)
+- **Domain**: Set to root domain for subdomain sharing (e.g., ".sigmasight.com")
+- **Path**: Consider restricting to "/api" if needed
+- **CORS**: Ensure credentials: 'include' is set in frontend fetch calls
 
 #### Benefits of This Approach
 1. **Zero Breaking Changes**: Existing Bearer token auth continues to work
