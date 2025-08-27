@@ -252,24 +252,43 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > 
 > Reference: TDD §7.0 for architectural decision, §7.1-7.6 for tool specifications
 
-### 1.0 Enhanced Agent-Optimized Endpoints (Priority)
+### 1.0 NEW Service Layer Methods Required
+
+> **Note**: Current endpoints query DB directly in API layer. For new Agent features,
+> we should create a service layer to encapsulate business logic.
+
+- [ ] **Create `app/services/portfolio_data_service.py`**
+  ```python
+  class PortfolioDataService:
+      async def get_top_positions_by_value(db, portfolio_id, limit=50)
+      async def get_portfolio_summary(db, portfolio_id)
+      async def get_historical_prices_with_selection(db, portfolio_id, selection_method, max_symbols)
+  ```
+
+### 1.1 Enhanced Agent-Optimized Endpoints (Priority)
 - [ ] **GET /api/v1/data/prices/historical/{portfolio_id}** - Add agent parameters
+  - [ ] Create service method `get_historical_prices_with_selection()`
   - [ ] Add `max_symbols` parameter (default: 5, max: 5)
   - [ ] Add `selection_method` (top_by_value, top_by_weight, all)
-  - [ ] Fetch portfolio positions internally when selection needed
+  - [ ] Service fetches positions and applies selection logic
   - [ ] Return max 5 symbols with price history
   - [ ] Include selection metadata in response
   - [ ] Token-aware response sizing (<2k tokens)
 
 - [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
-  - [ ] Pre-filter to top 50 positions by value
+  - [ ] Create service method `get_top_positions_by_value()`
+  - [ ] Calculate market value for each position
+  - [ ] Sort and filter to top 50 by value
+  - [ ] Calculate portfolio coverage percentage
   - [ ] Include aggregated statistics
   - [ ] Optimize response for LLM consumption
 
 - [ ] **GET /api/v1/data/portfolio/{portfolio_id}/summary** - New endpoint
-  - [ ] Condensed portfolio overview
-  - [ ] Key metrics only
-  - [ ] Designed for initial context setting
+  - [ ] Create service method `get_portfolio_summary()`
+  - [ ] Aggregate portfolio metrics
+  - [ ] Include top 5 holdings
+  - [ ] Calculate basic performance metrics
+  - [ ] Condensed overview for initial context
 
 ### 1.1 Existing Endpoints - Enhance with Parameters
 - [x] **GET /api/v1/data/portfolio/{portfolio_id}/complete** 
