@@ -18,9 +18,18 @@ Ship a **chat interface** where an Agent answers portfolio questions by combinin
 * **Phase 2:**
 
   * Add function tools for **calculation‑engine** endpoints (risk/exposures/attribution/stress tests, etc.).
-  * Add eval harness & tracing; consider async wrappers where needed.
+  * Implement **eval framework** for systematic prompt testing and user journey validation.
+  * Add **RLHF feedback mechanisms** (thumbs up/down, corrections) for dynamic prompt improvement.
+  * Deploy tracing & telemetry; consider async wrappers where needed.
 
-Users: 2 cofounders + \~10 beta testers. Target: functional prototype in \~2 weeks.
+* **Phase 3:**
+
+  * **Multi-LLM testing platform**: Integrate Anthropic (Claude), Google (Gemini), and xAI (Grok) alongside OpenAI.
+  * **Provider abstraction layer** for model-agnostic tool calling and streaming.
+  * **Comprehensive A/B testing** to identify optimal model/prompt combinations for quant finance.
+  * **Performance comparison** across dimensions: finance expertise, reasoning, tool usage, code interpretation.
+
+Users: 2 cofounders + \~10 beta testers. Target: Phase 1 functional prototype in \~2 weeks.
 
 ---
 
@@ -81,7 +90,100 @@ Users: 2 cofounders + \~10 beta testers. Target: functional prototype in \~2 wee
 
 ---
 
-## 4) User Flows (Phase 1)
+## 4) Frontend Requirements (MVP - Phase 1)
+
+### 4.1 Minimal Viable Chat Interface
+
+#### Essential Components Only
+* **Message Display**
+  * Simple scrollable message list
+  * User messages (right-aligned)
+  * Agent messages (left-aligned)
+  * Basic markdown rendering (bold, lists, code blocks)
+  * Timestamp per message
+
+* **Message Input**
+  * Single-line text input (or basic textarea)
+  * Send button
+  * Mode toggle (Analyst Blue/Green)
+  * Disabled state during streaming
+
+* **Streaming**
+  * Display text as it arrives (no smoothing required)
+  * "Thinking..." indicator during tool calls
+  * Basic connection error message
+
+### 4.2 MVP Scope Limitations
+
+* **No Conversation Management**
+  * Single active conversation only
+  * No history/sidebar
+  * Page refresh = new conversation
+  * No search, export, or archive
+
+* **No Advanced Features**
+  * No charts or visualizations
+  * No sortable tables
+  * No dark mode
+  * No mobile optimization
+  * No accessibility features
+  * No user feedback collection
+
+### 4.3 Simple Visual Design
+
+* **Basic Layout**
+  * Single column, centered
+  * Fixed max-width (800px)
+  * Desktop-only focus
+  * Light theme only
+
+* **Minimal Styling**
+  * SigmaSight logo and brand colors
+  * System fonts
+  * Basic CSS, no animations
+  * Standard HTML form controls
+
+### 4.4 MVP Performance Targets
+
+* **Relaxed Requirements**
+  * Page load: < 5s acceptable
+  * Stream start: < 5s acceptable
+  * Handle 50-100 messages
+  * Basic browser SSE support
+
+* **Browser Support**
+  * Latest Chrome (primary)
+  * Latest Safari/Firefox/Edge (should work)
+  * No polyfills or fallbacks
+
+### 4.5 Implementation Priorities
+
+**Week 1 Must-Haves:**
+1. Working SSE connection
+2. Display streaming text
+3. Send messages
+4. Show tool calls happening
+5. Basic markdown for tables
+
+**Nice-to-Haves (if time permits):**
+* Copy button for responses
+* Stop generation button
+* Better error messages
+* Code syntax highlighting
+
+**Explicitly Deferred to Phase 2:**
+* All conversation management
+* Data visualizations
+* Mobile responsive design
+* Dark mode
+* Accessibility
+* User feedback/ratings
+* Export functionality
+* Advanced error recovery
+
+---
+
+## 5) User Flows (Phase 1)
 
 ### 4.1 Authentication
 
@@ -271,37 +373,273 @@ All tools are **server-side handlers** that call our Raw Data service layer (in�
 
 * **Telemetry (P1 minimal):** log `run_id, user_id, conversation_id, mode, prompt_version, tool_calls[], latency, tokens, rating`.
 * **Cache:** small per‑conversation TTL cache (5–10 min) keyed by `{user_id, params_hash}` for read‑only slices.
-* **Evals/Tracing (Phase 2):** add golden set + tool‑use checks; instrument traces (Langfuse/OTel) when expanding features.
+* **Evals/Tracing (Phase 2):** comprehensive eval framework with prompt testing, user journey validation, and RLHF integration.
 
 ---
 
-## 12) Phase 2 Preview
+## 12) Phase 2: Advanced Analytics & Evaluation (4-6 weeks post-MVP)
 
+### Calculation Engine Integration
 * Register function tools for **calculation‑engine** endpoints (risk factors, exposures, attribution, scenario/stress, Greeks, etc.).
 * Add optional **async job wrappers** behind sync tool calls for long‑running analytics; still present a simple sync tool to the model.
-* Roll out eval harness & tracing; consider splitting `agent/` to its own service if scaling diverges.
+* Consider splitting `agent/` to its own service if scaling diverges.
+
+### Evaluation Framework
+* **Prompt Testing Suite:** Automated tests for each prompt version against golden queries
+* **User Journey Validation:** End-to-end testing of common workflows
+* **Response Quality Metrics:** Accuracy, completeness, hallucination detection
+* **A/B Testing Infrastructure:** Compare prompt versions systematically
+* **Performance Benchmarks:** Latency, token usage, cost per query
+
+### RLHF Feedback Mechanisms
+* **User Feedback Collection:**
+  * Thumbs up/down on responses
+  * Correction suggestions
+  * "This was helpful/not helpful" indicators
+  * Optional text feedback for improvements
+* **Dynamic Prompt Adjustment:**
+  * Store feedback with conversation context
+  * Identify patterns in negative feedback
+  * Auto-adjust prompt templates based on feedback clusters
+  * Version control for prompt iterations
+* **Feedback Loop Implementation:**
+  * Weekly prompt performance reviews
+  * Automated alerts for degradation
+  * Human-in-the-loop validation for significant changes
 
 ---
 
-## 13) Implementation Plan (2 weeks)
+## 12.5) Phase 3: Multi-LLM Testing Platform (8-10 weeks post-MVP)
 
-**Week 1**
+### Rationale
+Rather than assuming which model works best for which task, Phase 3 implements comprehensive A/B testing across all major LLMs to empirically determine the optimal model/prompt combination for portfolio analysis. Different models may excel at different aspects critical to our use case: quantitative finance expertise, mathematical reasoning, tool usage accuracy, and code interpretation capabilities.
 
-* Setup auth (POST login + HTTP‑only cookie), basic chat UI, SSE plumbing.
-* Create `/chat/conversations`, `/chat/send` endpoints; store conversation state.
-* Register the six Raw Data tools; wire server‑side handlers to service layer.
-* Draft Analyst Blue/Green prompts (v001); end‑to‑end happy path.
+### Provider Integration
+* **OpenAI GPT:**
+  * GPT-4/5 variants
+  * Baseline performance metrics
+  * Existing tool integration
+* **Anthropic Claude:**
+  * Claude 3 Opus/Sonnet variants
+  * Test for reasoning depth and accuracy
+  * Native tool use implementation
+* **Google Gemini:**
+  * Gemini Pro/Ultra variants
+  * Test multimodal and analytical capabilities
+  * Function calling compatibility layer
+* **xAI Grok:**
+  * Grok-2 variants
+  * Test for speed and market analysis
+  * API integration and tool adaptation
 
-**Week 2**
+### Provider Abstraction Layer
+* **Unified Interface:**
+  * Model-agnostic tool calling format
+  * Standardized streaming protocol
+  * Common error handling
+  * Consistent token counting
+* **Provider Capabilities Registry:**
+  * Max tokens, context window
+  * Tool calling support level
+  * Streaming capabilities
+  * Cost per token
 
-* Enable Code Interpreter by default; validate common calculations.
-* Add simple charts (FE Recharts) + table formatting.
-* Error handling; minimal telemetry & tiny cache; 15‑task golden set.
-* Beta deployment; fix critical issues; measure latency/cost.
+### Testing Dimensions
+* **Quantitative Finance Expertise:**
+  * Understanding of financial metrics and terminology
+  * Accuracy in interpreting portfolio data
+  * Knowledge of market mechanics
+* **Mathematical Reasoning:**
+  * Correctness of calculations
+  * Handling of complex formulas
+  * Statistical analysis capabilities
+* **Tool Usage Proficiency:**
+  * Accuracy in tool selection
+  * Parameter correctness
+  * Efficient tool call sequences
+* **Code Interpretation:**
+  * Quality of generated Python code
+  * Data manipulation accuracy
+  * Visualization code generation
+
+### A/B Testing Framework
+* **Bucket Testing Strategy:**
+  * Random user assignment to model/prompt combinations
+  * Controlled experiments with identical queries
+  * Statistical significance testing
+* **Performance Metrics:**
+  * Task completion accuracy
+  * Response latency
+  * Token efficiency
+  * User satisfaction scores
+  * Hallucination rates
+* **Prompt Variations:**
+  * Test same prompt across all models
+  * Test model-optimized prompts
+  * Iterate based on performance data
+
+### Model Selection Outcome
+* **Data-Driven Decision:**
+  * Identify best overall performer for default model
+  * Document model strengths/weaknesses
+  * Create model selection matrix
+* **Optimal Configuration:**
+  * Best model/prompt combination for finance use case
+  * Fallback strategies for model failures
+  * Cost/performance trade-off analysis
 
 ---
 
-## 14) Appendix — Tool Mapping Table
+## 13) Implementation Timeline
+
+### Phase 1: MVP Chat Agent (1 week sprint)
+
+**Backend (Days 1-3)**
+* ✅ Setup auth (POST login + HTTP‑only cookie) - COMPLETED
+* Day 1: Create `/chat/conversations`, `/chat/send` endpoints
+* Day 2: Register the six Raw Data tools; wire handlers
+* Day 3: Draft Analyst Blue/Green prompts; test streaming
+
+**Frontend MVP (Days 4-5)**
+* Day 4: Minimal chat UI (single HTML/JS file if needed)
+  * SSE connection handling
+  * Display streaming text
+  * Send button and input field
+* Day 5: Polish and testing
+  * Mode toggle (Blue/Green)
+  * Basic markdown rendering
+  * "Thinking..." during tool calls
+
+**Integration & Testing (Days 6-7)**
+* Day 6: End-to-end testing with real portfolios
+* Day 7: Bug fixes and deployment preparation
+
+### Phase 2: Advanced Analytics & Evaluation (Weeks 3-8)
+
+**Weeks 3-4: Calculation Engine Tools**
+* Integrate risk factors, exposures, attribution endpoints
+* Implement async job wrappers for long-running calculations
+* Add stress testing and Greeks calculations
+
+**Weeks 5-6: Evaluation Framework**
+* Build automated prompt testing suite
+* Implement user journey validation
+* Create response quality metrics and benchmarks
+* Deploy comprehensive tracing (Langfuse/OpenTelemetry)
+
+**Weeks 7-8: RLHF Implementation**
+* Add feedback UI components (thumbs, corrections)
+* Build feedback storage and analysis pipeline
+* Implement dynamic prompt adjustment system
+* Create prompt version control and rollback
+
+### Phase 3: Multi-LLM Testing Platform (Weeks 9-16)
+
+**Weeks 9-10: Provider Abstraction & Testing Framework**
+* Design unified LLM interface
+* Build provider capabilities registry
+* Implement common tool calling format
+* Create A/B testing infrastructure
+* Design performance measurement system
+
+**Weeks 11-12: Multi-Provider Integration**
+* Integrate Anthropic Claude API
+* Integrate Google Gemini API
+* Integrate xAI Grok API
+* Ensure all models work with existing tools
+* Standardize streaming across providers
+
+**Weeks 13-14: Comprehensive Testing**
+* Deploy bucket testing with real users
+* Test identical queries across all models
+* Test model-specific optimized prompts
+* Measure performance across all dimensions
+* Collect user feedback and preferences
+
+**Weeks 15-16: Analysis & Selection**
+* Analyze test results for statistical significance
+* Compare models on finance expertise
+* Evaluate tool usage accuracy
+* Assess code interpretation quality
+* Select optimal model/prompt combination as default
+* Document findings and create selection matrix
+
+---
+
+## 14) Technical Architecture Evolution
+
+### Phase 1 Architecture (Current)
+```
+Backend → OpenAI API → Raw Data Tools → Response
+```
+
+### Phase 2 Architecture (Enhanced)
+```
+Backend → OpenAI API → [Raw Data + Calc Engine Tools]
+    ↓
+Eval Framework → Feedback DB → Prompt Optimizer
+```
+
+### Phase 3 Architecture (Multi-LLM Testing)
+```
+Backend → A/B Test Controller → [OpenAI | Anthropic | Gemini | Grok]
+             ↓                        ↓
+      Unified Tool Interface → All Tools
+             ↓
+      Performance Analytics → Model Selection
+```
+
+### Key Architectural Components by Phase
+
+**Phase 1 (MVP):**
+- Single provider (OpenAI)
+- Direct API integration
+- Simple conversation storage
+- Basic SSE streaming
+
+**Phase 2 (Advanced):**
+- Eval framework with golden queries
+- Feedback collection system
+- Dynamic prompt templates
+- Performance monitoring
+- Async job queue for heavy calculations
+
+**Phase 3 (Testing Platform):**
+- Provider abstraction layer
+- Unified tool calling interface
+- A/B testing controller
+- Performance measurement system
+- Model comparison analytics
+- Optimal model selection based on empirical data
+
+---
+
+## 15) Success Metrics by Phase
+
+### Phase 1 Metrics (MVP)
+- Stream start ≤ 3s p50
+- Complete response ≤ 8-10s p95
+- 80% pass rate on 15 golden queries
+- 70% Good/Excellent usefulness rating
+
+### Phase 2 Metrics (Advanced)
+- 95% pass rate on expanded 50-query test suite
+- <5% hallucination rate on factual queries
+- 85% positive feedback rate
+- 20% improvement in response quality from RLHF
+- Full calculation engine coverage
+
+### Phase 3 Metrics (Testing Platform)
+- Complete testing across 4+ LLM providers
+- Statistical significance in model performance differences
+- Clear identification of best model for finance use case
+- >90% accuracy in tool usage for selected model
+- Optimal cost/performance ratio identified
+- Comprehensive performance matrix across all testing dimensions
+
+---
+
+## 16) Appendix — Tool Mapping Table
 
 | Tool Name                    | Method & Path                                            | Key Inputs                                                                      | Output Notes                                            |
 | ---------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -314,8 +652,10 @@ All tools are **server-side handlers** that call our Raw Data service layer (in�
 
 ---
 
-## 15) FAQ & Notes
+## 17) FAQ & Notes
 
 * **Are Raw Data tools sync?** Yes—keep them fast (p95 ≤ \~5–6s). If something is heavy, move it to Phase 2 with an async wrapper.
 * **How does Agents SDK fit?** It orchestrates prompts/tools; you still implement endpoints in FastAPI. Start with server‑side handlers calling your service layer; if you split the agent into its own service later, call the same endpoints via HTTP.
-* **Model default?** `gpt-5` default; admin can flip to `gpt-4o-mini` for cost/latency tests.
+* **Model default?** Phase 1: `gpt-5` default; Phase 3: Empirically determined best performer becomes default.
+* **Why multi-LLM in Phase 3?** To empirically determine which model/prompt combination works best for quantitative finance use cases. We'll test across dimensions like finance expertise, mathematical reasoning, tool usage accuracy, and code interpretation to find the optimal configuration rather than making assumptions.
+* **How will RLHF work?** Collect feedback → identify patterns → adjust prompts dynamically. Start with manual reviews, automate over time.
