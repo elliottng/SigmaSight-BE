@@ -20,13 +20,14 @@ Ship a **chat interface** where an Agent answers portfolio questions by combinin
   * Add function tools for **calculation‑engine** endpoints (risk/exposures/attribution/stress tests, etc.).
   * Implement **eval framework** for systematic prompt testing and user journey validation.
   * Add **RLHF feedback mechanisms** (thumbs up/down, corrections) for dynamic prompt improvement.
-  * Deploy tracing & telemetry; consider async wrappers where needed.
+  * Deploy tracing & telemetry
+  * Consider async wrappers where needed
 
 * **Phase 3:**
 
   * **Multi-LLM testing platform**: Integrate Anthropic (Claude), Google (Gemini), and xAI (Grok) alongside OpenAI.
   * **Provider abstraction layer** for model-agnostic tool calling and streaming.
-  * **Comprehensive A/B testing** to identify optimal model/prompt combinations for quant finance.
+  * **Comprehensive A/B testing** to identify optimal model/mode/prompt combinations.
   * **Performance comparison** across dimensions: finance expertise, reasoning, tool usage, code interpretation.
 
 Users: 2 cofounders + \~10 beta testers. Target: Phase 1 functional prototype in \~2 weeks.
@@ -88,9 +89,10 @@ The Agent is designed as a **separable service** that can be deployed either:
 
 **Interface Contracts:**
 * Authentication: Standard JWT Bearer tokens or service-to-service auth
-* Data Access: HTTP calls to Raw Data API endpoints
-* Response Format: Standardized JSON schemas
-* Error Handling: Consistent HTTP status codes and error formats
+* Data Access: HTTP calls to **Agent-specific endpoints** (`/api/v1/data/agent/*`)
+* Business Logic: Backend handles all filtering, selection, aggregation
+* Tool Handlers: Simple pass-through proxies (no data manipulation)
+* Response Format: Pre-optimized for LLM token limits (<2k tokens)
 
 ### 3.3 Current Architecture (Co-located MVP)
 
@@ -117,7 +119,7 @@ The Agent is designed as a **separable service** that can be deployed either:
 
 ## Architecture Decision Summary (for AI coding agent)
 
-* **Core stack:** OpenAI **Responses** + **Conversations**; **Agents SDK** for prompt modes and tool orchestration.
+* **Core stack:** OpenAI **Responses** + **Conversations**
 * **Backend-only OpenAI calls:** Frontend hits `/chat/*`; keys & rate-limits stay server-side.
 * **Streaming:** **SSE** for token/tool events.
 * **Tools (Phase 1):** Server-side handlers over **Raw Data** FastAPI services; **sync**, bounded responses, **no pagination**—enforce caps and return `meta.requested` vs `meta.applied`.
@@ -309,15 +311,15 @@ Users can switch modes using `/mode <color>` command (e.g., `/mode green`, `/mod
 
 ---
 
-## 6) Tools & Schemas (Phase 1 — Raw Data only)
+## 6) Tools & Schemas (Phase 1 — Agent-Optimized APIs)
 
-All tools are **server-side handlers** that call our Raw Data service layer (in‑process when co‑located with backend; HTTP call with short‑lived tool token if agent becomes a separate service).
+**Architecture Update:** Tools now call **agent-specific endpoints** (`/api/v1/data/agent/*`) that handle business logic server-side. Tool handlers are simple pass-through proxies with no data manipulation.
 
-> **Caps (no pagination in P1):**
-> Prices: `max_symbols=5`, `max_window=180d@1d` (or `5d@5m` intraday)
-> Positions: `max_rows=200`
-> Transactions (if applicable later): `max_rows=500`, default `window=30d`
-> Always echo `meta.requested` vs `meta.applied`, `truncated`, and `suggested_params`.
+> **Backend-Enforced Caps:**
+> - Prices: Backend returns max 5 symbols (by value/weight)
+> - Positions: Backend returns top 50-200 positions
+> - All responses optimized for <2k tokens
+> - Backend handles selection logic and truncation
 
 ### 6.1 Tool: **get\_portfolio\_complete**
 
@@ -478,15 +480,15 @@ Rather than assuming which model works best for which task, Phase 3 implements c
   * Baseline performance metrics
   * Existing tool integration
 * **Anthropic Claude:**
-  * Claude 3 Opus/Sonnet variants
+  * Claude 4 Opus/Sonnet variants
   * Test for reasoning depth and accuracy
   * Native tool use implementation
 * **Google Gemini:**
-  * Gemini Pro/Ultra variants
+  * Gemini 2.0 Pro variants
   * Test multimodal and analytical capabilities
   * Function calling compatibility layer
 * **xAI Grok:**
-  * Grok-2 variants
+  * Grok TBD variants
   * Test for speed and market analysis
   * API integration and tool adaptation
 

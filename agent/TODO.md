@@ -213,14 +213,37 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ---
 
-## 📋 Phase 1: Enhance Raw Data APIs for Agent Requirements (Day 2-3)
+## 📋 Phase 1: Create Agent-Specific API Endpoints (Day 2-3)
 
-> ✅ **IMPORTANT UPDATE**: All 6 Raw Data APIs are WORKING with REAL DATA as of 2025-08-26!
-> The APIs return real data, but need enhancements to match agent tool requirements.
-> See [API_IMPLEMENTATION_STATUS.md](../../backend/API_IMPLEMENTATION_STATUS.md) for current status.
-> Reference: TDD §7 for tool specifications, §18.5 for existing endpoints
+> **ARCHITECTURE UPDATE**: Based on review feedback, we're creating dedicated agent endpoints
+> rather than having tool handlers apply business logic. This keeps the Agent layer clean.
+> 
+> New endpoints will be under `/api/v1/data/agent/*` namespace and handle:
+> - Symbol selection logic (top N by value/weight)
+> - Token-aware response sizing
+> - Pre-filtered, capped responses
+> 
+> Reference: TDD §7.0 for architectural decision, §7.1-7.6 for tool specifications
 
-### 1.1 Portfolio Data Endpoints ✅ WORKING - Need Enhancements
+### 1.0 NEW Agent-Optimized Endpoints (Priority)
+- [ ] **GET /api/v1/data/agent/prices/historical/{portfolio_id}**
+  - [ ] Fetch portfolio positions internally
+  - [ ] Apply selection_method (top_by_value, top_by_weight)
+  - [ ] Return max 5 symbols with price history
+  - [ ] Include selection metadata in response
+  - [ ] Token-aware response sizing (<2k tokens)
+
+- [ ] **GET /api/v1/data/agent/positions/{portfolio_id}**
+  - [ ] Pre-filter to top 50 positions by value
+  - [ ] Include aggregated statistics
+  - [ ] Optimize response for LLM consumption
+
+- [ ] **GET /api/v1/data/agent/portfolio/{portfolio_id}/summary**
+  - [ ] Condensed portfolio overview
+  - [ ] Key metrics only
+  - [ ] Designed for initial context setting
+
+### 1.1 Existing Endpoints - Keep for Raw Data Access
 - [x] **GET /api/v1/data/portfolio/{portfolio_id}/complete** 
   - ✅ Returns real portfolio data with positions
   - ✅ cash_balance calculated as 5% of portfolio

@@ -155,7 +155,6 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
 * Import from `app.database` (DB session)
 * Import from `app.services.*` (business logic)
 * Share utility functions (copy what you need)
-* Access Redis/cache directly (use API endpoints)
 * Write to any database tables
 
 ### 5.2 Authentication Flow
@@ -244,6 +243,24 @@ agent_settings = AgentSettings()
 ---
 
 ## 7. Function Tools — Raw Data (Phase 1)
+
+### 7.0 Agent-Specific Endpoints (Architectural Decision)
+
+**Problem:** Having tool handlers fetch data, apply business logic, and filter results creates a "leaky abstraction" where the Agent layer knows too much about portfolio logic.
+
+**Solution:** Create agent-specific API endpoints that encapsulate this business logic server-side:
+
+1. **`/api/v1/data/agent/*`** - New namespace for agent-optimized endpoints
+2. **Pre-filtered responses** - Backend handles symbol selection, caps, truncation
+3. **Token-aware** - Endpoints designed to return <2k tokens per response
+4. **Clean tool handlers** - Tool handlers become simple pass-through proxies
+
+**Benefits:**
+- Cleaner separation of concerns
+- Business logic stays in backend where it belongs
+- Easier to test and maintain
+- Can optimize queries server-side
+- Tool handlers remain stateless
 
 ### 7.A Common response/ error shapes & parameter inventory
 
@@ -371,7 +388,7 @@ Error (non‑200):
 
 ### 7.4 `get_prices_historical`
 
-**Maps to:** `GET /api/v1/data/prices/historical/{portfolio_id}`\
+**Maps to:** `GET /api/v1/data/agent/prices/historical/{portfolio_id}` ⚠️ **NEW ENDPOINT**\
 **Input**
 
 ```json
@@ -379,23 +396,24 @@ Error (non‑200):
   "type":"object",
   "properties":{
     "portfolio_id":{"type":"string"},
-    "lookback_days":{"type":"integer", "default":150, "minimum":1},
-    "include_factor_etfs":{"type":"boolean", "default":true},
+    "lookback_days":{"type":"integer", "default":90, "maximum":180},
+    "max_symbols":{"type":"integer", "default":5, "maximum":5},
+    "selection_method":{"type":"string", "enum":["top_by_value","top_by_weight","all"], "default":"top_by_value"},
+    "include_factor_etfs":{"type":"boolean", "default":false},
     "date_format":{"type":"string", "enum":["iso","unix"], "default":"iso"}
   },
   "required":["portfolio_id"]
 }
 ```
 
-**Limits:** `max_window_days=180`; intraday alternative `5d@5m` (downsample to meet token budget).\
-**Output:** Per‑symbol series (dates, open/high/low/close/volume/adjusted\_close).
+**Limits:** `max_symbols=5`, `max_window_days=180`\
+**Output:** Per‑symbol series for top N symbols (by selection method)
 
-**Note (per product decision, no API change):** this endpoint **does not** accept a `symbols` filter. The tool handler will:
-
-1. fetch **positions** to identify **top 5 symbols by market value** (configurable policy),
-2. call this historical endpoint with the requested (or capped) window,
-3. **post‑process** the response to **retain only the selected symbols** before sending to the model,
-4. set `meta.truncated=true` and include `meta.applied.symbols` and `suggested_params` when trimming occurs. If payload still exceeds token thresholds, the handler will further **reduce **`` (down to the cap) and reflect that in `meta.applied`.
+**Architecture Update:** This is now a **dedicated agent endpoint** that:
+1. Handles symbol selection logic server-side (no tool handler fetching)
+2. Returns pre-filtered data within token limits
+3. Includes selection metadata in response
+4. Tool handler becomes a simple pass-through
 
 ### 7.5 `get_current_quotes`
 
