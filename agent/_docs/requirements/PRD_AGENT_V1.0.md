@@ -84,10 +84,11 @@ The Agent is designed as a **separable service** that can be deployed either:
 
 **Database Architecture:**
 * Agent owns its database schema with dedicated tables
+* All Agent tables use `agent_` prefix for clear separation
+* Agent tables created via **Alembic migrations** (same as backend)
 * Agent can directly create/manage conversation, message, preference tables
 * Agent MUST use APIs for all portfolio/market data (no access to backend tables)
-* Clear schema separation: `agent_*` tables vs core backend tables
-* When separated to microservice, Agent migrates its schema
+* When separated to microservice, Agent migrates its schema and migration history
 
 **Service Boundaries:**
 * No shared business logic or domain models between Agent and backend
@@ -566,6 +567,7 @@ Rather than assuming which model works best for which task, Phase 3 implements c
 * ✅ Setup auth (POST login + HTTP‑only cookie) - COMPLETED
 * Day 1: Create `/chat/conversations`, `/chat/send` endpoints
   * Place in separate `app/agent/` module, not mixed with core backend
+  * Create Agent models and run Alembic migrations for agent_* tables
   * Use dependency injection for Raw Data API clients
 * Day 2: Register the six Raw Data tools; wire handlers  
   * Tool handlers make HTTP calls to Raw Data APIs (even when co-located)

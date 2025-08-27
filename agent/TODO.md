@@ -92,6 +92,29 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [ ] Create `backend/app/agent/models/preferences.py`
   - [ ] Define `UserPreference` model (agent_user_preferences table)
 
+- [ ] **Update Alembic configuration**
+  - [ ] Import Agent models in `backend/alembic/env.py`:
+    ```python
+    from app.agent.models import conversations, preferences
+    ```
+  - [ ] Ensure Agent models are included in autogenerate
+
+- [ ] **Create and run Alembic migration**
+  ```bash
+  cd backend
+  # Create migration
+  uv run alembic revision --autogenerate -m "Create Agent tables (conversations, messages, preferences)"
+  
+  # Review generated migration file
+  # Ensure all tables have agent_ prefix
+  
+  # Apply migration
+  uv run alembic upgrade head
+  
+  # Verify tables created
+  uv run python -c "from app.database import engine; print(engine.table_names())"
+  ```
+
 - [ ] **Conversation model schema** (Agent owns these tables!)
   ```python
   class Conversation(Base):
@@ -195,6 +218,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 - [ ] **Agent owns its database schema**
   - [ ] Create Agent SQLAlchemy models in `app/agent/models/`
   - [ ] Use `agent_` prefix for all Agent tables
+  - [ ] **ALWAYS use Alembic migrations** (never create tables manually)
   - [ ] Direct database access for Agent tables (conversations, messages, etc.)
   - [ ] NO access to backend tables (users, portfolios, positions)
   - [ ] Use HTTP client for ALL portfolio/market data

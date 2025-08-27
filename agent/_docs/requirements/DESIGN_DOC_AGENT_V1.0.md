@@ -157,7 +157,11 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
 * Access Agent tables directly through SQLAlchemy
 * Use HTTP clients for portfolio/market data access
 * Create separate config with `AGENT_` prefixed env vars
-* Write Alembic migrations for Agent schema changes
+* **Always use Alembic migrations** for Agent schema changes:
+  ```bash
+  uv run alembic revision --autogenerate -m "Add agent_conversations table"
+  uv run alembic upgrade head
+  ```
 
 **DON'T:**
 * Import from `app.models.*` (backend domain models)
@@ -207,7 +211,34 @@ class AgentSettings(BaseSettings):
 agent_settings = AgentSettings()
 ```
 
-### 5.4 Testing Strategy
+### 5.4 Database Migration Strategy
+
+**Alembic Configuration:**
+```python
+# Agent models must be imported in env.py for autogenerate
+from app.agent.models import conversations, preferences
+```
+
+**Migration Commands:**
+```bash
+# Create new migration for Agent tables
+cd backend
+uv run alembic revision --autogenerate -m "Add agent_conversations and agent_messages"
+
+# Apply migrations
+uv run alembic upgrade head
+
+# Rollback if needed
+uv run alembic downgrade -1
+```
+
+**Migration Rules:**
+- All Agent tables MUST use `agent_` prefix
+- Never create foreign keys to backend tables (maintain separation)
+- Include both upgrade and downgrade paths
+- Test migrations on fresh database
+
+### 5.5 Testing Strategy
 
 **Unit Tests:**
 * Mock OpenAI responses
