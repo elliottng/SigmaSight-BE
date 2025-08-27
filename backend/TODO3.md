@@ -262,6 +262,243 @@ This document tracks Phase 3.0 (API Development) and future phases of the SigmaS
 - [ ] Add caching for expensive calculations
 - [ ] Optimize query performance
 
+### 3.0.2.3 UTC ISO 8601 Date/Time Standardization (Priority for Agent Integration)
+*Standardize all datetime outputs to UTC ISO 8601 format for consistency across APIs*
+
+**Added: 2025-08-26 19:15 PST**  
+**Risk Assessment Completed: 2025-08-27** - Overall Risk: **LOW-MEDIUM** (See UTC_ISO8601_RISK_ASSESSMENT.md)
+
+#### Problem Statement
+Currently we have mixed date/time formats in API responses:
+- Some use `datetime.utcnow().isoformat() + "Z"` → `"2025-08-27T02:12:55.628484Z"` ✅
+- Some return SQLAlchemy DateTime with offset → `"2025-08-27T07:48:00.498537+00:00"` ⚠️
+- Date fields use ISO date format → `"2025-08-23"` ✅
+- **11 instances** of `datetime.now()` (local time) instead of UTC
+- **Inconsistent** manual "Z" suffix addition across endpoints
+
+This inconsistency causes issues for:
+- LLM/Agent parsing and understanding
+- Frontend datetime handling
+- Code Interpreter date operations
+- API consumer confusion
+- **Date comparison logic failures** (mixing local vs UTC)
+
+#### Standardization Requirements
+1. **Timestamps**: Always UTC with "Z" suffix: `YYYY-MM-DDTHH:MM:SS.sssZ`
+2. **Dates**: ISO 8601 date only: `YYYY-MM-DD`
+3. **No timezone offsets**: Convert all `+00:00` to `Z`
+4. **Consistent field names**: Use `_at` suffix for timestamps, `_date` for dates
+5. **No local times**: Replace all `datetime.now()` with `datetime.utcnow()`
+
+#### Implementation Tasks (Risk-Mitigated Approach)
+
+##### Phase 1: Foundation & Testing Infrastructure (Week 1) - LOW RISK
+- [ ] Create `app/core/datetime_utils.py` with standardization helpers
+  ```python
+  from datetime import datetime, date
+  from typing import Optional, Any, Dict
+  
+  def utc_now() -> datetime:
+      """Get current UTC time (replaces datetime.now())"""
+      return datetime.utcnow()
+  
+  def to_utc_iso8601(dt: Optional[datetime]) -> Optional[str]:
+      """Convert any datetime to UTC ISO 8601 with Z suffix"""
+      if dt is None:
+          return None
+      if dt.tzinfo is None:
+          # Assume naive datetime is UTC
+          return dt.isoformat() + "Z"
+      # Convert timezone-aware to UTC
+      return dt.replace(tzinfo=None).isoformat() + "Z"
+      
+  def to_iso_date(d: Optional[date]) -> Optional[str]:
+      """Convert date to ISO 8601 date string"""
+      return d.isoformat() if d else None
+      
+  def standardize_datetime_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+      """Recursively standardize all datetime fields in a dict"""
+      # Implementation with field detection logic
+  ```
+  
+- [ ] **Create comprehensive test suite FIRST**:
+  - [ ] `tests/test_datetime_utils.py` - Unit tests for utility functions
+  - [ ] `tests/test_datetime_consistency.py` - Integration tests for all endpoints
+  - [ ] Test mixed timezone inputs, naive datetimes, None values
+  - [ ] Test backward compatibility scenarios
+
+- [ ] **Audit current datetime usage** (prevent surprises):
+  - [ ] Generate report of all `datetime.now()` usages (11 found)
+  - [ ] Generate report of all `.isoformat()` patterns (27 found)
+  - [ ] Document which services/endpoints need updates
+  - [ ] Identify external API datetime dependencies
+
+##### Phase 2: Service Layer Fixes (Week 2) - MEDIUM RISK (Mitigated)
+**Risk Mitigation: Fix service layer BEFORE API layer to ensure data consistency**
+
+- [ ] **Replace local time with UTC** (11 instances):
+  - [ ] `app/services/market_data_service.py:177` - timestamp in fallback
+  - [ ] `app/calculations/portfolio.py:50,55,57` - cache timing
+  - [ ] `app/clients/fmp_client.py:111,256` - timestamp fields
+  - [ ] `app/clients/tradefeeds_client.py:54,67` - request timing
+  - [ ] Create migration script for automated replacement
+  - [ ] Add linting rule to prevent future `datetime.now()` usage
+
+- [ ] **Fix calculation timestamp inconsistencies**:
+  - [ ] Standardize all `calculated_at` fields in calculations module
+  - [ ] Update batch processing timestamp handling
+  - [ ] Fix cache timestamp comparisons (use UTC)
+  
+- [ ] **Add service layer tests**:
+  - [ ] Test date comparisons work correctly with UTC
+  - [ ] Verify cache invalidation timing
+  - [ ] Test batch processing with UTC timestamps
+
+##### Phase 3: API Layer - Backward Compatible (Week 3) - MEDIUM RISK (Mitigated)
+**Risk Mitigation: Implement with feature flag and gradual rollout**
+
+- [ ] **Update Pydantic BaseSchema with compatibility**:
+  ```python
+  # app/schemas/base.py
+  from app.core.datetime_utils import to_utc_iso8601
+  from app.config import settings
+  
+  class BaseSchema(BaseModel):
+      model_config = ConfigDict(
+          json_encoders={
+              datetime: lambda v: (
+                  to_utc_iso8601(v) if settings.USE_ISO8601_STRICT 
+                  else v.isoformat() if v else None
+              ),
+          }
+      )
+  ```
+
+- [ ] **Add feature flag for gradual rollout**:
+  - [ ] `USE_ISO8601_STRICT=false` initially (backward compatible)
+  - [ ] Test with internal services first
+  - [ ] Monitor for client issues
+  - [ ] Gradually enable for specific endpoints
+
+- [ ] **Update /data/ Endpoints with compatibility checks**:
+  - [ ] `/portfolio/{id}/complete` - Add version parameter
+  - [ ] `/portfolio/{id}/data-quality` - Support both formats temporarily
+  - [ ] `/positions/details` - Deprecation warning for old format
+  - [ ] `/prices/historical/{id}` - Version-aware responses
+  - [ ] `/prices/quotes` - Maintain backward compatibility
+  - [ ] `/factors/etf-prices` - Phased migration
+
+- [ ] **Client communication plan**:
+  - [ ] Document format changes in API docs
+  - [ ] Add deprecation warnings to responses
+  - [ ] Provide migration timeline (4 weeks)
+  - [ ] Create client migration guide
+
+##### Phase 4: Full Migration (Week 4) - LOW RISK
+- [ ] **Enable strict mode globally**:
+  - [ ] Set `USE_ISO8601_STRICT=true`
+  - [ ] Remove backward compatibility code
+  - [ ] Update all API documentation
+  - [ ] Version bump API (if needed)
+
+- [ ] **Update remaining namespaces**:
+  - [ ] Analytics endpoints (when implemented)
+  - [ ] Management endpoints (when implemented)  
+  - [ ] Export endpoints (when implemented)
+  - [ ] System endpoints (when implemented)
+
+- [ ] **Database model enhancements**:
+  - [ ] Add UTC properties to all timestamp fields
+  - [ ] Update all serialization methods
+  - [ ] Ensure consistent timezone handling
+
+##### Phase 5: Verification & Monitoring (Week 5) - LOW RISK
+- [ ] **Comprehensive validation**:
+  - [ ] Run full test suite against all endpoints
+  - [ ] Validate with all 3 demo portfolios
+  - [ ] Test with Agent/LLM consumption
+  - [ ] Frontend integration testing
+  
+- [ ] **Performance monitoring**:
+  - [ ] Monitor API response times
+  - [ ] Check for increased error rates
+  - [ ] Validate cache performance
+  - [ ] Review batch processing times
+
+- [ ] **Documentation updates**:
+  - [ ] Update API specification
+  - [ ] Update developer documentation
+  - [ ] Add to CLAUDE.md best practices
+  - [ ] Update AI_AGENT_REFERENCE.md
+
+#### Rollback Strategy (Risk Mitigation)
+
+##### Immediate Rollback (< 5 minutes)
+1. **Feature flag disable**: Set `USE_ISO8601_STRICT=false`
+2. **Cache clear**: Flush any cached responses
+3. **Alert clients**: Send notification of temporary revert
+
+##### Service Layer Rollback (< 30 minutes)
+1. **Git revert**: `git revert <commit-hash>` for service changes
+2. **Redeploy**: Deploy previous version
+3. **Verify**: Run smoke tests on critical endpoints
+
+##### Full Rollback Plan
+1. **Database**: No rollback needed (no schema changes)
+2. **Services**: Revert to previous git tag
+3. **API**: Feature flag controls format
+4. **Monitoring**: Track error rates during rollback
+
+#### Example Implementation Pattern
+```python
+# In endpoint handlers:
+from app.core.datetime_utils import to_utc_iso8601, standardize_datetime_dict
+
+# Before returning response:
+response = {
+    "portfolio": {
+        "id": str(portfolio.id),
+        "name": portfolio.name,
+        "created_at": to_utc_iso8601(portfolio.created_at),
+        "updated_at": to_utc_iso8601(portfolio.updated_at),
+        # ... other fields
+    }
+}
+
+# Or for complex nested structures:
+return standardize_datetime_dict(response)
+
+# With feature flag:
+if settings.USE_ISO8601_STRICT:
+    return standardize_datetime_dict(response)
+else:
+    return response  # Old format for compatibility
+```
+
+#### Success Criteria & Metrics
+- [ ] **Data Consistency**: 100% of timestamps in UTC
+- [ ] **Format Compliance**: All responses pass ISO 8601 validation
+- [ ] **No Breaking Changes**: 0 client errors during migration
+- [ ] **Performance**: < 5% increase in response time
+- [ ] **Agent Compatibility**: LLM successfully parses all dates
+- [ ] **Test Coverage**: > 95% coverage on datetime utilities
+
+#### Risk Tracking Dashboard
+| Phase | Risk Level | Status | Issues Found | Mitigation Applied |
+|-------|------------|--------|--------------|-------------------|
+| Phase 1 | LOW | ⏳ | - | - |
+| Phase 2 | MEDIUM | ⏳ | - | - |
+| Phase 3 | MEDIUM | ⏳ | - | - |
+| Phase 4 | LOW | ⏳ | - | - |
+| Phase 5 | LOW | ⏳ | - | - |
+
+#### Notes
+- **Critical for Agent integration** (Phase 1 of Agent implementation)
+- **Risk assessment completed**: See UTC_ISO8601_RISK_ASSESSMENT.md
+- **Medium risk areas identified**: Service layer (11 datetime.now() instances) and API layer (client compatibility)
+- **Mitigation strategies in place**: Feature flags, phased rollout, comprehensive testing
+- **Rollback plan ready**: Can revert in < 5 minutes with feature flag
+
 #### Implementation Tracking
 - [ ] Create test script `test_raw_data_apis.py`
 - [ ] Run comprehensive tests against all demo accounts
