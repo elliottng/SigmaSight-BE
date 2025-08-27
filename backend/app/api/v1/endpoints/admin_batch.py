@@ -14,6 +14,7 @@ from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2 as batch_orche
 from app.batch.scheduler_config import batch_scheduler
 from app.batch.data_quality import pre_flight_validation
 from app.core.logging import get_logger
+from app.core.datetime_utils import utc_now
 
 logger = get_logger(__name__)
 
@@ -43,7 +44,7 @@ async def trigger_daily_batch(
         "status": "started",
         "message": f"Daily batch processing started for {'portfolio ' + portfolio_id if portfolio_id else 'all portfolios'}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -66,7 +67,7 @@ async def trigger_market_data_update(
         "status": "started",
         "message": "Market data update started",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -94,7 +95,7 @@ async def trigger_greeks_calculation(
         "status": "started",
         "message": f"Greeks calculation started for portfolio {portfolio_id}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -122,7 +123,7 @@ async def trigger_factor_analysis(
         "status": "started",
         "message": f"Factor analysis started for portfolio {portfolio_id}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -150,7 +151,7 @@ async def trigger_stress_tests(
         "status": "started",
         "message": f"Stress testing started for portfolio {portfolio_id}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -176,7 +177,7 @@ async def trigger_correlation_calculation(
         "status": "started",
         "message": f"Correlation calculation started for {'portfolio ' + portfolio_id if portfolio_id else 'all portfolios'}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -204,7 +205,7 @@ async def trigger_portfolio_snapshot(
         "status": "started",
         "message": f"Snapshot creation started for portfolio {portfolio_id}",
         "triggered_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -221,7 +222,7 @@ async def get_batch_job_status(
     Get status of recent batch jobs.
     """
     # Build query
-    since_date = datetime.now() - timedelta(days=days_back)
+    since_date = utc_now() - timedelta(days=days_back)
     
     conditions = [BatchJob.started_at >= since_date]
     
@@ -263,7 +264,7 @@ async def get_batch_job_summary(
     """
     Get summary statistics of batch jobs.
     """
-    since_date = datetime.now() - timedelta(days=days_back)
+    since_date = utc_now() - timedelta(days=days_back)
     
     # Get all jobs in period
     stmt = select(BatchJob).where(BatchJob.started_at >= since_date)
@@ -296,7 +297,7 @@ async def get_batch_job_summary(
     return {
         "period": {
             "start": since_date.isoformat(),
-            "end": datetime.now().isoformat(),
+            "end": utc_now().isoformat(),
             "days": days_back
         },
         "summary": {
@@ -357,7 +358,7 @@ async def pause_scheduler(
         "status": "paused",
         "message": "Batch scheduler has been paused",
         "paused_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -375,7 +376,7 @@ async def resume_scheduler(
         "status": "running",
         "message": "Batch scheduler has been resumed",
         "resumed_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -404,7 +405,7 @@ async def cancel_batch_job(
     
     # Update job status
     job.status = 'cancelled'
-    job.completed_at = datetime.now()
+    job.completed_at = utc_now()
     job.error_message = f"Cancelled by admin {admin_user.email}"
     
     await db.commit()
@@ -415,7 +416,7 @@ async def cancel_batch_job(
         "status": "cancelled",
         "job_id": job_id,
         "cancelled_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }
 
 
@@ -437,7 +438,7 @@ async def get_data_quality_status(
         
         # Add admin metadata
         validation_results['requested_by'] = admin_user.email
-        validation_results['request_timestamp'] = datetime.now()
+        validation_results['request_timestamp'] = utc_now()
         
         logger.info(
             f"Data quality check completed for admin {admin_user.email}: "
@@ -477,7 +478,7 @@ async def refresh_market_data_for_quality(
             "message": "Data quality is already within acceptable thresholds",
             "current_quality_score": validation_results.get('quality_score', 0),
             "requested_by": admin_user.email,
-            "timestamp": datetime.now()
+            "timestamp": utc_now()
         }
     
     # Run market data sync in background
@@ -497,5 +498,5 @@ async def refresh_market_data_for_quality(
         "current_quality_score": validation_results.get('quality_score', 0),
         "recommendations": recommendations[:3],  # Show top 3 recommendations
         "requested_by": admin_user.email,
-        "timestamp": datetime.now()
+        "timestamp": utc_now()
     }

@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from datetime import datetime, date
 import aiohttp
+from app.core.datetime_utils import utc_now
 
 from app.clients.base import MarketDataProvider
 
@@ -108,7 +109,7 @@ class FMPClient(MarketDataProvider):
                         'change': change,
                         'change_percent': change_percent,
                         'volume': volume,
-                        'timestamp': datetime.now(),
+                        'timestamp': utc_now(),
                         'provider': 'FMPClient',
                         'raw_data': quote  # Store raw data for debugging
                     }
@@ -253,7 +254,7 @@ class FMPClient(MarketDataProvider):
                         'ceo': profile.get('ceo'),
                         'employees': profile.get('fullTimeEmployees'),
                         'website': profile.get('website'),
-                        'timestamp': datetime.now(),
+                        'timestamp': utc_now(),
                         'provider': 'FMPClient'
                     }
                     

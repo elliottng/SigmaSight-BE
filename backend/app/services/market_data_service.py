@@ -7,6 +7,7 @@ import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Union, Any
+from app.core.datetime_utils import utc_now
 from polygon import RESTClient
 # import yfinance as yf  # Removed - using FMP primary architecture
 import pandas as pd
@@ -174,7 +175,7 @@ class MarketDataService:
                     'change': Decimal('0'),  # Not available from current implementation
                     'change_percent': Decimal('0'),
                     'volume': 0,
-                    'timestamp': datetime.now(),
+                    'timestamp': utc_now(),
                     'provider': 'Polygon (fallback)'
                 }
         

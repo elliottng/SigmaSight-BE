@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.models.users import Portfolio
+from app.core.datetime_utils import utc_now
 
 logger = get_logger(__name__)
 
@@ -66,7 +67,7 @@ class BatchOrchestratorV2:
         """
         Main entry point - processes portfolios sequentially to avoid concurrency issues.
         """
-        start_time = datetime.now()
+        start_time = utc_now()
         logger.info(f"Starting sequential batch processing at {start_time}")
         
         try:
@@ -98,7 +99,7 @@ class BatchOrchestratorV2:
                 if i < len(portfolios):
                     await asyncio.sleep(DEFAULT_PORTFOLIO_DELAY)
             
-            duration = datetime.now() - start_time
+            duration = utc_now() - start_time
             logger.info(f"Sequential batch processing completed in {duration.total_seconds():.2f}s")
             
             return all_results
@@ -181,7 +182,7 @@ class BatchOrchestratorV2:
         ]
         
         # Add correlations if requested
-        if run_correlations or (run_correlations is None and datetime.now().weekday() == 1):
+        if run_correlations or (run_correlations is None and utc_now().weekday() == 1):
             job_sequence.append(("position_correlations", self._calculate_correlations, [portfolio_id]))
         
         # Add report generation at the end (after all calculations)
@@ -214,7 +215,7 @@ class BatchOrchestratorV2:
         """
         Execute a single job with proper error handling and session isolation.
         """
-        start_time = datetime.now()
+        start_time = utc_now()
         
         for attempt in range(self.max_retries + 1):
             try:
@@ -227,7 +228,7 @@ class BatchOrchestratorV2:
                     else:
                         result = await job_func(db)
                 
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (utc_now() - start_time).total_seconds()
                 logger.info(f"Job {job_name} completed in {duration:.2f}s")
                 
                 return {
@@ -235,13 +236,13 @@ class BatchOrchestratorV2:
                     'status': 'completed',
                     'duration_seconds': duration,
                     'result': result,
-                    'timestamp': datetime.now(),
+                    'timestamp': utc_now(),
                     'portfolio_name': portfolio_name,
                     'attempt': attempt + 1
                 }
                 
             except Exception as e:
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (utc_now() - start_time).total_seconds()
                 error_msg = str(e)
                 
                 # Categorize error types for better handling  
@@ -268,7 +269,7 @@ class BatchOrchestratorV2:
                         'status': 'failed',
                         'duration_seconds': duration,
                         'error': error_msg,
-                        'timestamp': datetime.now(),
+                        'timestamp': utc_now(),
                         'portfolio_name': portfolio_name,
                         'attempts': attempt + 1,
                         'error_type': 'permanent'
@@ -285,7 +286,7 @@ class BatchOrchestratorV2:
                         'status': 'failed',
                         'duration_seconds': duration,
                         'error': error_msg,
-                        'timestamp': datetime.now(),
+                        'timestamp': utc_now(),
                         'portfolio_name': portfolio_name,
                         'attempts': attempt + 1,
                         'error_type': 'greenlet' if is_greenlet else 'transient' if is_transient else 'permanent'
@@ -530,7 +531,7 @@ class BatchOrchestratorV2:
         portfolio_uuid = ensure_uuid(portfolio_id)
         return await correlation_service.calculate_portfolio_correlations(
             portfolio_uuid,
-            calculation_date=datetime.now()
+            calculation_date=utc_now()
         )
     
     async def _generate_report(self, db: AsyncSession, portfolio_id: str):

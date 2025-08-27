@@ -12,6 +12,7 @@ from app.services.market_data_service import market_data_service
 from app.models.positions import Position
 from app.models.market_data import MarketDataCache
 from app.core.logging import get_logger
+from app.core.datetime_utils import utc_now
 
 logger = get_logger(__name__)
 
@@ -23,7 +24,7 @@ async def sync_market_data():
     - Updates price data from Polygon.io
     - Updates GICS sector data from YFinance
     """
-    start_time = datetime.now()
+    start_time = utc_now()
     logger.info(f"Starting market data sync at {start_time}")
     
     try:
@@ -44,7 +45,7 @@ async def sync_market_data():
                 days_back=5  # Get last 5 trading days for daily sync
             )
             
-            duration = datetime.now() - start_time
+            duration = utc_now() - start_time
             logger.info(f"Market data sync completed in {duration.total_seconds():.2f}s: {stats}")
             
             return stats
@@ -188,7 +189,7 @@ async def validate_and_ensure_factor_analysis_data(db: AsyncSession) -> Dict[str
     from sqlalchemy import func, and_
     
     logger.info("🔍 Validating 252-day historical data requirements for factor analysis")
-    start_time = datetime.now()
+    start_time = utc_now()
     
     try:
         # Get all portfolio + factor ETF symbols
@@ -264,7 +265,7 @@ async def validate_and_ensure_factor_analysis_data(db: AsyncSession) -> Dict[str
             logger.info(f"✅ Backfill completed: {backfill_results}")
         
         # Final validation summary
-        duration = datetime.now() - start_time
+        duration = utc_now() - start_time
         validation_results['validation_duration_seconds'] = duration.total_seconds()
         validation_results['status'] = 'passed' if insufficient_count == 0 else 'backfill_completed'
         
@@ -277,7 +278,7 @@ async def validate_and_ensure_factor_analysis_data(db: AsyncSession) -> Dict[str
         return {
             'status': 'failed',
             'error': str(e),
-            'validation_duration_seconds': (datetime.now() - start_time).total_seconds()
+            'validation_duration_seconds': (utc_now() - start_time).total_seconds()
         }
 
 

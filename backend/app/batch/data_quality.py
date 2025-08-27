@@ -12,6 +12,7 @@ from app.core.logging import get_logger
 from app.models.positions import Position
 from app.models.market_data import MarketDataCache
 from app.models.users import Portfolio
+from app.core.datetime_utils import utc_now
 
 logger = get_logger(__name__)
 
@@ -140,7 +141,7 @@ class DataQualityValidator:
         """Check availability of current price data"""
         
         # Get most recent price data for each symbol
-        recent_cutoff = datetime.now() - timedelta(days=7)  # Look back 1 week max
+        recent_cutoff = utc_now() - timedelta(days=7)  # Look back 1 week max
         
         stmt = select(
             MarketDataCache.symbol,
@@ -263,7 +264,7 @@ class DataQualityValidator:
     ) -> Dict[str, Any]:
         """Check if data is fresh enough for batch processing"""
         
-        freshness_cutoff = datetime.now() - timedelta(hours=self.quality_thresholds['data_freshness_hours'])
+        freshness_cutoff = utc_now() - timedelta(hours=self.quality_thresholds['data_freshness_hours'])
         
         stmt = select(
             MarketDataCache.symbol,
@@ -282,7 +283,7 @@ class DataQualityValidator:
                 # Convert date to datetime for comparison
                 latest_datetime = datetime.combine(record.latest_date, datetime.min.time())
                 is_fresh = latest_datetime >= freshness_cutoff
-                hours_old = (datetime.now() - latest_datetime).total_seconds() / 3600
+                hours_old = (utc_now() - latest_datetime).total_seconds() / 3600
                 
                 freshness_map[record.symbol] = {
                     'is_fresh': is_fresh,

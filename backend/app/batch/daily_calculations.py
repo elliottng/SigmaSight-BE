@@ -17,6 +17,7 @@ from app.calculations.market_data import (
     fetch_and_cache_prices
 )
 from app.batch.batch_orchestrator_v2 import batch_orchestrator_v2
+from app.core.datetime_utils import utc_now
 
 logger = get_logger(__name__)
 
@@ -42,14 +43,14 @@ async def run_daily_calculations(portfolio_id: Optional[str] = None):
     Returns:
         List of job results with status and timing information
     """
-    start_time = datetime.now()
+    start_time = utc_now()
     logger.info(f"Starting daily calculations using new orchestrator at {start_time}")
     
     try:
         # Use the new batch orchestrator
         results = await batch_orchestrator_v2.run_daily_batch_sequence(portfolio_id)
         
-        duration = datetime.now() - start_time
+        duration = utc_now() - start_time
         
         # Count successes and failures
         successful = sum(1 for r in results if r['status'] == 'completed')

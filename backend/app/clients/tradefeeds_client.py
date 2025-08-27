@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from datetime import datetime, date
 import aiohttp
+from app.core.datetime_utils import utc_now
 
 from app.clients.base import MarketDataProvider
 
@@ -51,7 +52,7 @@ class TradeFeedsClient(MarketDataProvider):
     
     async def _rate_limit_check(self):
         """Implement aggressive rate limiting to avoid CAPTCHA (10 calls/minute)"""
-        current_time = datetime.now().timestamp()
+        current_time = utc_now().timestamp()
         time_since_last = current_time - self.last_request_time
         min_interval = 60 / self.rate_limit  # seconds between calls
         
@@ -64,7 +65,7 @@ class TradeFeedsClient(MarketDataProvider):
             logger.debug(f"TradeFeeds rate limiting: waiting {wait_time:.2f} seconds")
             await asyncio.sleep(wait_time)
         
-        self.last_request_time = datetime.now().timestamp()
+        self.last_request_time = utc_now().timestamp()
     
     async def _make_request(self, endpoint: str, params: Dict[str, Any] = None, credit_multiplier: int = 1) -> Dict[str, Any]:
         """Make HTTP request to TradeFeeds API with CAPTCHA detection"""
@@ -158,7 +159,7 @@ class TradeFeedsClient(MarketDataProvider):
                         'change': change,
                         'change_percent': change_percent,
                         'volume': volume,
-                        'timestamp': datetime.now(),
+                        'timestamp': utc_now(),
                         'provider': 'TradeFeedsClient',
                         'raw_data': quote
                     }

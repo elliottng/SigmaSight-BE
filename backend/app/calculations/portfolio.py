@@ -18,6 +18,7 @@ import pandas as pd
 from functools import lru_cache, wraps
 from datetime import datetime, timedelta
 import logging
+from app.core.datetime_utils import utc_now
 
 from app.constants.portfolio import (
     OPTIONS_POSITION_TYPES,
@@ -47,14 +48,14 @@ def timed_lru_cache(seconds: int = AGGREGATION_CACHE_TTL, maxsize: int = 128):
         # Store the original function with LRU cache
         func = lru_cache(maxsize=maxsize)(func)
         # Track when cache was last cleared
-        func._last_clear = datetime.now()
+        func._last_clear = utc_now()
         
         @wraps(func)
         def wrapper_func(*args, **kwargs):
             # Check if cache needs to be cleared
-            if datetime.now() - func._last_clear > timedelta(seconds=seconds):
+            if utc_now() - func._last_clear > timedelta(seconds=seconds):
                 func.cache_clear()
-                func._last_clear = datetime.now()
+                func._last_clear = utc_now()
             return func(*args, **kwargs)
         
         # Expose cache_info and cache_clear methods
