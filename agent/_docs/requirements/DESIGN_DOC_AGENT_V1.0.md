@@ -287,48 +287,62 @@ uv run alembic downgrade -1
 
 ## 7. Function Tools — Raw Data (Phase 1)
 
-### 7.0 Agent-Optimized Endpoints (Architectural Decision)
+### 7.0 Provider-Agnostic Tool Architecture
 
-**Problem:** Having tool handlers fetch data, apply business logic, and filter results creates a "leaky abstraction" where the Agent layer knows too much about portfolio logic.
+**Design Principle:** Tool handlers must be structured for multi-provider support (OpenAI, Anthropic, Gemini, Grok) while keeping business logic provider-independent.
 
-**Solution:** Create agent-optimized API endpoints with a proper service layer:
+**Three-Layer Architecture:**
 
-1. **Enhanced `/api/v1/data/*` endpoints** - Agent-optimized parameters and responses
-2. **New service layer** - `PortfolioDataService` encapsulates business logic
-3. **Pre-filtered responses** - Service handles symbol selection, caps, truncation
-4. **Token-aware** - Endpoints designed to return <2k tokens per response
-5. **Clean tool handlers** - Tool handlers become simple pass-through proxies
-
-**Service Layer Architecture:**
 ```python
-# backend/app/services/portfolio_data_service.py
-class PortfolioDataService:
-    async def get_top_positions_by_value(
-        db: AsyncSession,
-        portfolio_id: UUID,
-        limit: int = 50
-    ) -> Dict
-    
-    async def get_portfolio_summary(
-        db: AsyncSession,
-        portfolio_id: UUID
-    ) -> Dict
-    
-    async def get_historical_prices_with_selection(
-        db: AsyncSession,
-        portfolio_id: UUID,
-        selection_method: str,
-        max_symbols: int = 5,
-        lookback_days: int = 90
-    ) -> Dict
+# Layer 1: Provider-agnostic business logic (95% portable)
+class PortfolioTools:
+    """Core tool implementations - completely provider-independent"""
+    async def get_portfolio_complete(self, portfolio_id: str, **kwargs) -> Dict:
+        # Business logic: data fetching, filtering, formatting
+        # 100% portable across all AI providers
+        
+    async def get_positions_details(self, portfolio_id: str, **kwargs) -> Dict:
+        # Business logic: caps enforcement, truncation, meta objects
+        # 100% portable across all AI providers
+
+# Layer 2: Provider-specific adapters (5% provider-specific)
+class OpenAIToolAdapter:
+    """Converts tool definitions and responses for OpenAI format"""
+    def __init__(self, tools: PortfolioTools):
+        self.tools = tools
+        
+    def get_function_schemas(self) -> List[Dict]:
+        # OpenAI function calling schema format
+        
+    async def execute_tool(self, name: str, args: Dict) -> str:
+        result = await getattr(self.tools, name)(**args)
+        return json.dumps(result)  # OpenAI expects JSON string
+
+class AnthropicToolAdapter:
+    """Converts tool definitions and responses for Anthropic format"""  
+    def get_tool_definitions(self) -> List[str]:
+        # Anthropic XML tool format
+        
+    async def execute_tool(self, name: str, args: Dict) -> Dict:
+        result = await getattr(self.tools, name)(**args)
+        return result  # Anthropic expects structured response
+
+# Layer 3: Service integration
+class OpenAIService:
+    def __init__(self):
+        self.adapter = OpenAIToolAdapter(PortfolioTools())
 ```
 
 **Benefits:**
-- Cleaner separation of concerns
-- Business logic in service layer, not API endpoints
-- Testable service methods
-- Reusable across multiple endpoints
-- Tool handlers remain stateless
+- **95% code reuse** across AI providers
+- **Easy migration** to new providers (1-2 days vs complete rewrite)
+- **Business logic isolation** - tool logic independent of AI provider
+- **Future-proof architecture** - ready for Gemini, Grok, Claude integration
+
+**Phase 1 Implementation:**
+- Implement OpenAI adapter only
+- Structure business logic for portability
+- Future providers require only new adapter classes
 
 ### 7.A Common response/ error shapes & parameter inventory
 
