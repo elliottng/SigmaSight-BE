@@ -5,6 +5,7 @@ Updated for v1.4.4 namespace organization
 from fastapi import APIRouter
 
 from app.api.v1 import auth, portfolio, positions, risk, modeling, market_data, data
+from app.api.v1.chat import router as chat_router
 
 # Create the main v1 router
 api_router = APIRouter(prefix="/v1")
@@ -12,6 +13,9 @@ api_router = APIRouter(prefix="/v1")
 # Include all endpoint routers
 # Authentication (foundation)
 api_router.include_router(auth.router)
+
+# Chat API for Agent
+api_router.include_router(chat_router, prefix="/chat", tags=["chat"])
 
 # Raw Data APIs (/data/) - for LLM consumption
 api_router.include_router(data.router)
