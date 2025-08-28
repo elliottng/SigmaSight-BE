@@ -1,0 +1,436 @@
+openapi: 3.0.3
+info:
+  title: SigmaSight Agent API
+  description: Chat-based portfolio analysis using GPT-5-2025-08-07 with function calling
+  version: 1.0.0
+  contact:
+    name: SigmaSight Support
+    email: support@sigmasight.com
+    
+servers:
+  - url: https://api.sigmasight.com/api/v1
+    description: Production
+  - url: http://localhost:8000/api/v1
+    description: Development
+    
+security:
+  - BearerAuth: []
+    
+paths:
+  /chat/conversations:
+    post:
+      summary: Create Conversation
+      description: Creates a new conversation with specified mode
+      operationId: createConversation
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+      responses:
+        '201':
+          description: Conversation created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+          
+    get:
+      summary: List Conversations
+      description: Retrieves all conversations for authenticated user
+      operationId: listConversations
+      tags:
+        - Chat
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: order_by
+          in: query
+          schema:
+            type: string
+            enum: [created_at, updated_at, message_count]
+            default: updated_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+          
+  /chat/conversations/{conversation_id}:
+    delete:
+      summary: Delete Conversation
+      description: Deletes a conversation and all its messages
+      operationId: deleteConversation
+      tags:
+        - Chat
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Conversation deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Conversation deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+          
+  /chat/conversations/{conversation_id}/messages:
+    get:
+      summary: Get Conversation History
+      description: Retrieves all messages in a conversation
+      operationId: getConversationHistory
+      tags:
+        - Chat
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Conversation messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageHistory'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+          
+  /chat/send:
+    post:
+      summary: Send Message (SSE Stream)
+      description: Sends message to agent and receives streaming response via Server-Sent Events
+      operationId: sendMessage
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+          
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      
+  parameters:
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Conversation UUID
+      
+  schemas:
+    CreateConversationRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [green, blue, indigo, violet]
+          default: green
+          description: Conversation mode determining response style
+        name:
+          type: string
+          maxLength: 100
+          description: Optional conversation name
+          
+    Conversation:
+      type: object
+      required:
+        - conversation_id
+        - user_id
+        - mode
+        - created_at
+        - updated_at
+        - message_count
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        mode:
+          type: string
+          enum: [green, blue, indigo, violet]
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        message_count:
+          type: integer
+          minimum: 0
+          
+    ConversationList:
+      type: object
+      required:
+        - conversations
+        - total_count
+        - has_more
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationSummary'
+        total_count:
+          type: integer
+        has_more:
+          type: boolean
+          
+    ConversationSummary:
+      type: object
+      required:
+        - conversation_id
+        - mode
+        - message_count
+        - created_at
+        - updated_at
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mode:
+          type: string
+          enum: [green, blue, indigo, violet]
+        message_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_message_preview:
+          type: string
+          maxLength: 100
+          
+    SendMessageRequest:
+      type: object
+      required:
+        - conversation_id
+        - text
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          
+    Message:
+      type: object
+      required:
+        - message_id
+        - role
+        - content
+        - created_at
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolCall'
+            
+    ToolCall:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          enum:
+            - get_portfolio_complete
+            - get_portfolio_data_quality
+            - get_positions_details
+            - get_prices_historical
+            - get_current_quotes
+            - get_factor_etf_prices
+        duration_ms:
+          type: integer
+          description: Tool execution time in milliseconds
+          
+    MessageHistory:
+      type: object
+      required:
+        - messages
+        - total_count
+        - has_more
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        total_count:
+          type: integer
+        has_more:
+          type: boolean
+          
+    Error:
+      type: object
+      required:
+        - error
+        - request_id
+        - timestamp
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - AUTH_ERROR
+                - NOT_FOUND
+                - RATE_LIMIT
+                - TOOL_ERROR
+                - OPENAI_ERROR
+                - TIMEOUT
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        request_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+          
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            
+tags:
+  - name: Chat
+    description: Conversation and messaging endpoints
