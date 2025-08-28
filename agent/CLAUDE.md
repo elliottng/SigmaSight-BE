@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SigmaSight Agent - A backend chat API that connects OpenAI GPT-5 with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs and Code Interpreter for calculations.
+SigmaSight Agent - A backend chat API that connects OpenAI GPT-5-2025-08-07 with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs and Code Interpreter for calculations.
 
 **Current Status**: Planning phase - backend chat infrastructure not yet implemented.
 
@@ -55,7 +55,7 @@ SigmaSight Agent - A backend chat API that connects OpenAI GPT-5 with portfolio 
 
 ### High-Level Design
 ```
-User → POST /chat/send → Backend Agent → OpenAI GPT-5 → Tools → Raw Data APIs
+User → POST /chat/send → Backend Agent → OpenAI GPT-5-2025-08-07 → Tools → Raw Data APIs
                               ↓
                         SSE Stream Response
 ```
@@ -95,7 +95,7 @@ uv run pytest tests/test_agent/
 Required in backend/.env:
 ```
 OPENAI_API_KEY=sk-...
-MODEL_DEFAULT=gpt-5
+MODEL_DEFAULT=gpt-5-2025-08-07
 MODEL_FALLBACK=gpt-5-mini
 SSE_HEARTBEAT_INTERVAL_MS=15000
 AGENT_CACHE_TTL=600

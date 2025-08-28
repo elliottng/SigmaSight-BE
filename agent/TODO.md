@@ -1,5 +1,12 @@
 # SigmaSight Agent Implementation TODO
 
+---
+Last Synchronized: 2025-08-28 UTC
+Code Version: 6c882b541972146e4d05cd17a418bcb6529f9e99
+Sync Agent Version: 1.0.0
+Verified Scope: /agent/ and related /backend/ code
+---
+
 **Created:** 2025-08-27  
 **Last Updated:** 2025-08-28  
 **Status:** Active Development - Phase 3  
@@ -14,7 +21,7 @@
 | **Phase 0: Prerequisites** | ✅ Complete | 100% | All setup, auth, DB schema done |
 | **Phase 1: Data APIs** | ✅ Complete | 100% | 2 endpoints implemented, 1 removed |
 | **Phase 2: Chat Infrastructure** | ✅ Complete | 100% | SSE, models, endpoints ready |
-| **Phase 3: Tool Handlers** | ✅ Complete | 100% | Provider-agnostic architecture |
+| **Phase 3: Tool Handlers** | 🔶 Partial | 85% | Provider-agnostic architecture, OpenAI integration pending |
 | **Phase 4: Prompts** | 📅 Planned | 0% | - |
 | **Phase 5: API Docs** | 📅 Planned | 0% | - |
 | **Phase 6: Testing** | 📅 Planned | 0% | - |
@@ -193,14 +200,14 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 ### 0.1 Configure GPT-5 Model Settings ✅ **COMPLETED**
 - [x] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
   - [x] 👤 **USER ACTION**: Verify GPT-5 access in OpenAI account
-  - [x] Set MODEL_DEFAULT = "gpt-5"
+  - [x] Set MODEL_DEFAULT = "gpt-5-2025-08-07"
   - [x] Set MODEL_FALLBACK = "gpt-5-mini"
   - [x] Update DESIGN_DOC_AGENT_V1.0.md to confirm GPT-5 usage
   - [x] Update PRD_AGENT_V1.0.md model references
   
   **Success Criteria:**
   - ✅ Config loads without errors: `python -c "from app.config import settings; print(settings.MODEL_DEFAULT)"`
-  - ✅ Returns "gpt-5"
+  - ✅ Returns "gpt-5-2025-08-07"
 
 ### 0.2 Environment Setup ✅ **COMPLETED**
 - [x] **Update backend/app/config.py with OpenAI settings**
@@ -211,7 +218,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   # Add to Settings class (uses pydantic_settings pattern)
   OPENAI_API_KEY: str = Field(..., env="OPENAI_API_KEY")
   OPENAI_ORG_ID: str = Field(default="", env="OPENAI_ORG_ID")  # Optional
-  MODEL_DEFAULT: str = Field(default="gpt-5", env="MODEL_DEFAULT")
+  MODEL_DEFAULT: str = Field(default="gpt-5-2025-08-07", env="MODEL_DEFAULT")
   MODEL_FALLBACK: str = Field(default="gpt-5-mini", env="MODEL_FALLBACK")
   AGENT_CACHE_TTL: int = Field(default=600, env="AGENT_CACHE_TTL")
   SSE_HEARTBEAT_INTERVAL_MS: int = Field(default=15000, env="SSE_HEARTBEAT_INTERVAL_MS")
@@ -221,7 +228,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```bash
   OPENAI_API_KEY=sk-...  # User must provide
   OPENAI_ORG_ID=org-... (if applicable)
-  MODEL_DEFAULT=gpt-5
+  MODEL_DEFAULT=gpt-5-2025-08-07
   MODEL_FALLBACK=gpt-5-mini
   AGENT_CACHE_TTL=600
   SSE_HEARTBEAT_INTERVAL_MS=15000
@@ -892,8 +899,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       created_at: datetime
   ```
 
-### 2.3 Implement SSE Streaming Endpoint 🔶 **PARTIAL - Placeholder Implementation**
-- [x] **POST /chat/send (SSE)** (ref: TDD §5.2, §8 for SSE protocol, PRD §4.3) ✅ **Placeholder ready for OpenAI integration**
+### 2.3 Implement SSE Streaming Endpoint ✅ **COMPLETED - Infrastructure Ready**
+- [x] **POST /chat/send (SSE)** (ref: TDD §5.2, §8 for SSE protocol, PRD §4.3) ✅ **Infrastructure complete, OpenAI adapter pending**
   
   **File:** `backend/app/api/v1/chat/send.py`
   ```python
