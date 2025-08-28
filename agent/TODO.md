@@ -1188,7 +1188,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### 3.3 Caps & Early Exit in Endpoints (Not Handlers) ✅ **COMPLETED**
-- [ ] **Enhance Raw Data API endpoints with caps enforcement**
+- [x] **Enhance Raw Data API endpoints with caps enforcement** ✅
   ```python
   # In backend/app/api/v1/data.py endpoints
   
@@ -1224,7 +1224,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### 3.4 Per-Tool Timeouts & Retries ✅ **COMPLETED**
-- [ ] **Implement httpx with timeout and retry logic**
+- [x] **Implement httpx with timeout and retry logic** ✅
   ```python
   import httpx
   from tenacity import retry, stop_after_attempt, wait_exponential
@@ -1251,7 +1251,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### 3.5 OpenAI Provider Adapter (Provider-Specific Layer) ✅ **COMPLETED**
-- [ ] **Create `backend/app/agent/adapters/openai_adapter.py`**
+- [x] **Create `backend/app/agent/adapters/openai_adapter.py`** ✅
   ```python
   class OpenAIToolAdapter:
       """Converts tool definitions/responses for OpenAI function calling"""
@@ -1269,7 +1269,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 3.6 Tool Implementation Details (Business Logic Layer) ✅ **COMPLETED**
 
-- [ ] **get_portfolio_complete** (ref: TDD §7.1, PRD §6.1)
+- [x] **get_portfolio_complete** (ref: TDD §7.1, PRD §6.1) ✅
   ```python
   async def get_portfolio_complete(
       portfolio_id: str,
@@ -1282,7 +1282,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Return standardized response with meta
   ```
 
-- [ ] **get_portfolio_data_quality**
+- [x] **get_portfolio_data_quality** ✅
   ```python
   async def get_portfolio_data_quality(
       portfolio_id: str,
@@ -1293,7 +1293,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Return feasibility assessment
   ```
 
-- [ ] **get_positions_details**
+- [x] **get_positions_details** ✅
   ```python
   async def get_positions_details(
       portfolio_id: Optional[str] = None,
@@ -1305,7 +1305,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Enforce max_rows=200 with truncation
   ```
 
-- [ ] **get_prices_historical**
+- [x] **get_prices_historical** ✅
   ```python
   async def get_prices_historical(
       portfolio_id: str,
@@ -1320,7 +1320,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Set truncated=true if filtering occurred
   ```
 
-- [ ] **get_current_quotes**
+- [x] **get_current_quotes** ✅
   ```python
   async def get_current_quotes(
       symbols: str,
@@ -1331,7 +1331,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Call /api/v1/data/prices/quotes
   ```
 
-- [ ] **get_factor_etf_prices**
+- [x] **get_factor_etf_prices** ✅
   ```python
   async def get_factor_etf_prices(
       lookback_days: int = 150,
@@ -1343,7 +1343,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### 3.7 Future Provider Support (Architecture Ready) ✅ **ARCHITECTURE READY**
-- [ ] **Adding New Provider (e.g., Anthropic, Gemini)** 🔮 **Future Work**
+- [x] **Adding New Provider (e.g., Anthropic, Gemini)** 🔮 **Future Work - Architecture Ready** ✅
   ```python
   class AnthropicToolAdapter:
       """When needed: Anthropic XML tool format adapter"""
@@ -1367,7 +1367,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 - ⏱️ **Total effort: 1-2 days vs complete rewrite**
 
 ### 3.8 Tool Response Standardization (Provider-Agnostic) ✅ **COMPLETED**
-- [ ] **Implement common response envelope** (used by all providers)
+- [x] **Implement common response envelope** (used by all providers) ✅
   ```python
   def format_tool_response(
       data: Any,
