@@ -6,6 +6,126 @@
 
 ---
 
+## 🚨 AUTONOMOUS DEVELOPMENT GUIDELINES
+
+### Things Requiring Explicit User Help
+**ALWAYS ASK THE USER TO:**
+1. **Environment Setup**
+   - Add/update API keys in `.env` file (OpenAI, Polygon, FMP, FRED)
+   - Launch Docker Desktop application before running PostgreSQL
+   - Create accounts or obtain credentials for external services
+   - Configure production environment variables
+
+2. **External Dependencies**
+   - Install system-level dependencies (PostgreSQL, Redis, etc.)
+   - Set up cloud services (AWS, GCP, etc.)
+   - Configure DNS or domain settings
+   - Set up monitoring/alerting services
+
+3. **Manual Verification**
+   - Verify API keys are working with external services
+   - Check Docker containers are running properly
+   - Confirm database connections after setup
+   - Validate production deployment settings
+
+### Things Requiring Explicit Permission
+**NEVER DO WITHOUT APPROVAL:**
+
+1. **Database Changes**
+   - ❌ Modifying existing backend tables (users, portfolios, positions)
+   - ❌ Changing column types or constraints on existing tables
+   - ❌ Deleting or renaming existing columns
+   - ❌ Creating database changes without Alembic migrations
+   - ✅ OK: Creating new agent_* prefixed tables via Alembic
+   - ✅ OK: Adding indexes to agent_* tables
+
+2. **API Contract Changes**
+   - ❌ Changing existing endpoint paths or methods
+   - ❌ Modifying existing Pydantic model fields in backend/app/schemas/
+   - ❌ Removing or renaming response fields
+   - ❌ Changing authentication requirements
+   - ✅ OK: Adding optional parameters with defaults
+   - ✅ OK: Creating new endpoints under /api/v1/chat/
+
+3. **Authentication & Security**
+   - ❌ Modifying JWT token generation or validation
+   - ❌ Changing password hashing algorithms
+   - ❌ Altering CORS or security headers
+   - ❌ Modifying rate limiting rules
+   - ✅ OK: Using existing auth dependencies as-is
+
+4. **Configuration & Environment**
+   - ❌ Changing production configuration values
+   - ❌ Modifying logging levels in production
+   - ❌ Altering cache TTLs without testing
+   - ❌ Changing external API rate limits
+   - ✅ OK: Adding new AGENT_* prefixed settings
+
+5. **External Service Integration**
+   - ❌ Adding new paid API dependencies
+   - ❌ Changing API provider (e.g., OpenAI to Anthropic)
+   - ❌ Modifying external API usage patterns that increase costs
+   - ✅ OK: Using already configured services (OpenAI with existing key)
+
+6. **Data Operations**
+   - ❌ Deleting any user data
+   - ❌ Running data migrations on existing tables
+   - ❌ Modifying data retention policies
+   - ❌ Changing backup strategies
+   - ✅ OK: Reading data via existing APIs
+
+7. **Performance-Critical Changes**
+   - ❌ Modifying database connection pooling
+   - ❌ Changing query optimization strategies
+   - ❌ Altering caching mechanisms
+   - ✅ OK: Adding caching to new agent endpoints
+
+8. **Architectural Decisions**
+   - ❌ Changing service boundaries
+   - ❌ Modifying the Agent/Backend separation
+   - ❌ Altering the communication protocol (REST/SSE)
+   - ✅ OK: Following established patterns
+
+### Decision Trees for Common Scenarios
+
+**When You Encounter an Import Error:**
+```
+IF module not found:
+  → Check PYTHONPATH includes /backend
+  → Run diagnostic: `PYTHONPATH=/path/to/backend uv run python -c "from app.models.users import User"`
+  → If fails: Document error in TODO.md and continue with other tasks
+ELSE IF circular import:
+  → Move import inside function
+  → Use TYPE_CHECKING pattern
+```
+
+**When You Get a Database Error:**
+```
+IF table doesn't exist:
+  → Check if migration was created
+  → Run: `uv run alembic history` to see migrations
+  → Run: `uv run alembic upgrade head`
+  → If still fails: Mark task as blocked, document issue
+ELSE IF permission denied:
+  → Ask user to check Docker is running
+  → Verify DATABASE_URL in .env
+```
+
+**When OpenAI API Returns Error:**
+```
+IF 401 Unauthorized:
+  → Ask user to verify OPENAI_API_KEY in .env
+  → Cannot proceed without valid key
+ELSE IF 429 Rate Limited:
+  → Implement exponential backoff (max 3 retries)
+  → Start with 1s, then 2s, then 4s delay
+ELSE IF 500+ Server Error:
+  → Log error and return graceful message to user
+  → Switch to fallback model if configured
+```
+
+---
+
 ## 📚 Requirements Documents Cross-Reference
 
 ### Primary Specifications
@@ -46,14 +166,21 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 0.1 Configure GPT-5 Model Settings
 - [ ] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
-  - [ ] Verify GPT-5 access in OpenAI account
+  - [ ] 👤 **USER ACTION**: Verify GPT-5 access in OpenAI account
   - [ ] Set MODEL_DEFAULT = "gpt-5"
   - [ ] Set MODEL_FALLBACK = "gpt-5-mini"
   - [ ] Update DESIGN_DOC_AGENT_V1.0.md to confirm GPT-5 usage
   - [ ] Update PRD_AGENT_V1.0.md model references
+  
+  **Success Criteria:**
+  - ✅ Config loads without errors: `python -c "from app.config import settings; print(settings.MODEL_DEFAULT)"`
+  - ✅ Returns "gpt-5"
 
 ### 0.2 Environment Setup
 - [ ] **Update backend/app/config.py with OpenAI settings**
+  
+  **File:** `backend/app/config.py`
+  **Location:** After line ~45 (after existing settings)
   ```python
   # Add to Settings class (uses pydantic_settings pattern)
   OPENAI_API_KEY: str = Field(..., env="OPENAI_API_KEY")
@@ -64,15 +191,23 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   SSE_HEARTBEAT_INTERVAL_MS: int = Field(default=15000, env="SSE_HEARTBEAT_INTERVAL_MS")
   ```
 
-- [ ] **Add to .env file**
+- [ ] 👤 **USER ACTION: Add to .env file**
   ```bash
-  OPENAI_API_KEY=sk-...
+  OPENAI_API_KEY=sk-...  # User must provide
   OPENAI_ORG_ID=org-... (if applicable)
   MODEL_DEFAULT=gpt-5
   MODEL_FALLBACK=gpt-5-mini
   AGENT_CACHE_TTL=600
   SSE_HEARTBEAT_INTERVAL_MS=15000
   ```
+  
+  **Validation:**
+  ```bash
+  cd backend
+  uv run python -c "from app.config import settings; assert settings.OPENAI_API_KEY.startswith('sk-'), 'API key not set'"
+  ```
+  
+  **If validation fails:** Ask user to update .env file with OpenAI API key
 
 ### 0.3 Implement Dual Authentication Support ✅ **COMPLETED**
 > **See canonical implementation**: `backend/TODO3.md` Section 4.0.1 - Dual Authentication Strategy
@@ -85,12 +220,30 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 0.4 Database Schema Updates (via Alembic Migrations)
 - [ ] **Create Agent-specific SQLAlchemy models** (ref: TDD §18.2 for patterns)
-  - [ ] Create `backend/app/agent/models/` directory
-  - [ ] Create `backend/app/agent/models/conversations.py`
+  
+  **Step 1: Create directory structure**
+  ```bash
+  mkdir -p backend/app/agent/models
+  touch backend/app/agent/models/__init__.py
+  touch backend/app/agent/models/conversations.py
+  touch backend/app/agent/models/preferences.py
+  ```
+  
+  **Step 2: Create conversations.py**
+  - [ ] File: `backend/app/agent/models/conversations.py`
   - [ ] Define `Conversation` model class (agent_conversations table)
   - [ ] Define `Message` model class (agent_messages table)
-  - [ ] Create `backend/app/agent/models/preferences.py`
+  - [ ] Import from: `from app.database import Base`
+  - [ ] Use UUID primary keys: `from uuid import uuid4`
+  
+  **Step 3: Create preferences.py**
+  - [ ] File: `backend/app/agent/models/preferences.py`
   - [ ] Define `UserPreference` model (agent_user_preferences table)
+  
+  **Success Criteria:**
+  - ✅ Models import without error: `python -c "from app.agent.models.conversations import Conversation"`
+  - ✅ All tables have agent_ prefix
+  - ✅ All models inherit from Base
 
 - [ ] **Update Alembic configuration**
   - [ ] Import Agent models in `backend/alembic/env.py`:
@@ -182,13 +335,49 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 - [ ] **Generate and apply Alembic migration**
-  - [ ] Generate migration: `cd backend && uv run alembic revision --autogenerate -m "Add conversation tables for agent"`
-  - [ ] Review generated migration file in `backend/alembic/versions/`
-  - [ ] Verify foreign keys and indexes are correct
-  - [ ] Test migration: `uv run alembic upgrade head --sql` (dry run)
-  - [ ] Apply migration: `uv run alembic upgrade head`
-  - [ ] Verify tables created: `uv run python -c "from app.models.conversations import Conversation, ConversationMessage; print('✅ Models imported successfully')"`
-  - [ ] Update `app/database.py` init_db() to import conversation models (line ~85)
+  
+  **Prerequisites:**
+  - 👤 **USER ACTION**: Ensure Docker Desktop is running
+  - 👤 **USER ACTION**: Ensure PostgreSQL container is up: `docker-compose up -d`
+  
+  **Step 1: Generate migration**
+  ```bash
+  cd backend
+  uv run alembic revision --autogenerate -m "Add conversation tables for agent"
+  ```
+  
+  **Step 2: Review migration**
+  - [ ] Check file in `backend/alembic/versions/`
+  - [ ] Verify all tables have agent_ prefix
+  - [ ] Verify indexes are created
+  
+  **Step 3: Test migration (dry run)**
+  ```bash
+  uv run alembic upgrade head --sql > migration_preview.sql
+  cat migration_preview.sql  # Review SQL
+  ```
+  
+  **Step 4: Apply migration**
+  ```bash
+  uv run alembic upgrade head
+  ```
+  
+  **Success Criteria:**
+  - ✅ Migration applies without errors
+  - ✅ Tables exist in database:
+    ```bash
+    uv run python -c "from app.database import engine; import asyncio; asyncio.run(engine.execute('SELECT tablename FROM pg_tables WHERE tablename LIKE \'agent_%\''))"
+    ```
+  
+  **Rollback if needed:**
+  ```bash
+  uv run alembic downgrade -1
+  ```
+  
+  **Step 5: Update database initialization**
+  - [ ] File: `backend/app/database.py`
+  - [ ] Location: Around line 85 in init_db()
+  - [ ] Add: `from app.agent.models import conversations, preferences`
 
 - [ ] **Data retention considerations (for production)**
   - [ ] Plan for 30-60 day retention policy to prevent unbounded growth
@@ -258,29 +447,151 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > we need both Pydantic schemas and a service layer.
 
 - [ ] **Create `app/schemas/data.py`** - Pydantic schemas for data endpoints
-  - [ ] `MetaInfo` - Common meta object for all responses
-  - [ ] `HistoricalPricesRequest` - Request schema with selection params
-  - [ ] `TopPositionsResponse` - Response with position summaries
-  - [ ] `PortfolioSummaryResponse` - Condensed portfolio response
-  - [ ] `PositionSummary` - Individual position data
+  
+  **File:** `backend/app/schemas/data.py`
+  ```python
+  from pydantic import BaseModel, Field
+  from typing import Dict, List, Optional, Any
+  from datetime import datetime
+  from uuid import UUID
+  from app.schemas.base import BaseSchema
+  
+  class MetaInfo(BaseModel):
+      """Common meta object for all agent responses"""
+      as_of: datetime
+      requested: Dict[str, Any]
+      applied: Dict[str, Any]
+      limits: Dict[str, int]
+      rows_returned: int
+      truncated: bool = False
+      suggested_params: Optional[Dict[str, Any]] = None
+  
+  class PositionSummary(BaseSchema):
+      position_id: UUID
+      symbol: str
+      quantity: float
+      market_value: float
+      weight: float
+      pnl_dollar: float
+      pnl_percent: float
+  
+  class TopPositionsResponse(BaseSchema):
+      meta: MetaInfo
+      positions: List[PositionSummary]
+      portfolio_coverage: float  # % of portfolio value covered
+  
+  class PortfolioSummaryResponse(BaseSchema):
+      meta: MetaInfo
+      portfolio_id: UUID
+      total_value: float
+      cash_balance: float
+      positions_count: int
+      top_holdings: List[PositionSummary]
+  ```
+  
+  **Success Criteria:**
+  - ✅ Schemas import without error: `python -c "from app.schemas.data import MetaInfo"`
+  - ✅ All schemas inherit from BaseSchema
+  - ✅ Meta object follows TDD §7.A spec
 
 - [ ] **Create `app/services/portfolio_data_service.py`**
+  
+  **File:** `backend/app/services/portfolio_data_service.py`
   ```python
+  from sqlalchemy.ext.asyncio import AsyncSession
+  from sqlalchemy import select, func, desc
+  from uuid import UUID
+  from typing import List, Dict, Any, Optional
+  from app.models.users import Portfolio
+  from app.models.positions import Position
+  from app.models.market_data import MarketDataCache
+  from app.schemas.data import TopPositionsResponse, PortfolioSummaryResponse, PositionSummary, MetaInfo
+  from app.core.datetime_utils import utc_now
+  
   class PortfolioDataService:
-      async def get_top_positions_by_value(db, portfolio_id, limit=50) -> TopPositionsResponse
-      async def get_portfolio_summary(db, portfolio_id) -> PortfolioSummaryResponse
-      async def get_historical_prices_with_selection(db, portfolio_id, selection_method, max_symbols) -> Dict
+      """Service layer for Agent-optimized portfolio data operations"""
+      
+      async def get_top_positions_by_value(
+          self,
+          db: AsyncSession,
+          portfolio_id: UUID,
+          limit: int = 50
+      ) -> TopPositionsResponse:
+          """Get top N positions by market value"""
+          # Implementation here
+          pass
+      
+      async def get_portfolio_summary(
+          self,
+          db: AsyncSession,
+          portfolio_id: UUID
+      ) -> PortfolioSummaryResponse:
+          """Get condensed portfolio overview"""
+          # Implementation here
+          pass
+      
+      async def get_historical_prices_with_selection(
+          self,
+          db: AsyncSession,
+          portfolio_id: UUID,
+          selection_method: str = "top_by_value",
+          max_symbols: int = 5
+      ) -> Dict[str, Any]:
+          """Get historical prices for selected symbols"""
+          # Implementation here
+          pass
+  ```
+  
+  **Success Criteria:**
+  - ✅ Service imports without error
+  - ✅ All methods are async
+  - ✅ All methods return proper response types
+  
+  **Testing:**
+  ```bash
+  uv run pytest tests/test_portfolio_data_service.py -v
   ```
 
 ### 1.1 Enhanced Agent-Optimized Endpoints (Priority)
 - [ ] **GET /api/v1/data/prices/historical/{portfolio_id}** - Add agent parameters
-  - [ ] Create service method `get_historical_prices_with_selection()`
-  - [ ] Add `max_symbols` parameter (default: 5, max: 5)
-  - [ ] Add `selection_method` (top_by_value, top_by_weight, all)
-  - [ ] Service fetches positions and applies selection logic
-  - [ ] Return max 5 symbols with price history
-  - [ ] Include selection metadata in response
-  - [ ] Token-aware response sizing (<2k tokens)
+  
+  **File:** `backend/app/api/v1/data.py`
+  **Function:** `get_historical_prices()` (enhance existing)
+  
+  **Add parameters:**
+  ```python
+  async def get_historical_prices(
+      portfolio_id: UUID,
+      max_symbols: int = Query(5, le=5, description="Max symbols to return"),
+      selection_method: str = Query("top_by_value", regex="^(top_by_value|top_by_weight|all)$"),
+      lookback_days: int = Query(180, le=180),
+      db: AsyncSession = Depends(get_db),
+      _: CurrentUser = Depends(get_current_user)
+  ):
+      service = PortfolioDataService()
+      return await service.get_historical_prices_with_selection(
+          db, portfolio_id, selection_method, max_symbols
+      )
+  ```
+  
+  **Implementation logic:**
+  1. Query positions for portfolio
+  2. Calculate market value for each
+  3. Apply selection_method (sort by value/weight)
+  4. Take top max_symbols
+  5. Query MarketDataCache for selected symbols
+  6. Format with meta object
+  
+  **Success Criteria:**
+  - ✅ Returns max 5 symbols
+  - ✅ Meta object includes selection info
+  - ✅ Response < 2000 tokens
+  
+  **Test:**
+  ```bash
+  curl -X GET "http://localhost:8000/api/v1/data/prices/historical/{portfolio_id}?max_symbols=3&selection_method=top_by_value" \
+    -H "Authorization: Bearer {token}"
+  ```
 
 - [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
   - [ ] Create service method `get_top_positions_by_value()`
@@ -401,31 +712,98 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 2.1 Create Chat Module Structure
 - [ ] **Create backend/app/api/v1/chat/ module** (ref: TDD §3 for structure)
+  
+  **Step 1: Create directory and files**
+  ```bash
+  mkdir -p backend/app/api/v1/chat
+  touch backend/app/api/v1/chat/__init__.py
+  touch backend/app/api/v1/chat/router.py
+  touch backend/app/api/v1/chat/conversations.py
+  touch backend/app/api/v1/chat/send.py
+  touch backend/app/api/v1/chat/tools.py
+  touch backend/app/api/v1/chat/schemas.py
   ```
-  backend/app/api/v1/chat/
-  ├── __init__.py
-  ├── router.py           # FastAPI router setup (prefix /api/v1/chat)
-  ├── conversations.py    # Conversation management
-  ├── send.py            # SSE streaming endpoint
-  ├── tools.py           # Tool handler implementations (registry + stubs)
-  └── schemas.py         # Pydantic models
+  
+  **Step 2: Create router.py**
+  ```python
+  # File: backend/app/api/v1/chat/router.py
+  from fastapi import APIRouter
+  from .conversations import router as conversations_router
+  from .send import router as send_router
+  
+  router = APIRouter()
+  router.include_router(conversations_router)
+  router.include_router(send_router)
   ```
-
-- [ ] **Register chat router in main API**
-  - [ ] Import chat.router in `backend/app/api/v1/router.py`
-  - [ ] Add `router.include_router(chat.router, prefix="/chat", tags=["chat"])`
+  
+  **Step 3: Register in main router**
+  - [ ] File: `backend/app/api/v1/router.py`
+  - [ ] Add after existing includes (around line 20):
+    ```python
+    from .chat import router as chat_router
+    api_router.include_router(chat_router.router, prefix="/chat", tags=["chat"])
+    ```
+  
+  **Success Criteria:**
+  - ✅ Server starts without import errors
+  - ✅ /api/v1/chat endpoints appear in /docs
+  - ✅ No circular imports
 
 ### 2.2 Implement Conversation Management
 - [ ] **POST /chat/conversations endpoint** (ref: TDD §5.1, PRD §7.1)
-  - [x] ✅ Dual auth support already implemented in backend:
-    - [x] Bearer token via HTTPBearer works
-    - [x] JWT from HTTP-only cookie works
-    - [x] Can use existing `get_current_user` dependency
-  - [ ] Insert conversation row in database with our UUID as id
-  - [ ] Return our UUID as conversation_id (canonical ID for frontend)
-  - [ ] Store provider_thread_id if OpenAI creates one (optional)
-  - [ ] Set provider = "openai", mode = "green" (default)
-  - [ ] Response includes conversation_id and provider_thread_id in meta if created
+  
+  **File:** `backend/app/api/v1/chat/conversations.py`
+  ```python
+  from fastapi import APIRouter, Depends, HTTPException
+  from sqlalchemy.ext.asyncio import AsyncSession
+  from uuid import uuid4
+  from app.database import get_db
+  from app.core.dependencies import get_current_user, CurrentUser
+  from app.agent.models.conversations import Conversation
+  from app.agent.schemas.chat import ConversationCreate, ConversationResponse
+  from app.core.datetime_utils import utc_now
+  
+  router = APIRouter()
+  
+  @router.post("/conversations", response_model=ConversationResponse)
+  async def create_conversation(
+      request: ConversationCreate,
+      db: AsyncSession = Depends(get_db),
+      current_user: CurrentUser = Depends(get_current_user)
+  ):
+      """Create a new conversation"""
+      conversation = Conversation(
+          id=uuid4(),  # Our canonical ID
+          user_id=current_user.id,
+          mode=request.mode or "green",
+          provider="openai",
+          created_at=utc_now(),
+          updated_at=utc_now()
+      )
+      db.add(conversation)
+      await db.commit()
+      await db.refresh(conversation)
+      
+      return ConversationResponse(
+          conversation_id=str(conversation.id),
+          mode=conversation.mode,
+          created_at=conversation.created_at
+      )
+  ```
+  
+  **Success Criteria:**
+  - ✅ POST /api/v1/chat/conversations returns 201
+  - ✅ Returns UUID as conversation_id
+  - ✅ Conversation saved to database
+  - ✅ Auth required (401 without token)
+  
+  **Test:**
+  ```bash
+  curl -X POST "http://localhost:8000/api/v1/chat/conversations" \
+    -H "Authorization: Bearer {token}" \
+    -H "Content-Type: application/json" \
+    -d '{"mode": "green"}'
+  ```
 
 - [ ] **Conversation schemas**
   ```python
@@ -440,14 +818,108 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 2.3 Implement SSE Streaming Endpoint
 - [ ] **POST /chat/send (SSE)** (ref: TDD §5.2, §8 for SSE protocol, PRD §4.3)
-  - [ ] Implement dual auth for SSE:
-    - [ ] Primary: JWT from HTTP-only cookie (best for SSE)
-    - [ ] Fallback: Bearer token via query param if needed
-  - [ ] Load conversation and mode from DB
-  - [ ] Set up SSE response headers (text/event-stream)
-  - [ ] Implement heartbeat mechanism (every 15s) - send ":\n"
-  - [ ] Stream OpenAI responses
-  - [ ] Wire error handling (rate limit, auth errors as SSE events)
+  
+  **File:** `backend/app/api/v1/chat/send.py`
+  ```python
+  from fastapi import APIRouter, Depends, HTTPException, Request
+  from fastapi.responses import StreamingResponse
+  from sqlalchemy.ext.asyncio import AsyncSession
+  import asyncio
+  import json
+  from typing import AsyncGenerator
+  from app.database import get_db
+  from app.core.dependencies import get_current_user_sse, CurrentUser
+  from app.agent.schemas.chat import MessageSend
+  from app.services.openai_service import OpenAIService
+  from app.agent.models.conversations import Conversation, ConversationMessage
+  from app.core.datetime_utils import utc_now
+  from app.core.logging import get_logger
+  
+  logger = get_logger(__name__)
+  router = APIRouter()
+  
+  async def sse_generator(
+      message: str,
+      conversation: Conversation,
+      openai_service: OpenAIService,
+      db: AsyncSession
+  ) -> AsyncGenerator[str, None]:
+      """Generate SSE events"""
+      try:
+          # Send start event
+          yield f"event: start\ndata: {json.dumps({'mode': conversation.mode})}\n\n"
+          
+          # Handle mode switching
+          if message.startswith("/mode "):
+              new_mode = message[6:].strip()
+              if new_mode in ["green", "blue", "indigo", "violet"]:
+                  conversation.mode = new_mode
+                  await db.commit()
+                  yield f"event: message\ndata: {json.dumps({'delta': f'Mode changed to {new_mode}'})}\n\n"
+                  yield "event: done\ndata: {}\n\n"
+                  return
+          
+          # Stream OpenAI response
+          async for chunk in openai_service.stream_completion(message, conversation):
+              if chunk.get('type') == 'delta':
+                  yield f"event: message\ndata: {json.dumps({'delta': chunk['content']})}\n\n"
+              elif chunk.get('type') == 'tool_call':
+                  yield f"event: tool_call\ndata: {json.dumps(chunk)}\n\n"
+              elif chunk.get('type') == 'tool_result':
+                  yield f"event: tool_result\ndata: {json.dumps(chunk)}\n\n"
+          
+          # Send done event
+          yield "event: done\ndata: {}\n\n"
+          
+      except Exception as e:
+          logger.error(f"SSE error: {e}")
+          yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+  
+  @router.post("/send")
+  async def send_message(
+      request: MessageSend,
+      db: AsyncSession = Depends(get_db),
+      current_user: CurrentUser = Depends(get_current_user_sse)  # Special SSE auth
+  ):
+      """Send message and stream response via SSE"""
+      # Load conversation
+      conversation = await db.get(Conversation, request.conversation_id)
+      if not conversation or conversation.user_id != current_user.id:
+          raise HTTPException(status_code=404, detail="Conversation not found")
+      
+      # Set up SSE response
+      openai_service = OpenAIService()
+      generator = sse_generator(request.text, conversation, openai_service, db)
+      
+      return StreamingResponse(
+          generator,
+          media_type="text/event-stream",
+          headers={
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+              "X-Accel-Buffering": "no",  # Disable nginx buffering
+          }
+      )
+  ```
+  
+  **Create SSE auth dependency:**
+  - [ ] File: `backend/app/core/dependencies.py`
+  - [ ] Add function `get_current_user_sse()` that checks cookie first, then query param
+  
+  **Success Criteria:**
+  - ✅ SSE connection established
+  - ✅ Events stream properly formatted
+  - ✅ Mode switching works
+  - ✅ Errors returned as SSE events
+  
+  **Test with curl:**
+  ```bash
+  curl -X POST "http://localhost:8000/api/v1/chat/send" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer {token}" \
+    -d '{"conversation_id": "{uuid}", "text": "What is my portfolio value?"}' \
+    -N  # No buffering for SSE
+  ```
 
 - [ ] **SSE Event Types**
   ```python

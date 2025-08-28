@@ -2,6 +2,49 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 CRITICAL: Autonomous Development Guidelines
+
+### Things Requiring EXPLICIT User Help
+**YOU MUST ASK THE USER TO:**
+1. **Environment Setup**
+   - Add OpenAI API key to backend/.env file (`OPENAI_API_KEY=sk-...`)
+   - Launch Docker Desktop application before running PostgreSQL
+   - Verify Docker containers are running: `docker-compose up -d`
+
+2. **External Services**
+   - Obtain API keys (OpenAI, Polygon, FMP, FRED)
+   - Verify API key validity with providers
+   - Set up monitoring/alerting services
+
+### Things Requiring EXPLICIT Permission
+**NEVER DO WITHOUT APPROVAL:**
+
+1. **Database Changes**
+   - ❌ Modifying ANY existing backend tables (users, portfolios, positions)
+   - ❌ Creating database changes without Alembic migrations
+   - ✅ OK: Creating new agent_* prefixed tables via Alembic ONLY
+
+2. **API Contract Changes**
+   - ❌ Modifying existing backend Pydantic models in app/schemas/
+   - ❌ Changing existing endpoint signatures
+   - ✅ OK: Adding optional parameters with defaults
+   - ✅ OK: Creating new /api/v1/chat/* endpoints
+
+3. **Authentication & Security**
+   - ❌ ANY changes to JWT token generation/validation
+   - ❌ Modifying authentication flow
+   - ✅ OK: Using existing auth dependencies as-is
+
+4. **External Service Integration**
+   - ❌ Adding new paid API dependencies
+   - ❌ Changing OpenAI usage patterns that increase costs
+   - ✅ OK: Using configured OpenAI with existing key
+
+5. **Architectural Decisions**
+   - ❌ Changing Agent/Backend service separation
+   - ❌ Modifying communication protocols (REST/SSE)
+   - ✅ OK: Following established patterns in TODO.md
+
 ## Project Overview
 
 SigmaSight Agent - A backend chat API that connects OpenAI GPT-5 with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs and Code Interpreter for calculations.
@@ -84,8 +127,10 @@ Map 6 Raw Data endpoints to OpenAI function tools:
 
 ### Phase 3: Prompts
 Create in `agent/agent_pkg/prompts/`:
-- `analyst_blue_v001.md` - Concise, quantitative mode
-- `analyst_green_v001.md` - Educational, explanatory mode
+- `green_v001.md` - Educational, explanatory mode (default)
+- `blue_v001.md` - Concise, quantitative mode
+- `indigo_v001.md` - Strategic, narrative mode
+- `violet_v001.md` - Conservative, risk-focused mode
 
 ## Critical Context
 
@@ -125,3 +170,7 @@ Create in `agent/agent_pkg/prompts/`:
 2. **Models need registration**: Add conversation models to `backend/app/database.py` init_db()
 3. **Use pydantic_settings pattern**: Settings fields need `Field(..., env="VAR_NAME")`
 4. **Raw Data APIs need enhancements**: Add caps, meta objects, parameter validation
+5. **ALWAYS use Alembic**: Never create tables manually, always use migrations
+6. **Import errors**: Check PYTHONPATH includes backend directory
+7. **Docker required**: PostgreSQL runs in Docker, ensure Docker Desktop is running
+8. **Service layer pattern**: New agent endpoints need service layer (PortfolioDataService)

@@ -8,7 +8,82 @@
 
 **Target**: Claude Code, Claude 3.5 Sonnet, and other AI coding agents
 
-**Last Updated**: 2025-08-26
+**Last Updated**: 2025-08-27
+
+---
+
+## 🚨 CRITICAL: Autonomous Development Guidelines
+
+### Things Requiring EXPLICIT User Help
+**YOU MUST ASK THE USER TO:**
+1. **Environment Setup**
+   - Add/update API keys in `.env` file (OpenAI, Polygon, FMP, FRED)
+   - Launch Docker Desktop application before running PostgreSQL
+   - Verify Docker containers are running: `docker-compose up -d`
+   - Install system dependencies (PostgreSQL client tools, etc.)
+
+2. **External Services**
+   - Obtain API keys from providers
+   - Verify API key validity
+   - Set up cloud services (AWS, GCP, monitoring)
+   - Configure production deployments
+
+### Things Requiring EXPLICIT Permission
+**NEVER DO WITHOUT APPROVAL:**
+
+1. **Database Schema Changes**
+   - ❌ Modifying existing tables (users, portfolios, positions, etc.)
+   - ❌ Changing column types, constraints, or relationships
+   - ❌ Deleting or renaming existing columns
+   - ❌ Creating ANY database changes without Alembic migrations
+   - ✅ OK: Adding indexes to existing tables
+   - ✅ OK: Creating new agent_* prefixed tables (Agent project only)
+
+2. **API Contract Changes**
+   - ❌ Changing existing endpoint paths or HTTP methods
+   - ❌ Modifying existing Pydantic models in app/schemas/
+   - ❌ Removing or renaming response fields
+   - ❌ Breaking changes to authentication flow
+   - ✅ OK: Adding optional query parameters with defaults
+   - ✅ OK: Adding new endpoints that don't conflict
+
+3. **Authentication & Security**
+   - ❌ Modifying JWT token generation or validation logic
+   - ❌ Changing password hashing algorithms
+   - ❌ Altering CORS policies or security headers
+   - ❌ Modifying rate limiting rules
+   - ✅ OK: Using existing auth dependencies as documented
+
+4. **Configuration & Environment**
+   - ❌ Changing production configuration values
+   - ❌ Modifying logging levels for production
+   - ❌ Altering cache TTLs without load testing
+   - ❌ Changing external API rate limits
+   - ✅ OK: Adding new configuration with sensible defaults
+
+5. **External Service Integration**
+   - ❌ Adding new paid API dependencies
+   - ❌ Changing market data providers
+   - ❌ Modifying usage patterns that increase API costs
+   - ✅ OK: Using already configured services
+
+6. **Data Operations**
+   - ❌ Deleting any user data or portfolios
+   - ❌ Running destructive migrations
+   - ❌ Modifying data retention policies
+   - ❌ Changing backup/recovery procedures
+   - ✅ OK: Reading data through existing patterns
+
+7. **Performance-Critical Changes**
+   - ❌ Modifying database connection pooling
+   - ❌ Changing async/await patterns in hot paths
+   - ❌ Altering caching strategies
+   - ❌ Modifying batch processing orchestration
+   - ✅ OK: Following existing async patterns
+
+8. **Feature Flags**
+   - ❌ Adding feature flags without explicit approval
+   - **Note**: We prefer simple, correct implementations over complex toggles
 
 ---
 
@@ -55,6 +130,7 @@
 - Follow async patterns consistently (avoid sync/async mixing)
 - Use the diagnostic commands from AI_AGENT_REFERENCE.md
 - Update completion status in TODO3.md as work progresses
+- **ALWAYS use Alembic migrations** for database changes
 
 **❌ DON'T:**
 - Explore file structure without consulting the reference guide
@@ -63,6 +139,7 @@
 - Mix async/sync database operations (causes greenlet errors)
 - Ignore batch processing issues documented in TODO1.md 1.6.14
 - **Add feature flags without explicit approval** - We prefer simple, correct implementations over complex toggles
+- **Create or modify database tables without Alembic migrations**
 
 ### **3. Code Quality Standards**
 
@@ -77,6 +154,10 @@ if isinstance(id, str):
     uuid_obj = UUID(id)
 else:
     uuid_obj = id
+
+# ALWAYS use Alembic for schema changes
+# Never: db.execute("CREATE TABLE ...")
+# Instead: uv run alembic revision --autogenerate -m "description"
 ```
 
 **Error Handling:**
