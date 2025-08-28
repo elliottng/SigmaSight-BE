@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from app.models.users import Portfolio
 from app.models.positions import Position, PositionType
-from app.models.market_data import MarketDataCache, PositionValuation
+from app.models.market_data import MarketDataCache
 from app.schemas.data import (
     TopPositionsResponse, 
     PortfolioSummaryResponse, 
@@ -27,24 +27,46 @@ logger = get_logger(__name__)
 class PortfolioDataService:
     """Service layer for Agent-optimized portfolio data operations"""
     
-    async def get_top_positions_by_value(
+    async def get_top_positions(
         self,
         db: AsyncSession,
         portfolio_id: UUID,
-        limit: int = 50
-    ) -> TopPositionsResponse:
+        limit: int = 20,
+        sort_by: str = "market_value", 
+        as_of_date: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Get top N positions by market value
+        Get top N positions sorted by market value or weight
         
         Args:
             db: Database session
             portfolio_id: Portfolio UUID
-            limit: Maximum positions to return (default 50)
+            limit: Maximum positions to return (capped at 50)
+            sort_by: Sorting method - "market_value" or "weight" 
+            as_of_date: Optional date for historical data (max 180d lookback)
             
         Returns:
-            TopPositionsResponse with position summaries and coverage metrics
+            Dict with positions array, coverage %, and meta object
         """
         try:
+            # Validate and cap limit
+            limit = min(limit, 50)
+            
+            # Validate as_of_date if provided (max 180 days lookback)
+            cutoff_date = None
+            if as_of_date:
+                from datetime import datetime
+                try:
+                    as_of_dt = datetime.fromisoformat(as_of_date.replace('Z', '+00:00'))
+                    cutoff_date = utc_now() - timedelta(days=180)
+                    if as_of_dt < cutoff_date:
+                        as_of_dt = cutoff_date
+                except ValueError:
+                    # Invalid date format, ignore and use current
+                    as_of_dt = utc_now()
+            else:
+                as_of_dt = utc_now()
+            
             # Get portfolio
             portfolio_result = await db.execute(
                 select(Portfolio).where(Portfolio.id == portfolio_id)
@@ -54,99 +76,119 @@ class PortfolioDataService:
             if not portfolio:
                 raise ValueError(f"Portfolio {portfolio_id} not found")
             
-            # Get positions with valuations
-            positions_query = (
-                select(Position, PositionValuation)
-                .join(
-                    PositionValuation,
-                    Position.id == PositionValuation.position_id,
-                    isouter=True
-                )
+            # Get active positions (not soft-deleted)
+            positions_result = await db.execute(
+                select(Position)
                 .where(
                     and_(
                         Position.portfolio_id == portfolio_id,
-                        Position.is_active == True
+                        Position.deleted_at == None
                     )
                 )
             )
+            positions = positions_result.scalars().all()
             
-            result = await db.execute(positions_query)
-            positions_data = result.all()
-            
-            # Calculate market values and sort
-            position_summaries = []
+            # Calculate market values for each position
+            position_data = []
             total_portfolio_value = 0.0
             
-            for position, valuation in positions_data:
-                # Calculate market value
-                if valuation and valuation.current_price:
-                    market_value = position.quantity * valuation.current_price
-                else:
-                    # Try to get latest price from MarketDataCache
-                    price_result = await db.execute(
-                        select(MarketDataCache.close)
-                        .where(MarketDataCache.symbol == position.symbol)
-                        .order_by(desc(MarketDataCache.date))
-                        .limit(1)
+            for position in positions:
+                # Get latest price from MarketDataCache
+                price_result = await db.execute(
+                    select(MarketDataCache.close)
+                    .where(
+                        and_(
+                            MarketDataCache.symbol == position.symbol,
+                            MarketDataCache.date <= as_of_dt
+                        )
                     )
-                    latest_price = price_result.scalar_one_or_none()
-                    market_value = position.quantity * (latest_price or position.cost_basis / position.quantity if position.quantity else 0)
+                    .order_by(desc(MarketDataCache.date))
+                    .limit(1)
+                )
+                latest_price = price_result.scalar_one_or_none()
+                
+                # Calculate market value
+                if latest_price:
+                    market_value = abs(float(position.quantity)) * float(latest_price)
+                else:
+                    # Fallback to entry price
+                    market_value = abs(float(position.quantity)) * float(position.entry_price)
                 
                 total_portfolio_value += market_value
                 
-                # Calculate P&L
-                total_cost = position.cost_basis
-                pnl_dollar = market_value - total_cost
-                pnl_percent = (pnl_dollar / total_cost * 100) if total_cost else 0
-                
-                position_summaries.append({
-                    'position': position,
+                # Store position data for sorting
+                position_data.append({
+                    'symbol': position.symbol,
+                    'name': position.symbol,  # Use symbol as name since Position doesn't have name field
+                    'quantity': float(position.quantity),
                     'market_value': market_value,
-                    'pnl_dollar': pnl_dollar,
-                    'pnl_percent': pnl_percent
+                    'sector': None  # TODO: Add sector lookup when sector data available
                 })
             
-            # Sort by market value and take top N
-            position_summaries.sort(key=lambda x: x['market_value'], reverse=True)
-            top_positions = position_summaries[:limit]
+            # Calculate weights and sort
+            for pos in position_data:
+                pos['weight'] = round(
+                    (pos['market_value'] / total_portfolio_value * 100) if total_portfolio_value else 0, 
+                    4  # Round to 4 decimal places as specified
+                )
             
-            # Calculate weights and coverage
-            covered_value = sum(p['market_value'] for p in top_positions)
-            portfolio_coverage = (covered_value / total_portfolio_value * 100) if total_portfolio_value else 0
+            # Sort by requested field
+            if sort_by == "weight":
+                position_data.sort(key=lambda x: x['weight'], reverse=True)
+            else:  # default to market_value
+                position_data.sort(key=lambda x: x['market_value'], reverse=True)
             
-            # Build response
+            # Apply limit
+            top_positions = position_data[:limit]
+            
+            # Calculate portfolio coverage
+            covered_value = sum(pos['market_value'] for pos in top_positions)
+            coverage_percent = round(
+                (covered_value / total_portfolio_value * 100) if total_portfolio_value else 0,
+                2
+            )
+            
+            # Create response with exact shape specified: {symbol, name, qty, value, weight, sector}
             positions_response = []
-            for pos_data in top_positions:
-                position = pos_data['position']
-                weight = (pos_data['market_value'] / total_portfolio_value * 100) if total_portfolio_value else 0
-                
-                positions_response.append(PositionSummary(
-                    position_id=position.id,
-                    symbol=position.symbol,
-                    quantity=position.quantity,
-                    market_value=pos_data['market_value'],
-                    weight=weight,
-                    pnl_dollar=pos_data['pnl_dollar'],
-                    pnl_percent=pos_data['pnl_percent'],
-                    position_type=position.position_type.value if position.position_type else 'stock'
-                ))
+            for pos in top_positions:
+                positions_response.append({
+                    'symbol': pos['symbol'],
+                    'name': pos['name'], 
+                    'qty': pos['quantity'],
+                    'value': round(pos['market_value'], 2),
+                    'weight': pos['weight'],  # Already rounded to 4dp
+                    'sector': pos['sector']   # TODO: Implement sector lookup
+                })
             
             # Create meta object
-            meta = MetaInfo(
-                as_of=utc_now(),
-                requested={'portfolio_id': str(portfolio_id), 'limit': limit},
-                applied={'limit': len(positions_response)},
-                limits={'max_positions': limit},
-                rows_returned=len(positions_response),
-                truncated=len(position_summaries) > limit
-            )
+            meta = {
+                'as_of': to_utc_iso8601(as_of_dt),
+                'requested': {
+                    'portfolio_id': str(portfolio_id),
+                    'limit': limit,
+                    'sort_by': sort_by,
+                    'as_of_date': as_of_date
+                },
+                'applied': {
+                    'limit': len(positions_response),
+                    'sort_by': sort_by,
+                    'as_of_date': to_utc_iso8601(as_of_dt)
+                },
+                'limits': {
+                    'max_limit': 50,
+                    'max_lookback_days': 180
+                },
+                'rows_returned': len(positions_response),
+                'truncated': len(position_data) > limit,
+                'schema_version': '1.0'
+            }
             
-            return TopPositionsResponse(
-                meta=meta,
-                positions=positions_response,
-                portfolio_coverage=portfolio_coverage,
-                total_portfolio_value=total_portfolio_value
-            )
+            return {
+                'meta': meta,
+                'data': positions_response,
+                'coverage_percent': coverage_percent,
+                'total_positions': len(position_data)
+            }
             
         except Exception as e:
             logger.error(f"Error getting top positions: {e}")
@@ -178,9 +220,12 @@ class PortfolioDataService:
                 raise ValueError(f"Portfolio {portfolio_id} not found")
             
             # Get top positions (reuse the other method)
-            top_positions_response = await self.get_top_positions_by_value(
+            top_positions_response = await self.get_top_positions(
                 db, portfolio_id, limit=5
             )
+            
+            # Extract total value from the response
+            total_value = sum(pos['value'] for pos in top_positions_response['data'])
             
             # Get position count and asset allocation
             positions_result = await db.execute(
@@ -192,18 +237,17 @@ class PortfolioDataService:
                 .where(
                     and_(
                         Position.portfolio_id == portfolio_id,
-                        Position.is_active == True
+                        Position.deleted_at == None
                     )
                 )
                 .group_by(Position.position_type)
             )
             
             position_stats = positions_result.all()
-            total_positions = sum(count for count, _, _ in position_stats)
+            total_positions = top_positions_response['total_positions']
             
             # Calculate asset allocation
             asset_allocation = {}
-            total_value = top_positions_response.total_portfolio_value
             
             for count, position_type, type_value in position_stats:
                 if position_type:
@@ -215,25 +259,26 @@ class PortfolioDataService:
             cash_balance = total_value * 0.05
             
             # Create meta object
-            meta = MetaInfo(
-                as_of=utc_now(),
-                requested={'portfolio_id': str(portfolio_id)},
-                applied={'top_holdings_count': 5},
-                limits={'max_top_holdings': 5},
-                rows_returned=len(top_positions_response.positions),
-                truncated=False
-            )
+            meta = {
+                'as_of': utc_now().isoformat() + 'Z',
+                'requested': {'portfolio_id': str(portfolio_id)},
+                'applied': {'top_holdings_count': 5},
+                'limits': {'max_top_holdings': 5},
+                'rows_returned': len(top_positions_response['data']),
+                'truncated': False,
+                'schema_version': '1.0'
+            }
             
-            return PortfolioSummaryResponse(
-                meta=meta,
-                portfolio_id=portfolio.id,
-                portfolio_name=portfolio.name,
-                total_value=total_value,
-                cash_balance=cash_balance,
-                positions_count=total_positions,
-                top_holdings=top_positions_response.positions[:5],
-                asset_allocation=asset_allocation
-            )
+            return {
+                'meta': meta,
+                'portfolio_id': str(portfolio.id),
+                'portfolio_name': portfolio.name,
+                'total_value': total_value,
+                'cash_balance': cash_balance,
+                'positions_count': total_positions,
+                'top_holdings': top_positions_response['data'][:5],
+                'asset_allocation': asset_allocation
+            }
             
         except Exception as e:
             logger.error(f"Error getting portfolio summary: {e}")
@@ -263,10 +308,11 @@ class PortfolioDataService:
         try:
             # Get top positions to determine which symbols to include
             if selection_method in ["top_by_value", "top_by_weight"]:
-                top_positions = await self.get_top_positions_by_value(
-                    db, portfolio_id, limit=max_symbols
+                sort_by = "market_value" if selection_method == "top_by_value" else "weight"
+                top_positions = await self.get_top_positions(
+                    db, portfolio_id, limit=max_symbols, sort_by=sort_by
                 )
-                selected_symbols = [pos.symbol for pos in top_positions.positions]
+                selected_symbols = [pos['symbol'] for pos in top_positions['data']]
             else:  # all
                 # Get all active position symbols
                 result = await db.execute(

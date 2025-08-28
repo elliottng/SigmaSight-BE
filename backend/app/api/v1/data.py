@@ -19,6 +19,7 @@ from app.models.market_data import MarketDataCache
 from app.schemas.auth import CurrentUser
 from app.core.logging import get_logger
 from app.services.market_data_service import MarketDataService
+from app.services.portfolio_data_service import PortfolioDataService
 
 logger = get_logger(__name__)
 
@@ -634,3 +635,57 @@ async def get_factor_etf_prices(
             },
             "data": factors_data
         }
+
+
+@router.get("/positions/top/{portfolio_id}")
+async def get_top_positions(
+    portfolio_id: UUID,
+    limit: int = Query(20, le=50, description="Max positions to return"),
+    sort_by: str = Query("market_value", regex="^(market_value|weight)$"),
+    as_of_date: Optional[str] = Query(None, description="ISO date, max 180d lookback"),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get top N positions sorted by market value or weight.
+    
+    API layer owns:
+    - Sorting by market value/weight
+    - Computing portfolio coverage percentage
+    - Applying limit caps (limit<=50, as_of_date<=180d lookback)
+    - Response shape: {symbol, name, qty, value, weight, sector} only
+    - Rounding weight to 4 decimal places
+    - Full meta object population
+    
+    Returns positions with coverage % and truncation metadata.
+    """
+    async with db as session:
+        # Verify portfolio ownership
+        portfolio_stmt = select(Portfolio).where(
+            and_(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio_result = await session.execute(portfolio_stmt)
+        portfolio = portfolio_result.scalar_one_or_none()
+        
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        # Use service layer to get top positions
+        service = PortfolioDataService()
+        try:
+            result = await service.get_top_positions(
+                session,
+                portfolio_id,
+                limit=limit,
+                sort_by=sort_by,
+                as_of_date=as_of_date
+            )
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Error getting top positions: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")

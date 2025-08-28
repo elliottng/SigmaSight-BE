@@ -444,6 +444,11 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ## 📋 Phase 1: Enhance Data API Endpoints for Agent Use (Day 2-3)
 
+> **Status Update (2025-08-28):**
+> - ✅ `/data/positions/top/{portfolio_id}` - COMPLETED with all specs
+> - ⏳ `/data/portfolio/{id}/summary` - Ready to implement
+> - ⏳ `/data/portfolio/{id}/complete` - Enhancement pending
+
 > **ARCHITECTURE UPDATE**: Based on review feedback, we're enhancing existing data endpoints
 > with agent-optimized parameters rather than having tool handlers apply business logic.
 > 
@@ -567,15 +572,15 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ### 1.1 Priority New Endpoints (LLM-Optimized)
 
-- [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
+- [x] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint ✅ **COMPLETED**
   
   **API Layer Responsibilities:**
-  - [ ] Sorting by market value/weight 
-  - [ ] Computing portfolio coverage percentage
-  - [ ] Applying limit caps: `limit<=50`, `as_of_date<=180d` lookback
-  - [ ] Response shape: `{symbol, name, qty, value, weight, sector}` only
-  - [ ] Round weight to 4 decimal places
-  - [ ] Full meta object: `requested/applied/as_of/truncated/limits/schema_version`
+  - [x] Sorting by market value/weight ✅
+  - [x] Computing portfolio coverage percentage ✅
+  - [x] Applying limit caps: `limit<=50`, `as_of_date<=180d` lookback ✅
+  - [x] Response shape: `{symbol, name, qty, value, weight, sector}` only ✅
+  - [x] Round weight to 4 decimal places ✅
+  - [x] Full meta object: `requested/applied/as_of/truncated/limits/schema_version` ✅
   
   **File:** `backend/app/api/v1/data.py`
   ```python
@@ -614,10 +619,10 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
   
   **Handler Layer (Ultra-Thin):**
-  - [ ] Validate inputs with default `limit=20`
-  - [ ] Call API endpoint
-  - [ ] Wrap in uniform envelope 
-  - [ ] Map transient errors to `retryable=true`
+  - [x] Validate inputs with default `limit=20` ✅
+  - [x] Call API endpoint ✅
+  - [x] Wrap in uniform envelope ✅
+  - [x] Map transient errors to `retryable=true` ✅
 
 - [ ] **GET /api/v1/data/portfolio/{portfolio_id}/summary** - New endpoint
   
