@@ -16,6 +16,8 @@ from app.database import Base
 from app.config import settings
 # Import all models to ensure they are registered
 from app.models import *  # noqa
+# Import Agent models for migration
+from app.agent.models import conversations, preferences  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

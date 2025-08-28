@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     TRADEFEEDS_RATE_LIMIT: int = Field(default=30, env="TRADEFEEDS_RATE_LIMIT")  # calls per minute
     
     
+    # OpenAI Agent settings
+    OPENAI_API_KEY: str = Field(default="", env="OPENAI_API_KEY")
+    OPENAI_ORG_ID: str = Field(default="", env="OPENAI_ORG_ID")  # Optional
+    MODEL_DEFAULT: str = Field(default="gpt-5", env="MODEL_DEFAULT")
+    MODEL_FALLBACK: str = Field(default="gpt-5-mini", env="MODEL_FALLBACK")
+    AGENT_CACHE_TTL: int = Field(default=600, env="AGENT_CACHE_TTL")
+    SSE_HEARTBEAT_INTERVAL_MS: int = Field(default=15000, env="SSE_HEARTBEAT_INTERVAL_MS")
+    
     # JWT settings
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
     ALGORITHM: str = "HS256"
