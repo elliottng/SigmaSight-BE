@@ -4,11 +4,13 @@ SSE streaming endpoint for chat messages
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Dict, Any
 from uuid import uuid4
+from datetime import datetime
 
 from app.database import get_db
 from app.core.dependencies import get_current_user, CurrentUser
@@ -18,8 +20,11 @@ from app.agent.schemas.sse import (
     SSEStartEvent,
     SSEMessageEvent,
     SSEDoneEvent,
-    SSEErrorEvent
+    SSEErrorEvent,
+    SSEHeartbeatEvent
 )
+from app.agent.services.openai_service import openai_service
+from app.services.portfolio_data_service import PortfolioDataService
 from app.core.datetime_utils import utc_now
 from app.core.logging import get_logger
 from app.config import settings
@@ -29,6 +34,34 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+async def load_message_history(
+    conversation_id: str,
+    db: AsyncSession,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """Load recent message history for a conversation"""
+    result = await db.execute(
+        select(ConversationMessage)
+        .where(ConversationMessage.conversation_id == conversation_id)
+        .order_by(ConversationMessage.created_at.desc())
+        .limit(limit)
+    )
+    messages = result.scalars().all()
+    
+    # Convert to dict format and reverse to chronological order
+    history = []
+    for msg in reversed(messages):
+        msg_dict = {
+            "role": msg.role,
+            "content": msg.content
+        }
+        if msg.tool_calls:
+            msg_dict["tool_calls"] = msg.tool_calls
+        history.append(msg_dict)
+    
+    return history
+
+
 async def sse_generator(
     message_text: str,
     conversation: Conversation,
@@ -36,20 +69,11 @@ async def sse_generator(
     current_user: CurrentUser
 ) -> AsyncGenerator[str, None]:
     """
-    Generate Server-Sent Events for the chat response.
-    
-    This is a placeholder implementation. The full OpenAI integration
-    will be added in the next phase.
+    Generate Server-Sent Events for the chat response using OpenAI.
     """
+    response_start_time = datetime.now()
+    
     try:
-        # Send start event
-        start_event = SSEStartEvent(
-            conversation_id=str(conversation.id),
-            mode=conversation.mode,
-            model=settings.MODEL_DEFAULT
-        )
-        yield f"event: start\ndata: {json.dumps(start_event.model_dump())}\n\n"
-        
         # Handle mode switching
         if message_text.startswith("/mode "):
             new_mode = message_text[6:].strip()
@@ -58,6 +82,15 @@ async def sse_generator(
                 conversation.updated_at = utc_now()
                 await db.commit()
                 
+                # Send start event
+                start_event = SSEStartEvent(
+                    conversation_id=str(conversation.id),
+                    mode=new_mode,
+                    model=settings.MODEL_DEFAULT
+                )
+                yield f"event: start\ndata: {json.dumps(start_event.model_dump())}\n\n"
+                
+                # Send mode change message
                 mode_change_msg = SSEMessageEvent(
                     delta=f"Mode changed to {new_mode}",
                     role="system"
@@ -69,19 +102,29 @@ async def sse_generator(
                 yield f"event: done\ndata: {json.dumps(done_event.model_dump())}\n\n"
                 return
         
-        # TODO: Implement OpenAI streaming here
-        # For now, return a placeholder response
-        placeholder_response = f"I received your message: '{message_text}'. OpenAI integration coming soon!"
+        # Load message history
+        message_history = await load_message_history(conversation.id, db)
         
-        # Simulate streaming by splitting the response
-        words = placeholder_response.split()
-        for i, word in enumerate(words):
-            chunk = word + " " if i < len(words) - 1 else word
-            message_event = SSEMessageEvent(delta=chunk, role="assistant")
-            yield f"event: message\ndata: {json.dumps(message_event.model_dump())}\n\n"
-            await asyncio.sleep(0.05)  # Simulate typing delay
+        # Get portfolio context if available (stored in metadata)
+        portfolio_context = None
+        portfolio_id = conversation.meta_data.get("portfolio_id") if conversation.meta_data else None
+        if portfolio_id:
+            portfolio_service = PortfolioDataService(db)
+            try:
+                portfolio_data = await portfolio_service.get_portfolio_complete(
+                    str(portfolio_id),
+                    include_holdings=False
+                )
+                if portfolio_data and not portfolio_data.get("error"):
+                    portfolio_context = {
+                        "portfolio_id": str(portfolio_id),
+                        "total_value": portfolio_data.get("portfolio", {}).get("total_value"),
+                        "position_count": portfolio_data.get("meta", {}).get("positions_count", 0)
+                    }
+            except Exception as e:
+                logger.warning(f"Could not load portfolio context: {e}")
         
-        # Store message in database
+        # Store user message
         user_message = ConversationMessage(
             id=uuid4(),
             conversation_id=conversation.id,
@@ -90,22 +133,63 @@ async def sse_generator(
             created_at=utc_now()
         )
         db.add(user_message)
+        await db.commit()
         
+        # Stream OpenAI response
+        assistant_content = ""
+        tool_calls_made = []
+        
+        async for sse_event in openai_service.stream_chat_completion(
+            conversation_id=str(conversation.id),
+            conversation_mode=conversation.mode,
+            message_text=message_text,
+            message_history=message_history,
+            portfolio_context=portfolio_context
+        ):
+            # Forward the SSE event
+            yield sse_event
+            
+            # Parse event to track content and tool calls
+            if "event: message" in sse_event:
+                try:
+                    data_line = sse_event.split("\ndata: ")[1].split("\n")[0]
+                    data = json.loads(data_line)
+                    if data.get("delta"):
+                        assistant_content += data["delta"]
+                except:
+                    pass
+            elif "event: tool_finished" in sse_event:
+                try:
+                    data_line = sse_event.split("\ndata: ")[1].split("\n")[0]
+                    data = json.loads(data_line)
+                    tool_calls_made.append({
+                        "name": data.get("tool_name"),
+                        "duration_ms": data.get("duration_ms")
+                    })
+                except:
+                    pass
+        
+        # Store assistant message
         assistant_message = ConversationMessage(
             id=uuid4(),
             conversation_id=conversation.id,
             role="assistant",
-            content=placeholder_response,
+            content=assistant_content,
             created_at=utc_now()
         )
+        if tool_calls_made:
+            assistant_message.tool_calls = tool_calls_made
+        
         db.add(assistant_message)
         await db.commit()
         
-        # Send done event
+        # Calculate latency
+        latency_ms = int((datetime.now() - response_start_time).total_seconds() * 1000)
+        
+        # Send final done event if not already sent
         done_event = SSEDoneEvent(
-            total_tokens=len(message_text.split()) + len(placeholder_response.split()),
-            tool_calls_count=0,
-            latency_ms=500  # Placeholder
+            tool_calls_count=len(tool_calls_made),
+            latency_ms=latency_ms
         )
         yield f"event: done\ndata: {json.dumps(done_event.model_dump())}\n\n"
         

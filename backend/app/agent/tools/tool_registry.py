@@ -280,3 +280,7 @@ class ToolRegistry:
             "available": True,
             "handler": self.registry[tool_name].__name__
         }
+
+
+# Create singleton instance
+tool_registry = ToolRegistry()

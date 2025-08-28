@@ -49,6 +49,25 @@ class SSEErrorEvent(AgentBaseSchema):
     details: Optional[Dict[str, Any]] = None
 
 
+class SSEToolStartedEvent(AgentBaseSchema):
+    """SSE tool started event data"""
+    tool_name: str
+    arguments: Dict[str, Any]
+
+
+class SSEToolFinishedEvent(AgentBaseSchema):
+    """SSE tool finished event data"""
+    tool_name: str
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    duration_ms: Optional[int] = None
+
+
+class SSEHeartbeatEvent(AgentBaseSchema):
+    """SSE heartbeat event for keeping connection alive"""
+    timestamp: str
+
+
 class SSEDoneEvent(AgentBaseSchema):
     """SSE completion event data"""
     total_tokens: Optional[int] = None
