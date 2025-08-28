@@ -446,8 +446,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 > **Status Update (2025-08-28):**
 > - ✅ `/data/positions/top/{portfolio_id}` - COMPLETED with all specs
-> - ⏳ `/data/portfolio/{id}/summary` - Ready to implement
-> - ⏳ `/data/portfolio/{id}/complete` - Enhancement pending
+> - ❌ `/data/portfolio/{id}/summary` - REMOVED (requires performance calculations that don't exist)
+> - ⏳ `/data/portfolio/{id}/complete` - Enhancement pending (next priority)
 
 > **ARCHITECTURE UPDATE**: Based on review feedback, we're enhancing existing data endpoints
 > with agent-optimized parameters rather than having tool handlers apply business logic.
@@ -624,53 +624,6 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [x] Wrap in uniform envelope ✅
   - [x] Map transient errors to `retryable=true` ✅
 
-- [ ] **GET /api/v1/data/portfolio/{portfolio_id}/summary** - New endpoint
-  
-  **API Layer Responsibilities:**
-  - [ ] KPIs: MTD/QTD/YTD, 1Y performance metrics
-  - [ ] Top/bottom 5 contributors
-  - [ ] Risk proxy (β or standard deviation)
-  - [ ] Cash percentage
-  - [ ] Optional tiny chart array `{t, pv}` with max 180 points
-  - [ ] Standard caps & meta object
-  
-  **File:** `backend/app/api/v1/data.py`  
-  ```python
-  @router.get("/portfolio/{portfolio_id}/summary")
-  async def get_portfolio_summary(
-      portfolio_id: UUID,
-      include_chart: bool = Query(False, description="Include mini chart data"),
-      service: PortfolioDataService = Depends(get_portfolio_data_service),
-      current_user: CurrentUser = Depends(get_current_user),
-      db: AsyncSession = Depends(get_async_session)
-  ):
-      return await service.get_portfolio_summary(
-          db, portfolio_id, include_chart
-      )
-  ```
-  
-  **Service Implementation:**
-  ```python
-  # In PortfolioDataService  
-  async def get_portfolio_summary(
-      self,
-      db: AsyncSession,
-      portfolio_id: UUID, 
-      include_chart: bool = False
-  ) -> Dict:
-      # 1. Calculate KPIs (MTD/QTD/YTD/1Y)
-      # 2. Identify top/bottom 5 contributors
-      # 3. Compute risk proxy (beta or stdev)
-      # 4. Calculate cash percentage
-      # 5. Optional: generate chart array (max 180 points)
-      # 6. Format with comprehensive meta object
-  ```
-  
-  **Handler Layer (Ultra-Thin):**
-  - [ ] Validate inputs only
-  - [ ] Call API endpoint
-  - [ ] Wrap in uniform envelope
-  - [ ] No business logic whatsoever
 
 ### 1.2 Existing Endpoint Enhancements
 

@@ -751,16 +751,7 @@ class TopPositionsResponse(BaseSchema):
     portfolio_coverage_percent: float
     total_positions: int
     
-class PortfolioSummaryResponse(BaseSchema):
-    """Response for /portfolio/summary endpoint"""
-    meta: MetaInfo
-    portfolio_id: UUID
-    name: str
-    total_value: float
-    position_count: int
-    top_holdings: List[Dict]
-    asset_allocation: Dict
-    key_metrics: Dict
+# Note: PortfolioSummaryResponse removed - requires performance calculations not available in backend
 ```
 
 ### 18.2 Service Layer Implementation
@@ -789,16 +780,7 @@ class PortfolioDataService:
         """
         # Implementation required
         
-    async def get_portfolio_summary(
-        self,
-        db: AsyncSession,
-        portfolio_id: UUID
-    ) -> Dict:
-        """
-        Get condensed portfolio overview with key metrics.
-        Optimized for initial Agent context setting.
-        """
-        # Implementation required
+    # Note: get_portfolio_summary removed - requires performance calculations not available
         
     async def get_historical_prices_with_selection(
         self,
@@ -845,15 +827,8 @@ async def get_top_positions(
     # New endpoint using service
     return await service.get_top_positions_by_value(...)
 
-@router.get("/portfolio/{portfolio_id}/summary")
-async def get_portfolio_summary(
-    portfolio_id: UUID,
-    service: PortfolioDataService = Depends(get_portfolio_data_service),
-    current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session)
-):
-    # New endpoint using service
-    return await service.get_portfolio_summary(...)
+# Note: /portfolio/{portfolio_id}/summary endpoint removed 
+# Requires performance calculations (MTD/QTD/YTD) not available in backend
 ```
 
 ## 19. Existing Backend Infrastructure (Project Context)
