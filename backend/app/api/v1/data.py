@@ -31,15 +31,22 @@ router = APIRouter(prefix="/data", tags=["raw-data"])
 @router.get("/portfolio/{portfolio_id}/complete")
 async def get_portfolio_complete(
     portfolio_id: UUID,
-    include_positions: bool = Query(True, description="Include position list"),
-    include_cash: bool = Query(True, description="Include cash balance"),
+    include_holdings: bool = Query(True, description="Include position details"),
+    include_timeseries: bool = Query(False, description="Include historical data"),
+    include_attrib: bool = Query(False, description="Include attribution data"),
     as_of_date: Optional[date] = Query(None, description="Historical snapshot date"),
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Get complete portfolio data with all positions and market values.
-    Returns raw data without any calculated metrics.
+    Get complete portfolio data with optional sections.
+    
+    API layer owns:
+    - Consistent as_of timestamps across all sections
+    - Deterministic ordering of positions/data
+    - Full meta object population
+    
+    Returns raw data with proper meta object.
     """
     async with db as session:
         # Verify portfolio ownership
@@ -56,6 +63,9 @@ async def get_portfolio_complete(
         if not portfolio:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         
+        # Set consistent as_of timestamp
+        as_of_timestamp = utc_now()
+        
         # Get positions with current market values
         positions_data = []
         total_market_value = 0
@@ -65,7 +75,7 @@ async def get_portfolio_complete(
         complete_data_count = 0
         partial_data_count = 0
         
-        if include_positions:
+        if include_holdings:
             for position in portfolio.positions:
                 # Get current price from market data cache
                 cache_stmt = select(MarketDataCache).where(
@@ -110,20 +120,50 @@ async def get_portfolio_complete(
                     "has_complete_history": has_complete_history
                 })
         
-        # Build response
+        # Sort positions for deterministic ordering
+        positions_data.sort(key=lambda x: (x['symbol'], x['id']))
+        
+        # Build response with proper meta object
         # Note: Portfolio model doesn't have cash_balance field
         # Using 5% of portfolio value as a reasonable cash allocation placeholder
         # This represents typical cash reserves for portfolio liquidity
         cash_balance = total_market_value * 0.05 if total_market_value > 0 else 10000.0
         
+        # Create meta object
+        meta = {
+            "as_of": to_utc_iso8601(as_of_timestamp),
+            "requested": {
+                "portfolio_id": str(portfolio_id),
+                "include_holdings": include_holdings,
+                "include_timeseries": include_timeseries,
+                "include_attrib": include_attrib,
+                "as_of_date": str(as_of_date) if as_of_date else None
+            },
+            "applied": {
+                "include_holdings": include_holdings,
+                "include_timeseries": include_timeseries,
+                "include_attrib": include_attrib,
+                "as_of_date": to_utc_iso8601(as_of_timestamp)
+            },
+            "limits": {
+                "max_positions": 2000,
+                "max_days": 180,
+                "max_symbols": 5 if include_timeseries else None
+            },
+            "rows_returned": len(positions_data) if include_holdings else 0,
+            "truncated": False,
+            "schema_version": "1.0"
+        }
+        
         response = {
+            "meta": meta,
             "portfolio": {
                 "id": str(portfolio.id),
                 "name": portfolio.name,
-                "total_value": total_market_value + cash_balance if include_cash else total_market_value,
-                "cash_balance": cash_balance if include_cash else 0,
+                "total_value": total_market_value + cash_balance,
+                "cash_balance": cash_balance,
                 "position_count": len(positions_data),
-                "timestamp": to_utc_iso8601(utc_now())
+                "as_of": to_utc_iso8601(as_of_timestamp)
             },
             "positions_summary": {
                 "long_count": long_count,
@@ -133,13 +173,34 @@ async def get_portfolio_complete(
             }
         }
         
-        if include_positions:
-            response["positions"] = positions_data
+        # Add holdings section if requested
+        if include_holdings:
+            response["holdings"] = positions_data
+            
+        # Add timeseries section if requested (placeholder for now)
+        if include_timeseries:
+            # TODO: Implement actual timeseries data retrieval
+            # For now, return empty structure
+            response["timeseries"] = {
+                "dates": [],
+                "values": [],
+                "note": "Timeseries data not yet implemented"
+            }
+            
+        # Add attribution section if requested (placeholder for now)  
+        if include_attrib:
+            # TODO: Implement actual attribution data retrieval
+            # For now, return empty structure
+            response["attribution"] = {
+                "contributors": [],
+                "detractors": [],
+                "note": "Attribution data not yet implemented"
+            }
             
         response["data_quality"] = {
             "complete_data_positions": complete_data_count,
             "partial_data_positions": partial_data_count,
-            "data_as_of": to_utc_iso8601(utc_now())
+            "as_of": to_utc_iso8601(as_of_timestamp)
         }
         
         return response
