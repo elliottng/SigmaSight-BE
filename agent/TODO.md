@@ -252,17 +252,24 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > 
 > Reference: TDD §7.0 for architectural decision, §7.1-7.6 for tool specifications
 
-### 1.0 NEW Service Layer Methods Required
+### 1.0 NEW Backend Components Required
 
 > **Note**: Current endpoints query DB directly in API layer. For new Agent features,
-> we should create a service layer to encapsulate business logic.
+> we need both Pydantic schemas and a service layer.
+
+- [ ] **Create `app/schemas/data.py`** - Pydantic schemas for data endpoints
+  - [ ] `MetaInfo` - Common meta object for all responses
+  - [ ] `HistoricalPricesRequest` - Request schema with selection params
+  - [ ] `TopPositionsResponse` - Response with position summaries
+  - [ ] `PortfolioSummaryResponse` - Condensed portfolio response
+  - [ ] `PositionSummary` - Individual position data
 
 - [ ] **Create `app/services/portfolio_data_service.py`**
   ```python
   class PortfolioDataService:
-      async def get_top_positions_by_value(db, portfolio_id, limit=50)
-      async def get_portfolio_summary(db, portfolio_id)
-      async def get_historical_prices_with_selection(db, portfolio_id, selection_method, max_symbols)
+      async def get_top_positions_by_value(db, portfolio_id, limit=50) -> TopPositionsResponse
+      async def get_portfolio_summary(db, portfolio_id) -> PortfolioSummaryResponse
+      async def get_historical_prices_with_selection(db, portfolio_id, selection_method, max_symbols) -> Dict
   ```
 
 ### 1.1 Enhanced Agent-Optimized Endpoints (Priority)
@@ -352,6 +359,45 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 ## 📋 Phase 2: Backend Chat Infrastructure (Day 4-6)
 
 > Reference: TDD §5 (Chat Endpoints), §8 (SSE Protocol), §18.1 (Auth), §18.4 (API Structure)
+
+### 2.0 Agent Pydantic Schemas
+
+- [ ] **Create `app/agent/schemas/` directory**
+  - [ ] `__init__.py` - Export all schemas
+  - [ ] `base.py` - AgentBaseSchema with common config
+  
+- [ ] **Create `app/agent/schemas/chat.py`**
+  ```python
+  from app.agent.schemas.base import AgentBaseSchema
+  
+  class ConversationCreate(AgentBaseSchema):
+      mode: str = "green"  # green|blue|indigo|violet
+      
+  class ConversationResponse(AgentBaseSchema):
+      conversation_id: UUID
+      mode: str
+      created_at: datetime
+      
+  class MessageSend(AgentBaseSchema):
+      conversation_id: UUID
+      text: str
+  ```
+
+- [ ] **Create `app/agent/schemas/sse.py`**
+  ```python
+  class SSEEvent(AgentBaseSchema):
+      event: str  # start|message|tool_call|tool_result|error|done
+      data: Dict
+      
+  class ToolCallEvent(AgentBaseSchema):
+      name: str
+      args: Dict
+      
+  class ToolResultEvent(AgentBaseSchema):
+      name: str
+      result: Dict
+      meta: Dict
+  ```
 
 ### 2.1 Create Chat Module Structure
 - [ ] **Create backend/app/api/v1/chat/ module** (ref: TDD §3 for structure)

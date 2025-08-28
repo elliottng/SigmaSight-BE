@@ -77,9 +77,12 @@ Frontend (Next.js) ──SSE POST /chat/send────────────
         __init__.py
         conversations.py      # Conversation, Message models
         preferences.py        # UserPreference, PromptVersion models
-      schemas/                # Pydantic models for API
-        chat.py              # Request/response schemas
+      schemas/                # Pydantic models for Agent API
+        __init__.py
+        base.py              # AgentBaseSchema with common config
+        chat.py              # ConversationCreate, MessageSend schemas
         sse.py               # SSE event schemas
+        responses.py         # ConversationResponse, MessageResponse
       handlers/
         conversations.py      # POST /chat/conversations handler
         send.py              # POST /chat/send SSE handler
@@ -687,7 +690,66 @@ Given the existing backend uses Bearer tokens but SSE works better with cookies,
 
 ## 18. Backend Implementation Requirements
 
-### 18.1 Service Layer Implementation
+### 18.1 Pydantic Schemas for Data Endpoints
+
+**Location:** `backend/app/schemas/data.py` (new file)
+
+```python
+from typing import Dict, List, Optional
+from uuid import UUID
+from datetime import datetime
+from app.schemas.base import BaseSchema
+
+# Request Schemas
+class HistoricalPricesRequest(BaseSchema):
+    """Request schema for enhanced historical prices endpoint"""
+    max_symbols: int = 5
+    selection_method: str = "top_by_value"  # top_by_value|top_by_weight|all
+    lookback_days: int = 90
+    include_factor_etfs: bool = False
+    date_format: str = "iso"
+
+# Response Schemas  
+class MetaInfo(BaseSchema):
+    """Common meta object for all responses"""
+    as_of: datetime
+    requested: Dict
+    applied: Dict
+    limits: Dict
+    rows_returned: int
+    truncated: bool
+    suggested_params: Optional[Dict] = None
+    selection_info: Optional[Dict] = None  # For endpoints that select symbols
+
+class PositionSummary(BaseSchema):
+    """Position summary for top positions endpoint"""
+    id: UUID
+    symbol: str
+    quantity: float
+    market_value: float
+    weight_percent: float
+    position_type: str
+    
+class TopPositionsResponse(BaseSchema):
+    """Response for /positions/top endpoint"""
+    meta: MetaInfo
+    positions: List[PositionSummary]
+    portfolio_coverage_percent: float
+    total_positions: int
+    
+class PortfolioSummaryResponse(BaseSchema):
+    """Response for /portfolio/summary endpoint"""
+    meta: MetaInfo
+    portfolio_id: UUID
+    name: str
+    total_value: float
+    position_count: int
+    top_holdings: List[Dict]
+    asset_allocation: Dict
+    key_metrics: Dict
+```
+
+### 18.2 Service Layer Implementation
 
 **New Service Required:**
 ```python
