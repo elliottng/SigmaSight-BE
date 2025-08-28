@@ -934,15 +934,46 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
     -N  # No buffering for SSE
   ```
 
-- [ ] **SSE Event Types**
+- [ ] **SSE Contract (Frontend Compatibility)**
   ```python
+  # Ensure server emits distinct SSE events:
+  
   class SSEEvent:
       START = "start"
-      MESSAGE = "message"  # default
-      TOOL_CALL = "tool_call"
-      TOOL_RESULT = "tool_result"
+      TOOL_STARTED = "tool_started"
+      TOOL_DELTA = "tool_delta"         # Optional streaming
+      TOOL_FINISHED = "tool_finished"
+      CONTENT_DELTA = "content_delta"   # Model text tokens
+      HEARTBEAT = "heartbeat"           # Every ~10s
       ERROR = "error"
       DONE = "done"
+  
+  # SSE generator updates:
+  async def sse_generator(...):
+      # Send heartbeat every 10s
+      last_heartbeat = time.time()
+      
+      # Tool execution events
+      yield f"event: tool_started\ndata: {json.dumps({'name': tool_name, 'args': args})}\n\n"
+      
+      # Tool completion
+      yield f"event: tool_finished\ndata: {json.dumps({'name': tool_name, 'result': envelope})}\n\n"
+      
+      # Model response streaming
+      async for chunk in openai_stream:
+          yield f"event: content_delta\ndata: {json.dumps({'delta': chunk})}\n\n"
+      
+      # Periodic heartbeat
+      if time.time() - last_heartbeat > 10:
+          yield f"event: heartbeat\ndata: {json.dumps({'ts': utc_now().isoformat()})}\n\n"
+          last_heartbeat = time.time()
+  
+  # Ensure proxy_buffering off is honored
+  headers = {
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive", 
+      "X-Accel-Buffering": "no"  # Critical for real-time
+  }
   ```
 
 - [ ] **Request/Response schemas**
@@ -997,22 +1028,149 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > **Architecture Note**: Structured for multi-provider support (OpenAI, Anthropic, Gemini, Grok)
 > with 95% code reuse. Phase 1 implements OpenAI adapter only.
 
-### 3.1 Core Tool Business Logic (Provider-Agnostic Layer)
-- [ ] **Create `backend/app/agent/tools/handlers.py`**
+### 3.1 Tool Registry + Ultra-Thin Handlers
+- [ ] **Create `backend/app/agent/tools/tool_registry.py`**
   ```python
-  class PortfolioTools:
-      """Provider-independent tool implementations (95% portable)"""
-      
-      async def get_portfolio_complete(self, portfolio_id: str, **kwargs) -> Dict:
-          # Business logic: data fetching, filtering, meta objects
-          # 100% portable across all AI providers
+  from typing import Dict, Callable, Any
+  from pydantic import BaseModel, ValidationError
+  
+  # Registry of all available tools
+  TOOL_REGISTRY: Dict[str, Callable] = {
+      "get_portfolio_complete": get_portfolio_complete,
+      "get_positions_details": get_positions_details,
+      "get_prices_historical": get_prices_historical,
+      "get_current_quotes": get_current_quotes,
+      "get_factor_etf_prices": get_factor_etf_prices,
+      "get_portfolio_data_quality": get_portfolio_data_quality
+  }
+  
+  async def dispatch_tool_call(
+      tool_name: str, 
+      payload: Dict[str, Any], 
+      ctx: Dict[str, Any]
+  ) -> Dict[str, Any]:
+      """Central dispatcher: validate → call → wrap"""
+      try:
+          # (a) Validate input with Pydantic
+          handler = TOOL_REGISTRY.get(tool_name)
+          if not handler:
+              raise ValueError(f"Unknown tool: {tool_name}")
           
-      async def get_positions_details(self, **kwargs) -> Dict:
-          # Business logic: caps enforcement, truncation 
-          # 100% portable across all AI providers
+          # (b) Call underlying HTTP endpoint
+          result = await handler(**payload)
+          
+          # (c) Wrap in uniform envelope
+          return format_success_envelope(result, payload)
+          
+      except Exception as e:
+          # (d) Map exceptions to error envelope
+          return format_error_envelope(str(e), payload)
   ```
 
-### 3.2 OpenAI Provider Adapter (Provider-Specific Layer)
+### 3.2 Uniform Envelope (All Tool Responses)
+- [ ] **Standardize response format**
+  ```python
+  def format_success_envelope(data: Any, requested_params: Dict) -> Dict:
+      return {
+          "meta": {
+              "requested": requested_params,  # Original request params
+              "applied": data.get("applied_params", requested_params),  # After caps/defaults
+              "as_of": utc_now().isoformat() + "Z",
+              "truncated": data.get("truncated", False),
+              "limits": {
+                  "symbols_max": 5,
+                  "lookback_days_max": 180,
+                  "timeout_ms": 3000
+              },
+              "retryable": False
+          },
+          "data": data.get("result") or data,
+          "error": None
+      }
+  
+  def format_error_envelope(message: str, requested_params: Dict, retryable: bool = False) -> Dict:
+      return {
+          "meta": {
+              "requested": requested_params,
+              "applied": {},
+              "as_of": utc_now().isoformat() + "Z",
+              "truncated": False,
+              "limits": {"symbols_max": 5, "lookback_days_max": 180, "timeout_ms": 3000},
+              "retryable": retryable
+          },
+          "data": None,
+          "error": {
+              "type": "validation_error" if "validation" in message.lower() else "execution_error",
+              "message": message,
+              "details": {}
+          }
+      }
+  ```
+
+### 3.3 Caps & Early Exit in Endpoints (Not Handlers)
+- [ ] **Enhance Raw Data API endpoints with caps enforcement**
+  ```python
+  # In backend/app/api/v1/data.py endpoints
+  
+  @router.get("/prices/quotes")
+  async def get_quotes(symbols: str = Query(...)):
+      symbol_list = symbols.split(',')
+      
+      # Apply caps
+      if len(symbol_list) > 5:
+          applied_symbols = symbol_list[:5]
+          truncated = True
+          suggested_params = {"symbols": ",".join(symbol_list[:5])}
+      else:
+          applied_symbols = symbol_list
+          truncated = False
+          suggested_params = None
+      
+      # Set meta fields for response
+      meta = {
+          "requested": {"symbols": symbols},
+          "applied": {"symbols": ",".join(applied_symbols)},
+          "truncated": truncated,
+          "suggested_params": suggested_params
+      }
+      
+      # Process request with capped parameters
+      quotes_data = await fetch_quotes(applied_symbols)
+      
+      return {
+          "meta": meta,
+          "data": quotes_data
+      }
+  ```
+
+### 3.4 Per-Tool Timeouts & Retries
+- [ ] **Implement httpx with timeout and retry logic**
+  ```python
+  import httpx
+  from tenacity import retry, stop_after_attempt, wait_exponential
+  
+  @retry(
+      stop=stop_after_attempt(3),  # Configurable per tool
+      wait=wait_exponential(multiplier=1, min=1, max=4),
+      retry_error_callback=lambda retry_state: {"retries": retry_state.attempt_number}
+  )
+  async def call_raw_data_api(endpoint: str, params: Dict, timeout: float = 3.0) -> Dict:
+      """Call Raw Data API with timeout and retry"""
+      async with httpx.AsyncClient(timeout=timeout) as client:
+          response = await client.get(endpoint, params=params)
+          
+          # Set retryable=true for transient errors
+          if response.status_code in [429, 500, 502, 503, 504]:
+              retryable = True
+              response.raise_for_status()  # Triggers retry
+          elif response.status_code >= 400:
+              retryable = False
+              response.raise_for_status()  # No retry
+          
+          return response.json()
+  ```
+
+### 3.5 OpenAI Provider Adapter (Provider-Specific Layer)
 - [ ] **Create `backend/app/agent/adapters/openai_adapter.py`**
   ```python
   class OpenAIToolAdapter:
@@ -1025,11 +1183,11 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
           # OpenAI function calling schema format
           
       async def execute_tool(self, name: str, args: Dict) -> str:
-          result = await getattr(self.tools, name)(**args)
+          result = await dispatch_tool_call(name, args, {})  # Use registry
           return json.dumps(result)  # OpenAI expects JSON string
   ```
 
-### 3.3 Tool Implementation Details (Business Logic Layer)
+### 3.6 Tool Implementation Details (Business Logic Layer)
 
 - [ ] **get_portfolio_complete** (ref: TDD §7.1, PRD §6.1)
   ```python
@@ -1104,7 +1262,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       # Include resolved symbols in meta.applied
   ```
 
-### 3.4 Future Provider Support (Architecture Ready)
+### 3.7 Future Provider Support (Architecture Ready)
 - [ ] **Adding New Provider (e.g., Anthropic, Gemini)** 🔮 **Future Work**
   ```python
   class AnthropicToolAdapter:
@@ -1128,7 +1286,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 - 🔧 Response formatting: ~20 lines per tool
 - ⏱️ **Total effort: 1-2 days vs complete rewrite**
 
-### 3.5 Tool Response Standardization (Provider-Agnostic)
+### 3.8 Tool Response Standardization (Provider-Agnostic)
 - [ ] **Implement common response envelope** (used by all providers)
   ```python
   def format_tool_response(
