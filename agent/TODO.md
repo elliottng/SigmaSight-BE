@@ -1563,9 +1563,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 ### 6.1 Unit Tests
 - [ ] **Test service layer**
   - [ ] `PortfolioDataService.get_top_positions_by_value()`
-  - [ ] `PortfolioDataService.get_portfolio_summary()`
   - [ ] `PortfolioDataService.get_historical_prices_with_selection()`
-  - [ ] Mock database sessions
   - [ ] Test selection methods (top_by_value, top_by_weight)
 
 - [ ] **Test conversation management**
@@ -1585,30 +1583,24 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [ ] Heartbeat mechanism
   - [ ] Error recovery
 
-### 5.2 Integration Tests
+### 6.2 Integration Tests
 - [ ] **End-to-end chat flow**
   - [ ] Login → Create conversation → Send message
   - [ ] Tool execution → Response streaming
   - [ ] Code Interpreter execution
 
-- [ ] **Golden Test Suite (15 queries)** (ref: PRD §13 for test cases)
-  1. [ ] "What's my 30-day P&L?"
-  2. [ ] "Show my biggest positions"
-  3. [ ] "What's my delta exposure?"
-  4. [ ] "Which positions expire this week?"
-  5. [ ] "Calculate my portfolio beta"
-  6. [ ] "Show factor exposures"
-  7. [ ] "What's my cash balance?"
-  8. [ ] "Compare this week vs last week performance"
-  9. [ ] "Show me AAPL historical prices"
-  10. [ ] "What's my portfolio value?"
-  11. [ ] "Calculate position-level returns"
-  12. [ ] "Show correlation matrix"
-  13. [ ] "What's my largest loss today?"
-  14. [ ] "Show options positions only"
-  15. [ ] "Calculate Sharpe ratio"
+- [ ] **Golden Test Suite (9 queries)**
+  1. [ ] "Show my biggest positions"
+  2. [ ] "Calculate my portfolio beta"
+  3. [ ] "Show factor exposures"
+  4. [ ] "What's my cash balance?"
+  5. [ ] "Show me AAPL historical prices"
+  6. [ ] "What's my portfolio value?"
+  7. [ ] "Calculate position-level returns"
+  8. [ ] "Show correlation matrix"
+  9. [ ] "What's my largest loss today?"
 
-### 5.3 Performance Testing
+### 6.3 Performance Testing
 - [ ] **Latency measurements** (ref: TDD §12, PRD §3 Success Metrics)
   - [ ] Stream start ≤ 3s p50
   - [ ] Complete response ≤ 8-10s p95
