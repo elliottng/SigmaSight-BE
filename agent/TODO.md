@@ -565,71 +565,144 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   uv run pytest tests/test_portfolio_data_service.py -v
   ```
 
-### 1.1 Enhanced Agent-Optimized Endpoints (Priority)
-- [ ] **GET /api/v1/data/prices/historical/{portfolio_id}** - Add agent parameters
+### 1.1 Priority New Endpoints (LLM-Optimized)
+
+- [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
+  
+  **API Layer Responsibilities:**
+  - [ ] Sorting by market value/weight 
+  - [ ] Computing portfolio coverage percentage
+  - [ ] Applying limit caps: `limit<=50`, `as_of_date<=180d` lookback
+  - [ ] Response shape: `{symbol, name, qty, value, weight, sector}` only
+  - [ ] Round weight to 4 decimal places
+  - [ ] Full meta object: `requested/applied/as_of/truncated/limits/schema_version`
   
   **File:** `backend/app/api/v1/data.py`
-  **Function:** `get_historical_prices()` (enhance existing)
-  
-  **Add parameters:**
   ```python
-  async def get_historical_prices(
+  @router.get("/positions/top/{portfolio_id}")
+  async def get_top_positions(
       portfolio_id: UUID,
-      max_symbols: int = Query(5, le=5, description="Max symbols to return"),
-      selection_method: str = Query("top_by_value", regex="^(top_by_value|top_by_weight|all)$"),
-      lookback_days: int = Query(180, le=180),
-      db: AsyncSession = Depends(get_db),
-      _: CurrentUser = Depends(get_current_user)
+      limit: int = Query(20, le=50, description="Max positions to return"),
+      sort_by: str = Query("market_value", regex="^(market_value|weight)$"),
+      as_of_date: Optional[str] = Query(None, description="ISO date, max 180d lookback"),
+      service: PortfolioDataService = Depends(get_portfolio_data_service),
+      current_user: CurrentUser = Depends(get_current_user),
+      db: AsyncSession = Depends(get_async_session)
   ):
-      service = PortfolioDataService()
-      return await service.get_historical_prices_with_selection(
-          db, portfolio_id, selection_method, max_symbols
+      return await service.get_top_positions(
+          db, portfolio_id, limit, sort_by, as_of_date
       )
   ```
   
-  **Implementation logic:**
-  1. Query positions for portfolio
-  2. Calculate market value for each
-  3. Apply selection_method (sort by value/weight)
-  4. Take top max_symbols
-  5. Query MarketDataCache for selected symbols
-  6. Format with meta object
-  
-  **Success Criteria:**
-  - ✅ Returns max 5 symbols
-  - ✅ Meta object includes selection info
-  - ✅ Response < 2000 tokens
-  
-  **Test:**
-  ```bash
-  curl -X GET "http://localhost:8000/api/v1/data/prices/historical/{portfolio_id}?max_symbols=3&selection_method=top_by_value" \
-    -H "Authorization: Bearer {token}"
+  **Service Implementation:**
+  ```python
+  # In PortfolioDataService
+  async def get_top_positions(
+      self,
+      db: AsyncSession, 
+      portfolio_id: UUID,
+      limit: int = 20,
+      sort_by: str = "market_value",
+      as_of_date: Optional[str] = None
+  ) -> Dict:
+      # 1. Query positions with market values
+      # 2. Sort by market_value or weight 
+      # 3. Apply limit cap (<=50)
+      # 4. Calculate portfolio coverage %
+      # 5. Format response with proper meta object
+      # 6. Round weight to 4dp
   ```
-
-- [ ] **GET /api/v1/data/positions/top/{portfolio_id}** - New endpoint
-  - [ ] Create service method `get_top_positions_by_value()`
-  - [ ] Calculate market value for each position
-  - [ ] Sort and filter to top 50 by value
-  - [ ] Calculate portfolio coverage percentage
-  - [ ] Include aggregated statistics
-  - [ ] Optimize response for LLM consumption
+  
+  **Handler Layer (Ultra-Thin):**
+  - [ ] Validate inputs with default `limit=20`
+  - [ ] Call API endpoint
+  - [ ] Wrap in uniform envelope 
+  - [ ] Map transient errors to `retryable=true`
 
 - [ ] **GET /api/v1/data/portfolio/{portfolio_id}/summary** - New endpoint
-  - [ ] Create service method `get_portfolio_summary()`
-  - [ ] Aggregate portfolio metrics
-  - [ ] Include top 5 holdings
-  - [ ] Calculate basic performance metrics
-  - [ ] Condensed overview for initial context
+  
+  **API Layer Responsibilities:**
+  - [ ] KPIs: MTD/QTD/YTD, 1Y performance metrics
+  - [ ] Top/bottom 5 contributors
+  - [ ] Risk proxy (β or standard deviation)
+  - [ ] Cash percentage
+  - [ ] Optional tiny chart array `{t, pv}` with max 180 points
+  - [ ] Standard caps & meta object
+  
+  **File:** `backend/app/api/v1/data.py`  
+  ```python
+  @router.get("/portfolio/{portfolio_id}/summary")
+  async def get_portfolio_summary(
+      portfolio_id: UUID,
+      include_chart: bool = Query(False, description="Include mini chart data"),
+      service: PortfolioDataService = Depends(get_portfolio_data_service),
+      current_user: CurrentUser = Depends(get_current_user),
+      db: AsyncSession = Depends(get_async_session)
+  ):
+      return await service.get_portfolio_summary(
+          db, portfolio_id, include_chart
+      )
+  ```
+  
+  **Service Implementation:**
+  ```python
+  # In PortfolioDataService  
+  async def get_portfolio_summary(
+      self,
+      db: AsyncSession,
+      portfolio_id: UUID, 
+      include_chart: bool = False
+  ) -> Dict:
+      # 1. Calculate KPIs (MTD/QTD/YTD/1Y)
+      # 2. Identify top/bottom 5 contributors
+      # 3. Compute risk proxy (beta or stdev)
+      # 4. Calculate cash percentage
+      # 5. Optional: generate chart array (max 180 points)
+      # 6. Format with comprehensive meta object
+  ```
+  
+  **Handler Layer (Ultra-Thin):**
+  - [ ] Validate inputs only
+  - [ ] Call API endpoint
+  - [ ] Wrap in uniform envelope
+  - [ ] No business logic whatsoever
 
-### 1.1 Existing Endpoints - Enhance with Parameters
-- [x] **GET /api/v1/data/portfolio/{portfolio_id}/complete** 
+### 1.2 Existing Endpoint Enhancements
+
+- [ ] **GET /api/v1/data/portfolio/{portfolio_id}/complete** - Add include flags
   - ✅ Returns real portfolio data with positions
   - ✅ cash_balance calculated as 5% of portfolio
-  - [ ] Add `as_of_date` parameter filtering
-  - [ ] Add `include_positions` boolean parameter (default: true)
-  - [ ] Add `include_cash` boolean parameter (default: true)
-  - [ ] Enforce max_rows_positions=200 cap
-  - [ ] Return proper meta object per agent spec
+  
+  **API Layer Enhancements:**
+  - [ ] Add `include_holdings` boolean parameter (default: true)  
+  - [ ] Add `include_timeseries` boolean parameter (default: false)
+  - [ ] Add `include_attrib` boolean parameter (default: false)
+  - [ ] Provide consistent `as_of` timestamp across all sections
+  - [ ] Deterministic ordering of positions/data
+  - [ ] Full meta object population
+  
+  **Enhanced endpoint signature:**
+  ```python
+  @router.get("/portfolio/{portfolio_id}/complete")
+  async def get_portfolio_complete(
+      portfolio_id: UUID,
+      include_holdings: bool = Query(True, description="Include position details"),
+      include_timeseries: bool = Query(False, description="Include historical data"),
+      include_attrib: bool = Query(False, description="Include attribution data"), 
+      service: PortfolioDataService = Depends(get_portfolio_data_service),
+      current_user: CurrentUser = Depends(get_current_user),
+      db: AsyncSession = Depends(get_async_session)
+  ):
+      return await service.get_portfolio_complete(
+          db, portfolio_id, include_holdings, include_timeseries, include_attrib
+      )
+  ```
+  
+  **Handler Layer (Ultra-Thin):**
+  - [ ] Validate inputs only
+  - [ ] Call API endpoint  
+  - [ ] Wrap in uniform envelope
+  - [ ] No truncation note logic (that belongs in API layer)
 
 - [x] **GET /api/v1/data/portfolio/{portfolio_id}/data-quality**
   - ✅ Returns real data quality assessment
