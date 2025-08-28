@@ -150,7 +150,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 **Critical Issues to Address:**
 - ✅ GPT-5 now available - use as default model (per OpenAI docs)
 - ✅ Raw Data APIs (6/6) return real data - need parameter enhancements only
-- Backend chat endpoints don't exist yet - need to implement
+- ✅ Backend chat endpoints IMPLEMENTED - /api/v1/chat/* ready
 - ✅ UTC ISO 8601 standardization COMPLETED (Phase 3)
 - ⚠️ Agent must use HTTP calls to Raw Data APIs (no direct DB access)
 
@@ -158,11 +158,11 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 ## 📋 Phase 0: Prerequisites & Fixes (Day 1-2)
 
-> **Status Update (2025-08-27):**
+> **Status Update (2025-08-28):**
 > - ✅ Dual authentication (0.3) - COMPLETED and tested
 > - ✅ GPT-5 configuration (0.1) - Model references updated
-> - ⏳ Environment setup (0.2) - Ready to proceed
-> - ⏳ Database schema (0.4) - Next priority
+> - ✅ Environment setup (0.2) - COMPLETED
+> - ✅ Database schema (0.4) - COMPLETED with migrations
 
 ### 0.1 Configure GPT-5 Model Settings ✅ **COMPLETED**
 - [x] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
@@ -268,7 +268,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   uv run python -c "from app.database import engine; print(engine.table_names())"
   ```
 
-- [ ] **Conversation model schema** (Agent owns these tables!)
+- [x] **Conversation model schema** (Agent owns these tables!) ✅ **COMPLETED**
   ```python
   class Conversation(Base):
       __tablename__ = "agent_conversations"  # Note: agent_ prefix
@@ -298,7 +298,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       )
   ```
 
-- [ ] **ConversationMessage model schema**
+- [x] **ConversationMessage model schema** ✅ **COMPLETED**
   ```python
   class ConversationMessage(Base):
       __tablename__ = "conversation_messages"
@@ -375,9 +375,9 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
   
   **Step 5: Update database initialization**
-  - [ ] File: `backend/app/database.py`
-  - [ ] Location: Around line 85 in init_db()
-  - [ ] Add: `from app.agent.models import conversations, preferences`
+  - [x] File: `backend/app/database.py` ✅
+  - [x] Location: Around line 85 in init_db() ✅
+  - [x] Add: `from app.agent.models import conversations, preferences` ✅ **Models imported in alembic/env.py**
 
 - [ ] **Data retention considerations (for production)**
   - [ ] Plan for 30-60 day retention policy to prevent unbounded growth
@@ -418,7 +418,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [ ] Injectable backend API base URL
 
 - [ ] **HTTP-only communication**
-  - [ ] Create `RawDataClient` class using httpx
+  - [ ] Create `RawDataClient` class using httpx 🔶 **DEFERRED - Using service layer pattern instead**
   - [ ] Include auth headers in all requests
   - [ ] Handle retries and timeouts
 
