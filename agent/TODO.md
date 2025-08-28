@@ -164,20 +164,20 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > - ⏳ Environment setup (0.2) - Ready to proceed
 > - ⏳ Database schema (0.4) - Next priority
 
-### 0.1 Configure GPT-5 Model Settings
-- [ ] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
-  - [ ] 👤 **USER ACTION**: Verify GPT-5 access in OpenAI account
-  - [ ] Set MODEL_DEFAULT = "gpt-5"
-  - [ ] Set MODEL_FALLBACK = "gpt-5-mini"
-  - [ ] Update DESIGN_DOC_AGENT_V1.0.md to confirm GPT-5 usage
-  - [ ] Update PRD_AGENT_V1.0.md model references
+### 0.1 Configure GPT-5 Model Settings ✅ **COMPLETED**
+- [x] **Set up GPT-5 as default model** (ref: PRD §3, TDD §17)
+  - [x] 👤 **USER ACTION**: Verify GPT-5 access in OpenAI account
+  - [x] Set MODEL_DEFAULT = "gpt-5"
+  - [x] Set MODEL_FALLBACK = "gpt-5-mini"
+  - [x] Update DESIGN_DOC_AGENT_V1.0.md to confirm GPT-5 usage
+  - [x] Update PRD_AGENT_V1.0.md model references
   
   **Success Criteria:**
   - ✅ Config loads without errors: `python -c "from app.config import settings; print(settings.MODEL_DEFAULT)"`
   - ✅ Returns "gpt-5"
 
-### 0.2 Environment Setup
-- [ ] **Update backend/app/config.py with OpenAI settings**
+### 0.2 Environment Setup ✅ **COMPLETED**
+- [x] **Update backend/app/config.py with OpenAI settings**
   
   **File:** `backend/app/config.py`
   **Location:** After line ~45 (after existing settings)
@@ -191,7 +191,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   SSE_HEARTBEAT_INTERVAL_MS: int = Field(default=15000, env="SSE_HEARTBEAT_INTERVAL_MS")
   ```
 
-- [ ] 👤 **USER ACTION: Add to .env file**
+- [x] 👤 **USER ACTION: Add to .env file** ✅ **COMPLETED**
   ```bash
   OPENAI_API_KEY=sk-...  # User must provide
   OPENAI_ORG_ID=org-... (if applicable)
@@ -218,8 +218,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - [x] Cookies work as fallback (required for SSE)
   - [x] No breaking changes - both methods fully supported and tested
 
-### 0.4 Database Schema Updates (via Alembic Migrations)
-- [ ] **Create Agent-specific SQLAlchemy models** (ref: TDD §18.2 for patterns)
+### 0.4 Database Schema Updates (via Alembic Migrations) ✅ **COMPLETED**
+- [x] **Create Agent-specific SQLAlchemy models** (ref: TDD §18.2 for patterns)
   
   **Step 1: Create directory structure**
   ```bash
@@ -230,29 +230,29 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
   
   **Step 2: Create conversations.py**
-  - [ ] File: `backend/app/agent/models/conversations.py`
-  - [ ] Define `Conversation` model class (agent_conversations table)
-  - [ ] Define `Message` model class (agent_messages table)
+  - [x] File: `backend/app/agent/models/conversations.py` ✅
+  - [x] Define `Conversation` model class (agent_conversations table) ✅
+  - [x] Define `Message` model class (agent_messages table) ✅
   - [ ] Import from: `from app.database import Base`
   - [ ] Use UUID primary keys: `from uuid import uuid4`
   
   **Step 3: Create preferences.py**
-  - [ ] File: `backend/app/agent/models/preferences.py`
-  - [ ] Define `UserPreference` model (agent_user_preferences table)
+  - [x] File: `backend/app/agent/models/preferences.py` ✅
+  - [x] Define `UserPreference` model (agent_user_preferences table) ✅
   
   **Success Criteria:**
   - ✅ Models import without error: `python -c "from app.agent.models.conversations import Conversation"`
   - ✅ All tables have agent_ prefix
   - ✅ All models inherit from Base
 
-- [ ] **Update Alembic configuration**
-  - [ ] Import Agent models in `backend/alembic/env.py`:
+- [x] **Update Alembic configuration** ✅
+  - [x] Import Agent models in `backend/alembic/env.py`: ✅
     ```python
     from app.agent.models import conversations, preferences
     ```
-  - [ ] Ensure Agent models are included in autogenerate
+  - [x] Ensure Agent models are included in autogenerate ✅
 
-- [ ] **Create and run Alembic migration**
+- [x] **Create and run Alembic migration** ✅ **COMPLETED**
   ```bash
   cd backend
   # Create migration
@@ -334,11 +334,11 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       )
   ```
 
-- [ ] **Generate and apply Alembic migration**
+- [x] **Generate and apply Alembic migration** ✅ **COMPLETED**
   
   **Prerequisites:**
-  - 👤 **USER ACTION**: Ensure Docker Desktop is running
-  - 👤 **USER ACTION**: Ensure PostgreSQL container is up: `docker-compose up -d`
+  - [x] 👤 **USER ACTION**: Ensure Docker Desktop is running ✅
+  - [x] 👤 **USER ACTION**: Ensure PostgreSQL container is up: `docker-compose up -d` ✅
   
   **Step 1: Generate migration**
   ```bash
@@ -390,7 +390,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 ## 🏗️ Service Separation Architecture (Throughout All Phases)
 
 ### Isolation Requirements
-- [ ] **Create isolated Agent module structure**
+- [x] **Create isolated Agent module structure** ✅ **PARTIAL - Core structure created**
   ```
   backend/app/agent/
   ├── __init__.py
@@ -404,11 +404,11 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
 
 ### Development Rules
-- [ ] **Agent owns its database schema**
-  - [ ] Create Agent SQLAlchemy models in `app/agent/models/`
-  - [ ] Use `agent_` prefix for all Agent tables
-  - [ ] **ALWAYS use Alembic migrations** (never create tables manually)
-  - [ ] Direct database access for Agent tables (conversations, messages, etc.)
+- [x] **Agent owns its database schema** ✅ **COMPLETED**
+  - [x] Create Agent SQLAlchemy models in `app/agent/models/` ✅
+  - [x] Use `agent_` prefix for all Agent tables ✅
+  - [x] **ALWAYS use Alembic migrations** (never create tables manually) ✅
+  - [x] Direct database access for Agent tables (conversations, messages, etc.) ✅
   - [ ] NO access to backend tables (users, portfolios, positions)
   - [ ] Use HTTP client for ALL portfolio/market data
 
@@ -441,12 +441,12 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 > 
 > Reference: TDD §7.0 for architectural decision, §7.1-7.6 for tool specifications
 
-### 1.0 NEW Backend Components Required
+### 1.0 NEW Backend Components Required ✅ **COMPLETED**
 
 > **Note**: Current endpoints query DB directly in API layer. For new Agent features,
 > we need both Pydantic schemas and a service layer.
 
-- [ ] **Create `app/schemas/data.py`** - Pydantic schemas for data endpoints
+- [x] **Create `app/schemas/data.py`** - Pydantic schemas for data endpoints ✅
   
   **File:** `backend/app/schemas/data.py`
   ```python
@@ -494,7 +494,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - ✅ All schemas inherit from BaseSchema
   - ✅ Meta object follows TDD §7.A spec
 
-- [ ] **Create `app/services/portfolio_data_service.py`**
+- [x] **Create `app/services/portfolio_data_service.py`** ✅ **COMPLETED**
   
   **File:** `backend/app/services/portfolio_data_service.py`
   ```python
@@ -671,13 +671,13 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
 
 > Reference: TDD §5 (Chat Endpoints), §8 (SSE Protocol), §18.1 (Auth), §18.4 (API Structure)
 
-### 2.0 Agent Pydantic Schemas
+### 2.0 Agent Pydantic Schemas ✅ **COMPLETED**
 
-- [ ] **Create `app/agent/schemas/` directory**
-  - [ ] `__init__.py` - Export all schemas
-  - [ ] `base.py` - AgentBaseSchema with common config
+- [x] **Create `app/agent/schemas/` directory** ✅
+  - [x] `__init__.py` - Export all schemas ✅
+  - [x] `base.py` - AgentBaseSchema with common config ✅
   
-- [ ] **Create `app/agent/schemas/chat.py`**
+- [x] **Create `app/agent/schemas/chat.py`** ✅
   ```python
   from app.agent.schemas.base import AgentBaseSchema
   
@@ -694,7 +694,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       text: str
   ```
 
-- [ ] **Create `app/agent/schemas/sse.py`**
+- [x] **Create `app/agent/schemas/sse.py`** ✅ **COMPLETED**
   ```python
   class SSEEvent(AgentBaseSchema):
       event: str  # start|message|tool_call|tool_result|error|done
@@ -710,8 +710,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       meta: Dict
   ```
 
-### 2.1 Create Chat Module Structure
-- [ ] **Create backend/app/api/v1/chat/ module** (ref: TDD §3 for structure)
+### 2.1 Create Chat Module Structure ✅ **COMPLETED**
+- [x] **Create backend/app/api/v1/chat/ module** (ref: TDD §3 for structure) ✅
   
   **Step 1: Create directory and files**
   ```bash
@@ -737,8 +737,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   ```
   
   **Step 3: Register in main router**
-  - [ ] File: `backend/app/api/v1/router.py`
-  - [ ] Add after existing includes (around line 20):
+  - [x] File: `backend/app/api/v1/router.py` ✅
+  - [x] Add after existing includes (around line 20): ✅
     ```python
     from .chat import router as chat_router
     api_router.include_router(chat_router.router, prefix="/chat", tags=["chat"])
@@ -749,8 +749,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
   - ✅ /api/v1/chat endpoints appear in /docs
   - ✅ No circular imports
 
-### 2.2 Implement Conversation Management
-- [ ] **POST /chat/conversations endpoint** (ref: TDD §5.1, PRD §7.1)
+### 2.2 Implement Conversation Management ✅ **COMPLETED**
+- [x] **POST /chat/conversations endpoint** (ref: TDD §5.1, PRD §7.1) ✅
   
   **File:** `backend/app/api/v1/chat/conversations.py`
   ```python
@@ -805,7 +805,7 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
     -d '{"mode": "green"}'
   ```
 
-- [ ] **Conversation schemas**
+- [x] **Conversation schemas** ✅ **COMPLETED**
   ```python
   class ConversationCreate(BaseSchema):
       mode: Optional[str] = "green"  # green|blue|indigo|violet
@@ -816,8 +816,8 @@ Implement a chat-based portfolio analysis agent that uses OpenAI's API with func
       created_at: datetime
   ```
 
-### 2.3 Implement SSE Streaming Endpoint
-- [ ] **POST /chat/send (SSE)** (ref: TDD §5.2, §8 for SSE protocol, PRD §4.3)
+### 2.3 Implement SSE Streaming Endpoint 🔶 **PARTIAL - Placeholder Implementation**
+- [x] **POST /chat/send (SSE)** (ref: TDD §5.2, §8 for SSE protocol, PRD §4.3) ✅ **Placeholder ready for OpenAI integration**
   
   **File:** `backend/app/api/v1/chat/send.py`
   ```python
