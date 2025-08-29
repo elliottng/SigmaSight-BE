@@ -47,9 +47,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SigmaSight Agent - A backend chat API that connects OpenAI GPT-5-2025-08-07 with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs and Code Interpreter for calculations.
+SigmaSight Agent - A backend chat API that connects OpenAI with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs.
 
-**Current Status**: Planning phase - backend chat infrastructure not yet implemented.
+**Current Status**: Phase 5.5 Complete - OpenAI integration working, ready for comprehensive testing in Phase 6.
 
 ## Architecture
 
@@ -95,8 +95,8 @@ uv run pytest tests/test_agent/
 Required in backend/.env:
 ```
 OPENAI_API_KEY=sk-...
-MODEL_DEFAULT=gpt-5-2025-08-07
-MODEL_FALLBACK=gpt-5-mini
+MODEL_DEFAULT=gpt-4o              # Use gpt-4o for streaming (gpt-5 requires org verification)
+MODEL_FALLBACK=gpt-4o-mini        # Fallback model
 SSE_HEARTBEAT_INTERVAL_MS=15000
 AGENT_CACHE_TTL=600
 ```
@@ -165,7 +165,9 @@ Create in `agent/agent_pkg/prompts/`:
 - 80% pass rate on 15 golden queries
 - No hallucinated values
 
-## Common Gotchas
+## Common Gotchas & Solutions
+
+### Original Issues (Keep These)
 1. **Auth uses dual support**: Both Bearer tokens (existing) AND cookies (for SSE). Login endpoint sets both
 2. **Models need registration**: Add conversation models to `backend/app/database.py` init_db()
 3. **Use pydantic_settings pattern**: Settings fields need `Field(..., env="VAR_NAME")`
@@ -174,3 +176,49 @@ Create in `agent/agent_pkg/prompts/`:
 6. **Import errors**: Check PYTHONPATH includes backend directory
 7. **Docker required**: PostgreSQL runs in Docker, ensure Docker Desktop is running
 8. **Service layer pattern**: New agent endpoints need service layer (PortfolioDataService)
+
+### OpenAI Integration Issues (Learned from Phase 5.5)
+9. **OpenAI Model Compatibility**:
+   - Use `gpt-4o` not `gpt-5-2025-08-07` (organization verification required for gpt-5 streaming)
+   - Use `max_completion_tokens` not `max_tokens` parameter
+   - Don't set `temperature` parameter (only default value 1.0 supported)
+   - Check `.env` file MODEL_DEFAULT - it overrides config.py defaults!
+
+10. **Critical Import Paths** (These WILL trip you up):
+   - ✅ `from app.services.portfolio_data_service import PortfolioDataService`
+   - ❌ ~~`from app.agent.services.portfolio_data_service`~~ (doesn't exist)
+   - ✅ `from app.agent.tools.tool_registry import tool_registry`
+   - ❌ ~~`from app.agent.services.tool_registry`~~ (wrong location)
+   - ⚠️ Tool registry needs singleton instance: Add `tool_registry = ToolRegistry()` at module level
+
+11. **Conversation Model Specifics**:
+   - No `portfolio_id` field on Conversation model
+   - Portfolio context stored in metadata: `conversation.meta_data.get("portfolio_id")`
+   - PromptManager.get_system_prompt() expects `user_context` not `portfolio_context`
+
+12. **Demo User Credentials** (for testing):
+   - Email: `demo_growth@sigmasight.com` (NOT john.demo@sigmasight.com)
+   - Password: `demo12345`
+   - Other demo users: demo_value@, demo_balanced@, etc.
+
+13. **SSE Response Parsing**:
+   ```python
+   # SSE format: "event: type\ndata: json\n\n"
+   async for line in response.content:
+       line_text = line.decode('utf-8').strip()
+       if line_text.startswith('event:'):
+           event_type = line_text.split(':', 1)[1].strip()
+       elif line_text.startswith('data:'):
+           data = json.loads(line_text.split(':', 1)[1])
+   ```
+
+14. **OpenAI Function Definitions**:
+   - Tool registry doesn't auto-generate OpenAI schemas
+   - Must manually define in `_get_tool_definitions()` with proper OpenAI format
+   - Each tool needs: name, description, parameters (with type, properties, required)
+
+15. **Missing SSE Event Types**:
+   - If you see missing SSE events, add to `app/agent/schemas/sse.py`:
+     - SSEToolStartedEvent
+     - SSEToolFinishedEvent
+     - SSEHeartbeatEvent
