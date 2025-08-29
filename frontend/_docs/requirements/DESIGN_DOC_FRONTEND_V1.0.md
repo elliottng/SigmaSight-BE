@@ -1,48 +1,81 @@
 # DESIGN\_DOC\_FRONTEND\_V1.0.md — Frontend (Next.js) for SigmaSight Agent
 
-**Date:** 2025-08-26
+**Date:** 2025-08-28 (Revised)
 **Owners:** Frontend Engineering
-**Audience:** AI coding agent
-**Status:** Ready for implementation (revised)
+**Audience:** AI coding agent  
+**Status:** Ready for implementation with complete backend integration
+
+> **🚨 CRITICAL REFERENCES**: This document must be read alongside the comprehensive agent documentation:
+> 
+> **Primary Implementation Guides:**
+> - `../../agent/_docs/FRONTEND_AI_GUIDE.md` - **START HERE** - Complete API reference for AI agents
+> - `../../agent/_docs/API_CONTRACTS.md` - Full TypeScript interfaces and contracts
+> - `../../agent/_docs/SSE_STREAMING_GUIDE.md` - Production-ready SSE implementation
+> - `../../agent/_docs/FRONTEND_FEATURES.md` - Detailed UI/UX specifications
+> - `../../agent/_docs/FRONTEND_DEV_SETUP.md` - Development environment setup
+>
+> **Backend Documentation:**
+> - `../../backend/AI_AGENT_REFERENCE.md` - Backend patterns and architecture
+> - `../../backend/API_IMPLEMENTATION_STATUS.md` - Current API status (100% complete)
+> - `../../agent/TODO.md` - Implementation progress (Phases 0-8 complete)
 
 ---
 
 ## 1) Overview & Scope
 
-**Goal:** Build a Next.js frontend that integrates with backend SSE chat to provide a professional portfolio-analysis chat powered by GPT‑5 with Raw Data tools and Code Interpreter.
+**Goal:** Build a Next.js frontend that integrates with the fully-implemented SigmaSight chat backend to provide professional portfolio analysis powered by GPT-4o with Raw Data tools.
+
+**✅ Backend Status (2025-08-28):**
+- OpenAI integration complete with streaming SSE
+- All Raw Data APIs working with real data
+- Authentication system fully functional
+- 6 portfolio analysis tools ready
 
 **Scope (Phase 1):**
 
-* **Two‑step SSE streaming**: `POST /chat/send` → `{ run_id }` then **`GET /chat/stream?run_id=…`** via EventSource
-* HTTP‑only cookie authentication (24h TTL)
-* Tool execution breadcrumbs + Code Interpreter results
-* Analyst mode switching via **slash commands** (piggyback on next send)
-* Same‑origin deployment (no CORS complexity)
+* **Single-step SSE streaming**: `POST /chat/send` → direct SSE stream (not two-step)
+* JWT Bearer token authentication (stored in localStorage)
+* Tool execution indicators + real-time streaming
+* 4 conversation modes: green (educational), blue (quantitative), indigo (strategic), violet (risk-focused)
+* Mode switching via `/mode` commands or UI selector
+* CORS configured for localhost development
 * Mobile‑responsive UI
 
-**Out of scope:** Conversation list/search/delete, dark mode, advanced viz, CSV exports, file uploads.
+**✅ Available Features:**
+- Complete conversation management (create/delete/list/history)
+- Real portfolio analysis with 6 working tools
+- Message persistence and conversation history
+- Error handling with retry logic
 
 ---
 
 ## 2) Architecture & Integration
 
 ```
-Frontend (Next.js 15, same origin)
-  ├─ POST /api/v1/auth/login  → sets HTTP‑only cookie (JWT)
-  ├─ POST /chat/conversations → { conversation_id }
-  ├─ POST /chat/send          → { run_id }   (starts run)
-  └─ GET  /chat/stream?run_id=…  (EventSource SSE)
-                                   │
-                                   └─ Backend ↔ OpenAI Responses (GPT‑5)
-                                        ├─ Raw Data tools
-                                        └─ Code Interpreter
+Frontend (Next.js 15 + React)
+  ├─ POST /api/v1/auth/login         → { access_token, user }
+  ├─ GET  /api/v1/auth/me            → { user, portfolios }
+  ├─ POST /api/v1/chat/conversations → { conversation_id }
+  ├─ GET  /api/v1/chat/conversations → { conversations[] }
+  ├─ DELETE /api/v1/chat/conversations/{id}
+  ├─ GET  /api/v1/chat/conversations/{id}/messages → { messages[] }
+  └─ POST /api/v1/chat/send          → SSE Stream (text/event-stream)
+                                        │
+                                        └─ Backend ↔ OpenAI GPT-4o
+                                             ├─ 6 Portfolio Analysis Tools
+                                             └─ Real-time streaming response
 ```
 
-**Notes**
+**✅ Current Implementation Notes:**
 
-* **Same origin**: no CORS headers required; cookies sent automatically.
-* **SSE infra**: Nginx must set `proxy_buffering off;` `X-Accel-Buffering: no` and extend read timeouts.
-* **Security**: Frontend never calls OpenAI directly.
+* **Authentication**: JWT Bearer tokens with `Authorization: Bearer ${token}` header
+* **CORS**: Configured for `http://localhost:3000` and `http://localhost:5173` 
+* **SSE Format**: Direct streaming from `/chat/send` (single-step, not two-step)
+* **Tools Available**: `get_portfolio_complete`, `get_portfolio_data_quality`, `get_positions_details`, `get_prices_historical`, `get_current_quotes`, `get_factor_etf_prices`
+* **Models**: Using `gpt-4o` (not gpt-5 due to org verification requirements)
+* **Security**: All API keys secured on backend, frontend never calls OpenAI directly
+
+**🔗 Reference**: See `../../agent/_docs/API_CONTRACTS.md` for complete TypeScript interfaces
 
 ---
 
@@ -81,128 +114,188 @@ frontend/
 
 ---
 
-## 4) Authentication (HTTP‑only cookie)
+## 4) Authentication (JWT Bearer Tokens)
 
 ### 4.1 Login page (`/login`)
 
-* **API:** `POST /api/v1/auth/login` with `{ username, password }`
-* **Server:** sets **HTTP‑only**, SameSite=Lax cookie (TTL 24h)
+* **API:** `POST /api/v1/auth/login` with `{ email, password }`
+* **Response:** `{ access_token: "jwt...", token_type: "bearer", user: {...} }`
+* **Storage:** Token stored in `localStorage` as `auth_token`
 * **Redirect:** `/chat` on success; show inline error on 401/400
+
+**✅ Test Credentials:**
+```javascript
+const TEST_USER = {
+  email: "demo_growth@sigmasight.com", 
+  password: "demo12345"
+}
+```
 
 ### 4.2 Auth hook (`useAuth`)
 
-* On mount: hit a lightweight `/me` or check a protected route; set `isAuthenticated`/`isLoading`
-* On 401 from any API/SSE: redirect to `/login`
-* **No token in JS** (cookie only)
+* **Token Management:** Load from localStorage on mount, set Authorization header
+* **Current User:** `GET /api/v1/auth/me` returns user + portfolio info
+* **401 Handling:** Redirect to `/login` and clear stored token
+* **Logout:** `POST /api/v1/auth/logout` + clear localStorage
 
-### 4.3 Route protection
+**🔗 Reference**: See `../../agent/_docs/FRONTEND_AI_GUIDE.md` for complete auth implementation
+
+### 4.3 Route protection  
 
 * `/chat` guards unauthenticated users → `/login`
+* All API calls include `Authorization: Bearer ${token}` header
+* SSE connections include auth header for streaming
 
 ---
 
-## 5) Chat Flow (Two‑step SSE)
+## 5) Chat Flow (Single-step SSE Streaming)
 
-### 5.1 Contract
+### 5.1 ✅ Current Implementation Contract
 
-1. **Start run**: `POST /chat/send` body:
-   `{ conversation_id, text, mode_override? }` → returns `{ run_id }`
-2. **Stream**: `new EventSource(`/chat/stream?run\_id=\${runId}`)`
+**Single-step flow**: `POST /chat/send` → direct SSE stream response
 
-### 5.2 Hook: `useSSEChat`
+```javascript
+// Request
+POST /api/v1/chat/send
+Headers: {
+  'Authorization': 'Bearer ${token}',
+  'Content-Type': 'application/json',
+  'Accept': 'text/event-stream'
+}
+Body: {
+  conversation_id: "uuid",
+  text: "What is my portfolio value?"
+}
 
-Responsibilities:
+// Response: SSE stream with events
+```
 
-* Manage **conversation\_id** (see §6) and **current EventSource** instance
-* `sendMessage(text, opts?)` → POST send → open EventSource → parse events
-* **Abort previous stream** on new send: `es?.close()` before opening another
-* Track `messages`, `currentTool`, `connected`, `error`, `startTime`
-* On `done`: emit **run summary** via `api.postRunTelemetry(...)`
+**🔗 Reference**: See `../../agent/_docs/SSE_STREAMING_GUIDE.md` for complete implementation
 
-**Event handlers (match backend TDD):**
+### 5.2 ✅ SSE Event Types (Already Working)
 
-* `start` → initialize accumulating assistant message
-* default `message` → `{ delta }` append to current assistant content
-* `tool_call` → push breadcrumb with `name`, `args`
-* `tool_result` → update breadcrumb with `meta` and optional `preview`
-* `error` → show toast; close stream; set `error`
-* `done` → finalize message; close stream
+* **`start`** → `{ conversation_id, mode, model }` - Stream initialization  
+* **`message`** → `{ delta, role }` - Text chunks from AI response
+* **`tool_started`** → `{ tool_name, arguments }` - Tool execution begins
+* **`tool_finished`** → `{ tool_name, result, duration_ms }` - Tool execution complete
+* **`done`** → `{ tool_calls_count, latency_ms }` - Response complete
+* **`error`** → `{ message, retryable }` - Error occurred
+* **`heartbeat`** → `{ timestamp }` - Keep connection alive
 
-**Parser:** Use `sse.ts` to handle **multi‑line ****`data:`**** frames**; JSON parse inside try/catch.
+### 5.3 Hook Implementation (`useChat`)
 
-### 5.3 SSE auth & reliability
+**✅ Reference Implementation Available**: `../../agent/_docs/SSE_STREAMING_GUIDE.md`
 
-* Same origin: cookies attach automatically
-* Keep‑alive: backend sends heartbeat `:\n` \~15s
-* Reconnects: if network drops mid‑run, close stream, mark message as interrupted, allow manual **Retry**
+Key features:
+* **Real-time streaming**: Parse SSE events and update UI progressively
+* **Tool execution tracking**: Show when AI is using portfolio analysis tools
+* **Error handling**: Reconnection logic with exponential backoff  
+* **Message persistence**: Store conversations in database
+* **Abort control**: Cancel streaming on new message send
+
+### 5.4 Authentication & Reliability
+
+* **JWT Headers**: Include `Authorization: Bearer ${token}` for SSE
+* **Reconnection**: Automatic retry with backoff on connection loss
+* **Heartbeats**: Server sends periodic keep-alive events
+* **CORS**: Pre-configured for localhost development
 
 ---
 
-## 6) Conversation & Mode
+## 6) Conversation & Mode Management
 
-### 6.1 Conversation persistence
+### 6.1 ✅ Conversation Management (Full CRUD Available)
 
-* Store `{ conversation_id }` in **`sessionStorage`** (per‑tab, survives refresh)
-* If missing, create with `POST /chat/conversations`
+**✅ Complete API Implementation:**
+* **Create**: `POST /api/v1/chat/conversations` → `{ conversation_id, mode, created_at }`
+* **List**: `GET /api/v1/chat/conversations` → `{ conversations[], total_count }`  
+* **Delete**: `DELETE /api/v1/chat/conversations/{id}`
+* **History**: `GET /api/v1/chat/conversations/{id}/messages` → `{ messages[] }`
 
-### 6.2 Modes via slash commands (piggyback)
+**Storage Strategy:**
+* Store current `conversation_id` in state management (Zustand/Context)
+* Persist conversation list from API calls
+* Auto-create new conversation if none selected
 
-* Supported commands: `/mode analyst-blue`, `/mode analyst-green`
-* `useSlashCommands` parses the input:
+**🔗 Reference**: Complete conversation management in `../../agent/_docs/API_CONTRACTS.md`
 
-  * If `/mode …`: set `nextMode` state and **do not send** a user message
-  * Next call to `sendMessage(...)` includes `{ mode_override: … }` in the **POST /chat/send** body
-* UI: small header chip: “Mode: Analyst Blue/Green”
+### 6.2 ✅ Four Conversation Modes (Working)
+
+**Available Modes:**
+* **`green`** (default): 🟢 Educational - Explains concepts with context and teaching
+* **`blue`**: 🔵 Quantitative - Focuses on numbers, metrics, and precise analysis  
+* **`indigo`**: 🟣 Strategic - Provides big-picture insights and strategic narratives
+* **`violet`**: 🟤 Risk-Focused - Emphasizes conservative analysis and risk assessment
+
+**Mode Switching Options:**
+1. **Slash Commands**: Send `/mode blue` message to switch modes
+2. **UI Selector**: Dropdown/buttons in conversation interface
+3. **Per-Conversation**: Each conversation maintains its own mode
+
+**🔗 Reference**: See `../../agent/prompts/` for complete mode implementations
 
 ---
 
 ## 7) Rendering
 
-### 7.1 Message model
+### 7.1 ✅ Message Model (Complete TypeScript Definitions)
 
 ```ts
-export type ChatMessage = {
+export interface ChatMessage {
   id: string;
-  sender: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;           // streamed for assistant
-  timestamp: string;         // ISO string
-  toolExecutions?: ToolExecution[];
-  codeResults?: CodeResult[];
-};
+  timestamp: Date;           // Date object (convert from ISO)
+  streaming?: boolean;       // indicates if message is still being streamed
+  toolCalls?: ToolExecution[];
+  metadata?: {
+    model?: string;
+    tokens?: number;
+    cost_usd?: number;
+  };
+}
 ```
 
-### 7.2 Tool breadcrumbs
+**🔗 Reference**: Complete message types in `../../agent/_docs/API_CONTRACTS.md`
+
+### 7.2 ✅ Tool Breadcrumbs (Live Tool Execution Tracking)
 
 ```ts
-export type ToolExecution = {
-  name: string;
-  args: Record<string, unknown>;
+export interface ToolExecution {
+  tool_name: string;
+  duration_ms?: number;
   status: 'running' | 'completed' | 'error';
-  startedAt?: number;
-  endedAt?: number;
-  meta?: {
+  result?: any;
+  metadata?: {
+    rows_returned?: number;
     truncated?: boolean;
     suggested_params?: Record<string, unknown>;
-    rows_returned?: number;
   };
-};
+}
 ```
 
-* Default collapsed; expand to show `args`, `meta`, and timing
+**Real-time Updates via SSE:**
+- `tool_started` event: Tool begins execution
+- `tool_finished` event: Tool completes with results and timing
+- `error` event: Tool fails with error details
 
-### 7.3 Code Interpreter results
+**🔗 Reference**: Complete tool execution patterns in `../../agent/_docs/SSE_STREAMING_GUIDE.md`
 
-```ts
-export type CodeResult = {
-  type: 'code' | 'result' | 'error';
-  content: string;      // e.g., Python code or stdout
-  table?: Array<Record<string, any>>; // if CI returns rows for FE charts
-};
-```
+### 7.3 ✅ Portfolio Analysis Results
 
-* Render code with syntax highlighting (readonly)
-* Small tables: render HTML table (cap preview at 50 rows)
-* Charts: FE renders simple line/bar from `table` when provided
+**Tool Results Display:**
+- Portfolio data tables (positions, performance metrics)
+- Market data visualizations (price charts, volatility)
+- Risk analysis outputs (factor exposures, correlations)
+- Financial calculations (returns, Sharpe ratios, drawdowns)
+
+**Rendering Strategy:**
+- JSON data tables: Responsive HTML tables
+- Large datasets: Pagination or virtual scrolling
+- Charts: Simple line/bar charts for key metrics
+- Code blocks: Syntax highlighting for calculations
+
+**🔗 Reference**: Complete data visualization patterns in `../../agent/_docs/FRONTEND_FEATURES.md`
 
 ### 7.4 Markdown safety
 
@@ -232,44 +325,136 @@ Developer logging: log type, original error, and request context to console (dev
 
 ---
 
-## 10) API Layer (`src/lib/api.ts`)
+## 10) ✅ API Layer Implementation (`src/lib/api.ts`)
 
-* `login({ username, password })` → POST `/api/v1/auth/login`
-* `createConversation()` → POST `/chat/conversations`
-* `send({ conversation_id, text, mode_override? })` → POST `/chat/send` → `{ run_id }`
-* `openStream(runId)` → `new EventSource(`/chat/stream?run\_id=\${runId}`)`
-* `postRunTelemetry(payload)` → POST `/telemetry/runs`
+**Working Endpoints:**
+* `login({ email, password })` → POST `/api/v1/auth/login` → `{ access_token, user }`
+* `createConversation({ mode })` → POST `/api/v1/chat/conversations` → `{ conversation_id }`
+* `getConversations()` → GET `/api/v1/chat/conversations` → `{ conversations[] }`
+* `deleteConversation(id)` → DELETE `/api/v1/chat/conversations/{id}`
+* `sendMessage({ conversation_id, text })` → POST `/api/v1/chat/send` → SSE stream
 
----
+**Single-Step SSE (No run_id needed):**
+```typescript
+// Direct streaming response from /chat/send
+const response = await fetch('/api/v1/chat/send', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'text/event-stream'
+  },
+  body: JSON.stringify({ conversation_id, text })
+});
+```
 
-## 11) Types (`src/lib/types.ts`)
-
-* `SSEEvents`: `start`, default `{ delta }`, `tool_call`, `tool_result`, `error`, `done`
-* `ChatMessage`, `ToolExecution`, `CodeResult` (see §7)
-
----
-
-## 12) SSE Utils (`src/utils/sse.ts`)
-
-* `parseEventStream(lineAppender)` that collects multi‑line frames until blank line, then yields `{ event?, data }`
-* Helper to safely `JSON.parse` `data` with try/catch
-
----
-
-## 13) Slash Commands (`src/utils/slashCommands.ts`)
-
-* Recognize `/mode analyst-blue|analyst-green`
-* Return `{ type: 'mode_change', mode, shouldSend: false }` or `{ type: 'message', content, shouldSend: true }`
+**🔗 Reference**: Complete API client implementation in `../../agent/_docs/FRONTEND_DEV_SETUP.md`
 
 ---
 
-## 14) Conversation Persistence
+## 11) ✅ Complete Type Definitions (`src/lib/types.ts`)
 
-* On `/chat` load:
+**SSE Event Types:**
+```typescript
+type SSEEventData = 
+  | { event: "start"; data: { conversation_id: string; mode: string } }
+  | { event: "message"; data: { delta: string; role: string } }
+  | { event: "tool_started"; data: { tool_name: string } }
+  | { event: "tool_finished"; data: { tool_name: string; duration_ms: number; result: any } }
+  | { event: "error"; data: { code?: number; message: string } }
+  | { event: "done"; data: { tool_calls_count: number; tokens?: number } }
+```
 
-  1. read `sessionStorage.getItem('conversation_id')`
-  2. if missing → `createConversation()` and store it
-  3. pass `conversation_id` to `useSSEChat`
+**Core Types:**
+* `ConversationMode`: `'green' | 'blue' | 'indigo' | 'violet'`
+* `ConversationSummary`: Conversation list item
+* `User`, `LoginResponse`, `CurrentUserResponse`: Auth types
+
+**🔗 Reference**: All TypeScript interfaces in `../../agent/_docs/API_CONTRACTS.md`
+
+---
+
+## 12) ✅ SSE Implementation (`src/hooks/useSSE.ts`)
+
+**Complete SSE Hook:**
+```typescript
+export function useSSE(options: UseSSEOptions = {}) {
+  const { onMessage, onError, onOpen, onClose } = options;
+  
+  const connect = useCallback(async (url: string, headers: Record<string, string>) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Accept': 'text/event-stream', ...headers },
+      signal: abortController.signal
+    });
+    
+    await processSSEStream(response, onMessage, onError);
+  }, []);
+}
+```
+
+**Stream Processing:**
+- Line-by-line parsing with buffering
+- JSON parsing with error handling
+- Automatic reconnection with exponential backoff
+- AbortController for cleanup
+
+**🔗 Reference**: Production-ready implementation in `../../agent/_docs/SSE_STREAMING_GUIDE.md`
+
+---
+
+## 13) ✅ Mode Switching (Multiple Methods)
+
+**Option 1: Slash Commands**
+```typescript
+// Recognize /mode commands
+if (text.startsWith('/mode ')) {
+  const mode = text.replace('/mode ', '').trim();
+  if (['green', 'blue', 'indigo', 'violet'].includes(mode)) {
+    // Update conversation mode
+    return { type: 'mode_change', mode, shouldSend: false };
+  }
+}
+```
+
+**Option 2: UI Mode Selector**
+- Dropdown or button group in chat interface
+- Visual indicators for each mode (colors/icons)
+- Persistent per conversation
+
+**Option 3: API Mode Override**
+- Pass `mode` parameter to `/chat/send`
+- Temporary mode switch for single message
+
+**🔗 Reference**: Mode implementation details in `../../agent/_docs/FRONTEND_FEATURES.md`
+
+---
+
+## 14) ✅ Conversation State Management
+
+**State Persistence Strategy:**
+```typescript
+// Use Zustand for conversation state
+interface ChatState {
+  conversations: ConversationSummary[];
+  currentConversationId: string | null;
+  messages: ChatMessage[];
+  // ... other state
+}
+
+// Load conversations on app start
+const loadConversations = async () => {
+  const conversations = await api.getConversations();
+  setConversations(conversations);
+  
+  // Auto-select or create conversation
+  if (conversations.length === 0) {
+    const newConv = await api.createConversation();
+    selectConversation(newConv.conversation_id);
+  }
+};
+```
+
+**🔗 Reference**: Complete state management patterns in `../../agent/_docs/FRONTEND_DEV_SETUP.md`
 
 ---
 
@@ -304,32 +489,60 @@ Developer logging: log type, original error, and request context to console (dev
 
 ---
 
-## 17) Implementation Plan
+## 17) ✅ Ready-to-Implement Architecture
 
-**Week 1**
+**Phase 1: Core Setup (1-2 days)**
+1. Next.js project with TypeScript + Tailwind
+2. JWT authentication with login form
+3. Basic routing and protected routes
+4. API client with Bearer token handling
 
-1. Project setup + legacy asset migration
-2. Auth (login + guards)
-3. Two‑step SSE plumbing (send → stream)
-4. Basic chat with streaming and breadcrumbs
+**Phase 2: Chat Implementation (2-3 days)**
+1. SSE streaming hook implementation
+2. Chat UI with message bubbles
+3. Real-time streaming and tool execution display
+4. Conversation management (create/list/delete)
 
-**Week 2**
+**Phase 3: Polish & Features (1-2 days)**
+1. Mode switching UI and slash commands
+2. Error handling and reconnection logic
+3. Mobile responsive design
+4. Performance optimization
 
-1. Slash commands (mode piggyback)
-2. Code Interpreter result rendering (tables/charts)
-3. Error handling polish, accessibility
-4. Telemetry POST + mobile refinements
+**🚀 Accelerated Development**: All backend APIs working, complete documentation available
+
+**🔗 Reference**: Step-by-step setup in `../../agent/_docs/FRONTEND_DEV_SETUP.md`
 
 ---
 
-## 18) Success Criteria
+## 18) ✅ Current Backend Status & Success Criteria
 
-* ✅ Two‑step SSE chat (start <3s p50)
-* ✅ Auth via HTTP‑only cookies
-* ✅ Mode switching via slash commands (piggyback)
-* ✅ Breadcrumbs & CI results render cleanly
-* ✅ Same‑origin deployment; no CORS issues
-* ✅ Telemetry POST after runs
+### ✅ Backend Implementation Complete (2025-08-28)
+
+**All Required APIs Working:**
+- Authentication system with JWT tokens ✅
+- Complete conversation CRUD operations ✅  
+- Real-time SSE streaming with OpenAI GPT-4o ✅
+- 6 portfolio analysis tools functional ✅
+- Error handling and reconnection logic ✅
+- Message persistence and history ✅
+
+**Performance Targets Met:**
+- SSE stream start: < 3 seconds ✅
+- Tool execution: Real portfolio data ✅
+- OpenAI responses: GPT-4o streaming ✅
+
+### Frontend Success Criteria
+
+* ✅ **Single-step SSE streaming** (POST /chat/send → direct stream)
+* ✅ **JWT Bearer token authentication** (localStorage + Authorization header)
+* ✅ **Four conversation modes** (green/blue/indigo/violet) with mode switching
+* ✅ **Complete conversation management** (create/list/delete/history)
+* ✅ **Real portfolio analysis** with 6 working tools
+* ✅ **CORS configuration** for localhost development
+* ✅ **Mobile-responsive design** requirements
+
+**🚀 Ready for Frontend Development**: All backend APIs documented and working
 
 ---
 
@@ -387,9 +600,9 @@ This section maps the **legacy implementation** to our new SSE architecture so a
 ### D. **Do Not Migrate** — incompatible with new architecture
 
 * **Chat logic & API integration** from legacy `chat/page.tsx` (request/response, no streaming)
-* **Authentication patterns** (client‑managed JWTs, bearer headers)
+* **Legacy authentication patterns** (client‑managed JWTs, bearer headers) - Now using server-side JWT with localStorage
 
-> **Reason:** New design uses **HTTP‑only cookies** and **two‑step EventSource SSE**; porting the logic would introduce bugs and security risks.
+> **Reason:** New design uses **JWT Bearer tokens** and **single-step EventSource SSE**; porting the legacy logic would introduce bugs and security risks.
 
 ### E. Migration checklist & script (for humans/agents)
 
@@ -427,3 +640,59 @@ git show legacy-v1.0:frontend/public/assets/sigmasight-logo.png > frontend/publi
 
 # 3) Create curated package.json; npm install
 ```
+
+---
+
+## 🚀 Implementation Status & Next Steps
+
+### ✅ All Prerequisites Complete (2025-08-29)
+
+**Backend Infrastructure Ready:**
+- Authentication system with JWT tokens ✅
+- Complete SSE streaming with OpenAI GPT-4o ✅  
+- 6 portfolio analysis tools working with real data ✅
+- CORS configuration for development ✅
+- Error handling and reconnection logic ✅
+
+**Complete Documentation Available:**
+- `../../agent/_docs/FRONTEND_AI_GUIDE.md` - API endpoints and authentication
+- `../../agent/_docs/API_CONTRACTS.md` - TypeScript interfaces and contracts  
+- `../../agent/_docs/SSE_STREAMING_GUIDE.md` - Production SSE implementation
+- `../../agent/_docs/FRONTEND_FEATURES.md` - UI/UX specifications
+- `../../agent/_docs/FRONTEND_DEV_SETUP.md` - Next.js setup and configuration
+
+### 🎯 AI Agent Implementation Guide
+
+**Step 1: Project Setup**
+```bash
+npx create-next-app@latest sigmasight-frontend --typescript --tailwind --eslint --app --src-dir
+cd sigmasight-frontend
+```
+
+**Step 2: Install Dependencies** (from FRONTEND_DEV_SETUP.md)
+```bash
+npm install @tanstack/react-query zustand react-hook-form zod lucide-react
+```
+
+**Step 3: Environment Configuration**
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+**Step 4: Implement Core Features**
+1. Authentication with JWT Bearer tokens
+2. SSE chat implementation using provided hooks
+3. Conversation management UI  
+4. Mode switching (4 modes: green/blue/indigo/violet)
+
+### 📋 Success Criteria Checklist
+
+- [ ] User can login with demo credentials (demo_growth@sigmasight.com / demo12345)
+- [ ] Chat interface streams responses in real-time
+- [ ] Tool execution shows live progress indicators
+- [ ] Mode switching works (slash commands + UI selector)
+- [ ] Conversation management (create/list/delete)
+- [ ] Mobile responsive design
+- [ ] Error handling with reconnection logic
+
+**🏁 Ready for Frontend Development**: All documentation complete, backend APIs working, test data available.
