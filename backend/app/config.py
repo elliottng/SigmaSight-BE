@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = Field(default="", env="OPENAI_API_KEY")
     OPENAI_ORG_ID: str = Field(default="", env="OPENAI_ORG_ID")  # Optional
     MODEL_DEFAULT: str = Field(default="gpt-4o", env="MODEL_DEFAULT")
-    MODEL_FALLBACK: str = Field(default="gpt-5-mini", env="MODEL_FALLBACK")
+    MODEL_FALLBACK: str = Field(default="gpt-4o-mini", env="MODEL_FALLBACK")
     AGENT_CACHE_TTL: int = Field(default=600, env="AGENT_CACHE_TTL")
     SSE_HEARTBEAT_INTERVAL_MS: int = Field(default=15000, env="SSE_HEARTBEAT_INTERVAL_MS")
     

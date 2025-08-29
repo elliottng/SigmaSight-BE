@@ -49,13 +49,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SigmaSight Agent - A backend chat API that connects OpenAI with portfolio analysis tools via SSE streaming. The agent answers portfolio questions using function calling to Raw Data APIs.
 
-**Current Status**: Phase 5.5 Complete - OpenAI integration working, ready for comprehensive testing in Phase 6.
+**Current Status**: Phase 8+ Complete - Full implementation with OpenAI integration, prompts, and documentation. Ready for frontend development and production testing.
 
 ## Architecture
 
 ### High-Level Design
 ```
-User → POST /chat/send → Backend Agent → OpenAI GPT-5-2025-08-07 → Tools → Raw Data APIs
+User → POST /chat/send → Backend Agent → OpenAI gpt-4o → Tools → Raw Data APIs
                               ↓
                         SSE Stream Response
 ```
@@ -126,7 +126,7 @@ Map 6 Raw Data endpoints to OpenAI function tools:
 - `get_factor_etf_prices` → `/api/v1/data/factors/etf-prices`
 
 ### Phase 3: Prompts
-Create in `agent/agent_pkg/prompts/`:
+Create in `backend/app/agent/prompts/`:
 - `green_v001.md` - Educational, explanatory mode (default)
 - `blue_v001.md` - Concise, quantitative mode
 - `indigo_v001.md` - Strategic, narrative mode
@@ -179,7 +179,7 @@ Create in `agent/agent_pkg/prompts/`:
 
 ### OpenAI Integration Issues (Learned from Phase 5.5)
 9. **OpenAI Model Compatibility**:
-   - Use `gpt-4o` not `gpt-5-2025-08-07` (organization verification required for gpt-5 streaming)
+   - Use `gpt-4o` for production streaming (gpt-4o-turbo also available)
    - Use `max_completion_tokens` not `max_tokens` parameter
    - Don't set `temperature` parameter (only default value 1.0 supported)
    - Check `.env` file MODEL_DEFAULT - it overrides config.py defaults!
