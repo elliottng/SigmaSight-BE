@@ -32,7 +32,27 @@ cd frontend
 npm install
 ```
 
-### 4. Environment Configuration
+### 4. Install shadcn/ui Components
+
+```bash
+# Initialize shadcn/ui with default settings
+npx shadcn@latest init --defaults
+
+# Add essential UI components
+npx shadcn@latest add button card input dialog separator
+```
+
+### 5. Install MCP Playwright (for Visual Testing)
+
+For development and design review agents:
+
+```bash
+# Install MCP Playwright server (if not already available)
+# This enables the agents to take screenshots and validate UI changes
+# Follow Claude Code documentation for MCP setup
+```
+
+### 6. Environment Configuration
 
 Create a `.env` file in the frontend directory:
 
@@ -80,7 +100,7 @@ NEXT_PUBLIC_ENABLE_GPT_FEATURES=true
 NEXT_PUBLIC_ENABLE_BACKEND_INTEGRATION=true
 ```
 
-### 5. Start the Development Server
+### 7. Start the Development Server
 
 ```bash
 npm run dev
@@ -158,6 +178,8 @@ The frontend is designed to work with the SigmaSight backend:
 The frontend includes:
 
 - **Landing Page** - 100% exact replica of sigmasight.io
+- **shadcn/ui Components** - Professional UI component library
+- **MCP Playwright Integration** - Visual testing and validation
 - **Portfolio Analysis** - Risk analysis and correlation tools
 - **AI Integration** - OpenAI-powered insights
 - **Responsive Design** - Works on all device sizes

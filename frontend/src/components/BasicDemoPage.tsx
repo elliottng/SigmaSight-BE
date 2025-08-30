@@ -15,16 +15,16 @@ export function BasicDemoPage() {
               </div>
               <nav className="hidden md:flex items-center space-x-6">
                 <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Portfolio
+                  Product
                 </a>
                 <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Analytics
+                  Pricing
                 </a>
                 <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Risk
+                  Resources
                 </a>
                 <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Reports
+                  Company
                 </a>
               </nav>
             </div>
@@ -44,19 +44,18 @@ export function BasicDemoPage() {
       <section className="py-20 px-4">
         <div className="container mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 text-foreground">
-            Advanced Portfolio
-            <span className="text-primary"> Risk Analytics</span>
+            Do you know the risks in your
+            <span className="text-primary"> portfolio?</span>
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Comprehensive risk management and portfolio analytics platform designed for
-            institutional investors and financial professionals.
+            Get AI driven institutional grade portfolio analysis in plain English
           </p>
           <div className="flex justify-center space-x-4">
             <button className="px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-              Start Free Trial
+              Try it for free
             </button>
             <button className="px-8 py-4 border border-border text-foreground rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors font-semibold">
-              View Demo
+              Choose Your Plan
             </button>
           </div>
         </div>
@@ -100,53 +99,114 @@ export function BasicDemoPage() {
         </div>
       </section>
 
-      {/* Dashboard Preview */}
+      {/* Pricing Section */}
       <section className="py-16 px-4">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12 text-foreground">
-            Intuitive Dashboard
+            Choose Your Plan
           </h2>
-          <div className="bg-card border border-border rounded-xl p-8 shadow-lg">
-            <div className="space-y-6">
-              {/* Mock Dashboard Header */}
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-card-foreground">Portfolio Overview</h3>
-                <div className="flex space-x-2">
-                  <div className="px-3 py-1 bg-primary/10 text-primary text-sm rounded">
-                    Total Value: $2.4M
-                  </div>
-                  <div className="px-3 py-1 bg-accent/10 text-accent-foreground text-sm rounded">
-                    Daily P&L: +$12.5K
-                  </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Basic Plan */}
+            <div className="bg-card border border-border rounded-xl p-8 shadow-sm">
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold text-card-foreground mb-2">Basic</h3>
+                <div className="text-4xl font-bold text-foreground mb-1">Free</div>
+                <div className="text-muted-foreground">Perfect for getting started</div>
+              </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Basic portfolio analysis
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Risk metrics (VaR, volatility)
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Up to 3 portfolios
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Email support
+                </li>
+              </ul>
+              <button className="w-full px-6 py-3 border border-border text-foreground rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors font-semibold">
+                Get Started
+              </button>
+            </div>
+
+            {/* Standard Plan */}
+            <div className="bg-card border-2 border-primary rounded-xl p-8 shadow-sm relative">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
+                  Most Popular
                 </div>
               </div>
-              
-              {/* Mock Chart Area */}
-              <div className="h-64 bg-muted/50 rounded-lg flex items-center justify-center">
-                <div className="text-muted-foreground">
-                  Interactive Portfolio Performance Chart
-                </div>
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold text-card-foreground mb-2">Standard</h3>
+                <div className="text-4xl font-bold text-foreground mb-1">$9<span className="text-lg text-muted-foreground">/month</span></div>
+                <div className="text-muted-foreground">For serious investors</div>
               </div>
-              
-              {/* Mock Metrics Grid */}
-              <div className="grid md:grid-cols-4 gap-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-sm text-muted-foreground">Value at Risk</div>
-                  <div className="text-xl font-bold text-foreground">$45.2K</div>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-sm text-muted-foreground">Sharpe Ratio</div>
-                  <div className="text-xl font-bold text-foreground">1.47</div>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-sm text-muted-foreground">Max Drawdown</div>
-                  <div className="text-xl font-bold text-foreground">-8.4%</div>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-sm text-muted-foreground">Beta</div>
-                  <div className="text-xl font-bold text-foreground">0.92</div>
-                </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Everything in Basic
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Advanced risk analytics
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Factor exposure analysis
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Up to 10 portfolios
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Priority support
+                </li>
+              </ul>
+              <button className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold">
+                Start Free Trial
+              </button>
+            </div>
+
+            {/* Professional Plan */}
+            <div className="bg-card border border-border rounded-xl p-8 shadow-sm">
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold text-card-foreground mb-2">Professional</h3>
+                <div className="text-4xl font-bold text-foreground mb-1">$29<span className="text-lg text-muted-foreground">/month</span></div>
+                <div className="text-muted-foreground">For institutional needs</div>
               </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Everything in Standard
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Stress testing & scenarios
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Options & derivatives modeling
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Unlimited portfolios
+                </li>
+                <li className="flex items-center text-card-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                  Dedicated support
+                </li>
+              </ul>
+              <button className="w-full px-6 py-3 border border-border text-foreground rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors font-semibold">
+                Contact Sales
+              </button>
             </div>
           </div>
         </div>
